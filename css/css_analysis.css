@@ -1,0 +1,155 @@
+/* ==========================================================
+   CHANNEL ANALYSIS
+========================================================== */
+
+.analysis-screen{
+
+    min-height:calc(100vh - var(--navbar-height));
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    padding:4rem 1rem;
+
+}
+
+.analysis-card{
+
+    width:min(720px,100%);
+
+    background:var(--color-surface);
+
+    border:var(--border);
+
+    border-radius:var(--radius-lg);
+
+    padding:3rem;
+
+    text-align:center;
+
+    box-shadow:var(--shadow-card);
+
+}
+
+.analysis-icon{
+
+    font-size:3rem;
+
+    margin-bottom:1.5rem;
+
+    animation:pulse 2s infinite;
+
+}
+
+.analysis-title{
+
+    font-family:var(--font-display);
+
+    font-size:2rem;
+
+    margin-bottom:.8rem;
+
+}
+
+.analysis-description{
+
+    color:var(--color-text-muted);
+
+    margin:0 auto 2rem;
+
+    max-width:500px;
+
+}
+
+.analysis-progress{
+
+    width:100%;
+
+    height:12px;
+
+    border-radius:999px;
+
+    overflow:hidden;
+
+    background:var(--color-surface-light);
+
+}
+
+.analysis-progress-bar{
+
+    width:0%;
+
+    height:100%;
+
+    background:linear-gradient(
+        90deg,
+        var(--color-secondary),
+        var(--color-primary)
+    );
+
+    transition:width .4s ease;
+
+}
+
+.analysis-progress-text{
+
+    margin-top:.8rem;
+
+    font-family:var(--font-mono);
+
+    color:var(--color-primary);
+
+}
+
+.analysis-steps{
+
+    margin-top:2rem;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:1rem;
+
+    text-align:left;
+
+}
+
+.analysis-step{
+
+    padding:1rem;
+
+    border-radius:12px;
+
+    background:var(--color-background);
+
+    display:flex;
+
+    align-items:center;
+
+    gap:0.75rem;
+
+    font-size:0.95rem;
+
+}
+
+.analysis-step.done{
+
+    color:var(--color-success);
+
+    background:rgba(34,197,94,0.1);
+
+}
+
+.analysis-live{
+
+    margin-top:2rem;
+
+    color:var(--color-secondary);
+
+    font-family:var(--font-mono);
+
+}

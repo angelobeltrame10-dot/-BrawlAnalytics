@@ -1,0 +1,473 @@
+<!-- ==========================================================
+     BRAWL ANALYTICS
+     APPLICATION SCREEN
+========================================================== -->
+
+
+<div class="app-screen">
+
+
+
+    <!-- ==================================================
+         APP HEADER
+    =================================================== -->
+
+
+    <section class="app-header">
+
+
+        <div>
+
+
+            <h1 class="app-title">
+
+                Your Analytics Dashboard
+
+            </h1>
+
+
+            <p class="app-subtitle">
+
+                Understand what makes your Shorts perform.
+
+            </p>
+
+
+        </div>
+
+
+
+    </section>
+
+
+
+
+
+    <!-- ==================================================
+         APP TABS
+    =================================================== -->
+
+
+    <nav class="app-tabs">
+
+
+        <button class="app-tab active"
+                data-tab="overview">
+
+            Overview
+
+        </button>
+
+
+
+        <button class="app-tab"
+                data-tab="videos">
+
+            Videos analysis
+
+        </button>
+
+
+
+        <button class="app-tab"
+                data-tab="formats">
+
+            Formats
+
+        </button>
+
+
+
+        <button class="app-tab"
+                data-tab="ideas">
+
+            Ideas
+
+        </button>
+
+
+
+    </nav>
+
+
+
+
+    <section id="overview-section" class="dashboard-section">
+
+
+    <!-- ==================================================
+         UPLOAD CSV PANEL
+    =================================================== -->
+
+
+    <section class="panel" id="upload-panel">
+
+
+        <h2 class="panel-title">
+
+            Upload your YouTube Studio CSV
+
+        </h2>
+
+
+        <p class="panel-subtitle">
+
+            Your data stays in your browser.
+
+        </p>
+
+
+        <div class="upload-box"
+             id="csv-dropzone">
+
+
+            <div class="upload-icon">
+
+                ↑
+
+            </div>
+
+
+            <strong>
+
+                Drop your CSV file here
+
+            </strong>
+
+
+
+            <span class="dim">
+
+                or click to browse
+
+            </span>
+
+
+
+            <input 
+                id="csv-input"
+                type="file"
+                accept=".csv"
+                hidden
+            >
+
+
+        </div>
+
+
+        <div class="progress">
+
+            <div class="progress-bar"
+                 id="upload-progress">
+
+            </div>
+
+        </div>
+
+        <button 
+            id="upload-another-btn"
+            class="btn btn-outline"
+            style="width: 100%; margin-top: 1rem; display: none;">
+            📁 Upload another CSV
+        </button>
+
+    </section>
+
+
+
+
+    <!-- ==================================================
+         VIRALITY SCORE
+    =================================================== -->
+
+
+    <section class="panel">
+
+
+        <div class="score-hero">
+
+
+
+            <div class="score-value">
+
+                92
+
+            </div>
+
+
+
+
+            <div class="score-info">
+
+
+                <h2>
+
+                    Virality Score
+
+                </h2>
+
+
+                <p>
+
+                    Your channel performs above average.
+                    Your strongest signal is retention.
+
+                </p>
+
+
+
+                <span class="badge badge-success">
+
+                    Excellent
+
+                </span>
+
+
+
+            </div>
+
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- ==================================================
+         PERFORMANCE STATS
+    =================================================== -->
+
+
+    <section class="panel">
+
+
+        <h2 class="panel-title">
+
+            Channel Performance
+
+        </h2>
+
+
+
+        <div class="stat-grid">
+
+
+
+            <div class="stat-card">
+
+
+                <div class="stat-value total-views">
+
+                    1.4M
+
+                </div>
+
+
+                <div class="stat-label">
+
+                    Total views
+
+                </div>
+
+
+            </div>
+
+
+
+            <div class="stat-card">
+
+
+                <div class="stat-value average-retention">
+
+                    78%
+
+                </div>
+
+
+                <div class="stat-label">
+
+                    Average retention
+
+                </div>
+
+
+            </div>
+
+
+
+            <div class="stat-card">
+
+
+                <div class="stat-value video-count">
+
+                    24
+
+                </div>
+
+
+                <div class="stat-label">
+
+                    Shorts analyzed
+
+                </div>
+
+
+            </div>
+
+            <div class="stat-card">
+
+
+                <div class="stat-value avg-views-per-video">
+
+                    58.3K
+
+                </div>
+
+
+                <div class="stat-label">
+
+                    Avg views per video
+
+                </div>
+
+
+            </div>
+
+            <div class="stat-card">
+
+
+                <div class="stat-value best-video-views">
+
+                    245K
+
+                </div>
+
+
+                <div class="stat-label">
+
+                    Best performing video
+
+                </div>
+
+
+            </div>
+
+            <div class="stat-card">
+
+
+                <div class="stat-value growth-rate">
+
+                    +12.5%
+
+                </div>
+
+
+                <div class="stat-label">
+
+                    Growth rate
+
+                </div>
+
+
+            </div>
+
+
+
+        </div>
+
+
+    </section>
+
+
+
+
+    <!-- ==================================================
+         FORMATS ANALYSIS
+    =================================================== -->
+
+
+    <section class="panel">
+
+
+        <div class="panel-header">
+
+            <h2 class="panel-title">
+                Best Performing Formats
+            </h2>
+
+            <button
+                id="add-format-btn"
+                class="btn btn-primary btn-sm">
+
+                + Add Format
+
+            </button>
+
+        </div>
+
+        <div class="format-list" id="format-list">
+        </div>
+
+    </section>
+
+
+    </section>
+
+    <section id="formats-section" class="dashboard-section" hidden>
+        <section class="panel">
+            <h2 class="panel-title">Your Formats</h2>
+            
+            <div id="formats-container" class="formats-container">
+                <!-- Format cards will be rendered here -->
+            </div>
+
+            <button 
+                id="create-format-btn"
+                class="btn btn-outline"
+                style="width: 100%; margin-top: 1.5rem;">
+                ➕ Create new format
+            </button>
+        </section>
+    </section>
+
+    <section id="ideas-section" class="dashboard-section" hidden>
+        <section class="panel">
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); gap: var(--space-3); flex-wrap: wrap;">
+                <h2 class="panel-title" style="margin: 0;">Suggested Ideas</h2>
+                <button id="generate-ideas-btn" class="btn btn-primary" style="padding: var(--space-2) var(--space-4); font-size: 0.85rem;">
+                    Genera Nuove Idee
+                </button>
+            </div>
+            <div class="idea-list"></div>
+            <section id="ideas-blocked" class="ideas-blocked" hidden>
+                <div class="blocked-content">
+                    <div class="blocked-icon">🔒</div>
+                    <h3>Upload your CSV first</h3>
+                    <p>You need to upload your YouTube Studio CSV to generate AI-powered content ideas.</p>
+                </div>
+            </section>
+        </section>
+    </section>
+
+    <!-- Video analysis is unlocked after the channel CSV is loaded. -->
+    <section id="videos-section" class="dashboard-section" hidden>
+        <section id="video-analysis" class="video-analysis" hidden aria-live="polite">
+            <div class="va-intro">
+                <span class="va-eyebrow">Video intelligence</span>
+                <h2>Know a Short's potential before you publish.</h2>
+                <p>Upload a Brawl Stars Short to create a simulated report enriched by your channel CSV data.</p>
+            </div>
+            <div id="va-flow"></div>
+        </section>
+        <section id="video-analysis-blocked" class="video-analysis-blocked" hidden>
+            <div class="blocked-content">
+                <div class="blocked-icon">🔒</div>
+                <h3>Upload your CSV first</h3>
+                <p>You need to upload your YouTube Studio CSV to analyze individual videos.</p>
+            </div>
+        </section>
+    </section>
+</div>

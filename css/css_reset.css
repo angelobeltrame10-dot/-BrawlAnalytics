@@ -1,0 +1,210 @@
+/* ==========================================================
+   BRAWL ANALYTICS
+   RESET + BASE STYLES
+========================================================== */
+
+/* ---------- Box Model ---------- */
+
+*,
+*::before,
+*::after{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+
+/* ---------- HTML ---------- */
+
+html{
+
+    scroll-behavior:smooth;
+
+    -webkit-text-size-adjust:100%;
+
+}
+
+
+/* ---------- BODY ---------- */
+
+body{
+
+    min-height:100vh;
+
+    background:var(--color-background);
+
+    color:var(--color-text);
+
+    font-family:var(--font-body);
+
+    font-size:16px;
+
+    line-height:1.5;
+
+    -webkit-font-smoothing:antialiased;
+
+    text-rendering:optimizeLegibility;
+
+    overflow-x:hidden;
+
+}
+
+
+/* ---------- Media ---------- */
+
+img,
+picture,
+svg,
+video,
+canvas{
+
+    display:block;
+
+    max-width:100%;
+
+}
+
+
+/* ---------- Forms ---------- */
+
+input,
+button,
+textarea,
+select{
+
+    font:inherit;
+
+}
+
+
+/* ---------- Buttons ---------- */
+
+button{
+
+    background:none;
+
+    border:none;
+
+    cursor:pointer;
+
+}
+
+
+/* ---------- Links ---------- */
+
+a{
+
+    color:inherit;
+
+    text-decoration:none;
+
+}
+
+
+/* ---------- Lists ---------- */
+
+ul,
+ol{
+
+    list-style:none;
+
+}
+
+
+/* ---------- Tables ---------- */
+
+table{
+
+    border-collapse:collapse;
+
+    border-spacing:0;
+
+}
+
+
+/* ---------- Headings ---------- */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6{
+
+    font-weight:normal;
+
+    line-height:1.15;
+
+}
+
+
+/* ---------- Paragraph ---------- */
+
+p{
+
+    max-width:75ch;
+
+}
+
+
+/* ---------- Selection ---------- */
+
+::selection{
+
+    background:var(--color-primary);
+
+    color:var(--color-background);
+
+}
+
+
+/* ---------- Focus ---------- */
+
+:focus-visible{
+
+    outline:3px solid var(--color-secondary);
+
+    outline-offset:4px;
+
+}
+
+
+/* ---------- Disabled ---------- */
+
+:disabled{
+
+    cursor:not-allowed;
+
+}
+
+
+/* ---------- Hidden ---------- */
+
+[hidden]{
+
+    display:none !important;
+
+}
+
+
+/* ---------- Reduced Motion ---------- */
+
+@media (prefers-reduced-motion:reduce){
+
+    html{
+
+        scroll-behavior:auto;
+
+    }
+
+    *,
+    *::before,
+    *::after{
+
+        animation:none !important;
+
+        transition:none !important;
+
+    }
+
+}

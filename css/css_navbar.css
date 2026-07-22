@@ -1,0 +1,281 @@
+/* ==========================================================
+   BRAWL ANALYTICS
+   Global Navigation
+========================================================== */
+
+
+/* ==========================================================
+   NAVBAR
+========================================================== */
+
+.navbar{
+
+    position:sticky;
+
+    top:0;
+
+    z-index:var(--z-navbar);
+
+    width:100%;
+
+    height:var(--navbar-height);
+
+    background:rgba(21,11,46,.88);
+
+    backdrop-filter:blur(12px);
+
+    border-bottom:var(--border);
+
+}
+
+
+/* ==========================================================
+   INNER CONTAINER
+========================================================== */
+
+.navbar__inner{
+
+    width:min(100% - 2rem,var(--container));
+
+    height:100%;
+
+    margin-inline:auto;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    gap:var(--space-5);
+
+}
+
+
+/* ==========================================================
+   LOGO
+========================================================== */
+
+.logo{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:var(--space-3);
+
+    flex-shrink:0;
+
+}
+
+
+.logo__mark{
+
+    width:38px;
+
+    height:38px;
+
+    display:grid;
+
+    place-items:center;
+
+    background:var(--color-primary);
+
+    color:var(--color-background);
+
+    border-radius:var(--radius-sm);
+
+    font-family:var(--font-display);
+
+    font-size:1.3rem;
+
+    transform:rotate(-6deg);
+
+}
+
+
+.logo__text{
+
+    font-family:var(--font-display);
+
+    font-size:1.25rem;
+
+    letter-spacing:.02em;
+
+}
+
+
+.logo__text strong{
+
+    color:var(--color-primary);
+
+    font-weight:normal;
+
+}
+
+
+/* ==========================================================
+   NAVIGATION LINKS
+========================================================== */
+
+.navlinks{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:var(--space-5);
+
+}
+
+
+.navlinks a,
+
+.navlinks button{
+
+    color:var(--color-text-muted);
+
+    font-size:.9rem;
+
+    font-weight:700;
+
+    transition:color var(--transition-fast);
+
+}
+
+
+.navlinks a:hover,
+
+.navlinks button:hover{
+
+    color:var(--color-text);
+
+}
+
+
+/* ==========================================================
+   ACTIONS
+========================================================== */
+
+.navbar__actions{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:var(--space-3);
+
+}
+
+
+/* ==========================================================
+   APP MODE
+========================================================== */
+
+.navbar.app-mode .logo__mark{
+
+    transform:rotate(0);
+
+}
+
+
+.navbar.app-mode .navlinks a,
+
+.navbar.app-mode .navlinks button{
+
+    font-size:.85rem;
+
+}
+
+
+/* ==========================================================
+   MOBILE MENU BUTTON
+========================================================== */
+
+.menu-button{
+
+    display:none;
+
+    flex-direction:column;
+
+    gap:5px;
+
+    padding:8px;
+
+}
+
+
+.menu-button span{
+
+    width:22px;
+
+    height:2px;
+
+    display:block;
+
+    background:var(--color-text);
+
+    border-radius:10px;
+
+}
+
+
+/* ==========================================================
+   MOBILE
+========================================================== */
+
+@media(max-width:780px){
+
+    .navbar__inner{
+
+        gap:var(--space-3);
+
+    }
+
+    .navlinks{
+
+        display:none;
+
+        position:absolute;
+
+        top:var(--navbar-height);
+
+        left:0;
+
+        width:100%;
+
+        padding:var(--space-5);
+
+        flex-direction:column;
+
+        background:var(--color-surface);
+
+        border-bottom:var(--border);
+
+    }
+
+    .navlinks.open{
+
+        display:flex;
+
+    }
+
+    .menu-button{
+
+        display:flex;
+
+    }
+
+    .logo__text{
+
+        font-size:1rem;
+
+    }
+
+    .navbar__actions{
+
+        gap:var(--space-2);
+
+    }
+
+}

@@ -1,0 +1,245 @@
+/* ==========================================================
+   BRAWL ANALYTICS
+   Layout
+========================================================== */
+
+/* ==========================================================
+   PAGE
+========================================================== */
+
+body{
+    display:flex;
+    flex-direction:column;
+}
+
+main{
+    flex:1;
+}
+
+
+/* ==========================================================
+   CONTAINER
+========================================================== */
+
+.container{
+    width:min(100% - 2rem,var(--container));
+    margin-inline:auto;
+}
+
+
+/* ==========================================================
+   SECTIONS
+========================================================== */
+
+.section{
+    padding-block:var(--space-8);
+}
+
+.section-sm{
+    padding-block:var(--space-6);
+}
+
+.section-lg{
+    padding-block:6rem;
+}
+
+
+/* ==========================================================
+   SCREENS
+========================================================== */
+
+.screen{
+
+    min-height:calc(100vh - var(--navbar-height));
+
+    animation:fadeIn .35s ease;
+
+}
+
+.screen[hidden]{
+
+    display:none !important;
+
+}
+
+
+/* ==========================================================
+   GRID
+========================================================== */
+
+.grid{
+    display:grid;
+}
+
+.grid-2{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:var(--space-5);
+}
+
+.grid-3{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:var(--space-5);
+}
+
+.grid-auto{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:var(--space-5);
+}
+
+
+/* ==========================================================
+   FLEX
+========================================================== */
+
+.flex{
+    display:flex;
+}
+
+.flex-column{
+    display:flex;
+    flex-direction:column;
+}
+
+.center{
+    align-items:center;
+}
+
+.middle{
+    justify-content:center;
+}
+
+.between{
+    justify-content:space-between;
+}
+
+.around{
+    justify-content:space-around;
+}
+
+.end{
+    justify-content:flex-end;
+}
+
+.wrap{
+    flex-wrap:wrap;
+}
+
+
+/* ==========================================================
+   GAP
+========================================================== */
+
+.gap-1{gap:var(--space-1);}
+.gap-2{gap:var(--space-2);}
+.gap-3{gap:var(--space-3);}
+.gap-4{gap:var(--space-4);}
+.gap-5{gap:var(--space-5);}
+.gap-6{gap:var(--space-6);}
+
+
+/* ==========================================================
+   WIDTH
+========================================================== */
+
+.w-100{
+    width:100%;
+}
+
+.max-500{
+    max-width:500px;
+}
+
+.max-700{
+    max-width:700px;
+}
+
+.max-900{
+    max-width:900px;
+}
+
+
+/* ==========================================================
+   TEXT
+========================================================== */
+
+.text-center{
+    text-align:center;
+}
+
+.text-right{
+    text-align:right;
+}
+
+
+/* ==========================================================
+   MARGIN
+========================================================== */
+
+.mt-1{margin-top:var(--space-1);}
+.mt-2{margin-top:var(--space-2);}
+.mt-3{margin-top:var(--space-3);}
+.mt-4{margin-top:var(--space-4);}
+.mt-5{margin-top:var(--space-5);}
+.mt-6{margin-top:var(--space-6);}
+.mt-7{margin-top:var(--space-7);}
+
+.mb-1{margin-bottom:var(--space-1);}
+.mb-2{margin-bottom:var(--space-2);}
+.mb-3{margin-bottom:var(--space-3);}
+.mb-4{margin-bottom:var(--space-4);}
+.mb-5{margin-bottom:var(--space-5);}
+.mb-6{margin-bottom:var(--space-6);}
+.mb-7{margin-bottom:var(--space-7);}
+
+
+/* ==========================================================
+   PADDING
+========================================================== */
+
+.p-1{padding:var(--space-1);}
+.p-2{padding:var(--space-2);}
+.p-3{padding:var(--space-3);}
+.p-4{padding:var(--space-4);}
+.p-5{padding:var(--space-5);}
+.p-6{padding:var(--space-6);}
+
+
+/* ==========================================================
+   DISPLAY
+========================================================== */
+
+.hidden{
+    display:none !important;
+}
+
+.invisible{
+    visibility:hidden;
+}
+
+
+/* ==========================================================
+   ANIMATIONS
+========================================================== */
+
+@keyframes fadeIn{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(8px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:none;
+
+    }
+
+}
