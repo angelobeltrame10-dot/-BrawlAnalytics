@@ -4,6 +4,8 @@ import { analyzeVirality } from "./js_virality_engine.js";
 import { consumeVideoAnalysis } from "./js_subscription.js";
 
 let initialized = false;
+let cachedChannelProfile = null;
+let activeUploadTimer = null; 
 
 // Store user's answers for virality analysis
 let userAnswers = {
@@ -13,24 +15,13 @@ let userAnswers = {
     description: null
 };
 
-const baseQuestions = [
-    ["How original is your video?", ["Completely original", "Mostly original", "Mostly reused"]],
-    ["How original is the idea?", ["Completely original", "Inspired by another creator", "Copy of another creator"]],
-    ["Which format best describes this video?", null], // Dynamic formats loaded from Channel Profile
-    ["Write a short description of your video.", null]
-];
+async function getDynamicQuestions() {
+    if (!cachedChannelProfile) {
+        cachedChannelProfile = await loadChannelProfile();
+    }
+    const availableFormats = getAvailableFormats(cachedChannelProfile);
+    const formatOptions = availableFormats.length > 0 ? availableFormats : [];
 
-// Get dynamic questions with formats from Channel Profile
-function getDynamicQuestions() {
-    const channelProfile = loadChannelProfile();
-    const availableFormats = getAvailableFormats(channelProfile);
-    
-    // If we have formats from the channel, use them exclusively
-    // NO hardcoded fallback - if no formats detected, show empty list
-    const formatOptions = availableFormats.length > 0 
-        ? availableFormats 
-        : [];
-    
     return [
         baseQuestions[0],
         baseQuestions[1],
@@ -133,9 +124,7 @@ function renderUpload(flow){
 function startUpload(file, flow){
 
     if(!file){
-
         return;
-
     }
 
     document.getElementById("va-file-name").textContent = file.name;
@@ -144,7 +133,11 @@ function startUpload(file, flow){
 
     let value = 0;
 
-    const timer = setInterval(()=>{
+    if (activeUploadTimer) {
+        clearInterval(activeUploadTimer);
+    }
+
+    activeUploadTimer = setInterval(()=>{
 
         value = Math.min(100, value + 10 + Math.random() * 12);
         document.getElementById("va-upload-bar").style.width = `${value}%`;
@@ -152,7 +145,8 @@ function startUpload(file, flow){
 
         if(value >= 100){
 
-            clearInterval(timer);
+            clearInterval(activeUploadTimer);
+            activeUploadTimer = null;
 
             setTimeout(()=> renderWizard(flow, 0), 450);
 
@@ -162,9 +156,28 @@ function startUpload(file, flow){
 
 }
 
-function renderWizard(flow, index){
+function resetVideoAnalysisState(){
 
-    const questions = getDynamicQuestions();
+    if (activeUploadTimer) {
+        clearInterval(activeUploadTimer);
+        activeUploadTimer = null;
+    }
+
+    initialized = false;
+    cachedChannelProfile = null;
+
+    userAnswers = {
+        videoOriginality: null,
+        ideaOriginality: null,
+        format: null,
+        description: null
+    };
+
+}
+
+async function renderWizard(flow, index){
+
+    const questions = await getDynamicQuestions();
     const [title, options] = questions[index];
     const dots = questions.map((_, dotIndex)=> `<i class="${dotIndex <= index ? "active" : ""}"></i>`).join("");
     let choices = "";
@@ -182,40 +195,21 @@ function renderWizard(flow, index){
 
     }
 
-    flow.innerHTML = `
-        <div class="va-card va-wizard-card">
-            <div class="va-wizard-top"><span class="va-step">02 — CONTEXT · ${index + 1} OF 4</span><div class="va-dots">${dots}</div></div>
-            <div class="va-question"><h3>${title}</h3><p>Quick context lets the future scoring engine personalise this report.</p>${choices}</div>
-        </div>`;
-
     flow.querySelectorAll(".va-options button, .va-formats button").forEach(button=>{
-
         button.addEventListener("click", ()=>{
-
             button.classList.add("selected");
-            
-            // Store the user's answer
             const selectedText = button.textContent.trim().replace("→", "").trim();
-            if (index === 0) {
-                userAnswers.videoOriginality = selectedText;
-            } else if (index === 1) {
-                userAnswers.ideaOriginality = selectedText;
-            } else if (index === 2) {
-                userAnswers.format = selectedText;
-            }
-            
+            if (index === 0) userAnswers.videoOriginality = selectedText;
+            else if (index === 1) userAnswers.ideaOriginality = selectedText;
+            else if (index === 2) userAnswers.format = selectedText;
+
             setTimeout(()=> renderWizard(flow, index + 1), 260);
-
         });
-
     });
 
     document.getElementById("va-report")?.addEventListener("click", ()=> {
-        // Store description
         const descElement = document.getElementById("va-description");
-        if (descElement) {
-            userAnswers.description = descElement.value.trim();
-        }
+        if (descElement) userAnswers.description = descElement.value.trim();
         renderAnalysis(flow);
     });
 
@@ -356,6 +350,7 @@ function setupResultActions(flow){
 
 export {
 
-    initVideoAnalysis
+    initVideoAnalysis,
+    resetVideoAnalysisState
 
 };

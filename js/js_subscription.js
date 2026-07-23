@@ -153,21 +153,17 @@ async function consumeUsage(kind){
         const supabase = await getSupabaseClient();
 
         if(!supabase){
-
             console.error(`Subscription: client Supabase non disponibile (${kind}).`);
-            openUpgradeModal();
+            showMessage("Connection error. Please try again.");
             return false;
-
         }
 
         const { data, error } = await supabase.rpc("try_consume_usage", { p_kind: kind });
 
         if(error || !data || !data[0]){
-
             console.error(`Subscription: verifica utilizzo (${kind}) fallita.`, error);
-            openUpgradeModal();
+            showMessage("Unable to verify usage. Please try again.");
             return false;
-
         }
 
         const row = data[0];
@@ -185,11 +181,11 @@ async function consumeUsage(kind){
 
         refreshUsageIndicators();
 
+        // La modal Upgrade compare SOLO quando la RPC dice esplicitamente
+        // "non permesso" (quota a 0), MAI per un errore tecnico.
         if(!row.allowed){
-
             openUpgradeModal();
             return false;
-
         }
 
         return true;
@@ -198,7 +194,7 @@ async function consumeUsage(kind){
     catch(error){
 
         console.error(`Subscription: consumeUsage(${kind}) fallita.`, error);
-        openUpgradeModal();
+        showMessage("Connection error. Please try again.");
         return false;
 
     }

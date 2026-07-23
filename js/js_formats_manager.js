@@ -30,11 +30,11 @@ function getIconForFormat(formatName) {
     return '📹';
 }
 
-function renderFormatCards() {
+async function renderFormatCards() {
     const container = document.getElementById('formats-container');
     if (!container) return;
 
-    const formats = loadCustomFormats();
+    const formats = await loadCustomFormats();
     const videos = getDashboardData();
     
     // Get video counts for each format
@@ -113,25 +113,21 @@ function handleFormatAction(event) {
     const action = event.target.dataset.action;
     const card = event.target.closest('.format-card');
     const formatIndex = parseInt(card.dataset.formatIndex);
-    
-    if (action === 'delete') {
-        deleteFormat(formatIndex);
-    } else if (action === 'rename') {
-        renameFormat(formatIndex);
-    } else if (action === 'view') {
-        viewFormat(formatIndex);
-    }
+
+    if (action === 'delete') deleteFormat(formatIndex);
+    else if (action === 'rename') renameFormat(formatIndex);
+    else if (action === 'view') viewFormat(formatIndex);
 }
 
-function deleteFormat(index) {
-    const formats = loadCustomFormats();
+async function deleteFormat(index) {
+    const formats = await loadCustomFormats();
     formats.splice(index, 1);
-    saveCustomFormats(formats);
-    renderFormatCards();
+    await saveCustomFormats(formats);
+    await renderFormatCards();
 }
 
 async function renameFormat(index) {
-    const formats = loadCustomFormats();
+    const formats = await loadCustomFormats();
     const format = formats[index];
     
     const newName = prompt('Enter new name:', format.name);
@@ -149,16 +145,14 @@ async function renameFormat(index) {
         .filter(video => video.format === format.name)
         .map(video => getVideoTitle(video))
         .filter(Boolean);
-    
-    // Update format preserving video associations
+
     formats[index] = {
         ...format,
         name: newName.trim(),
         description: newDescription?.trim() || format.description,
         associatedVideos: format.associatedVideos || []
     };
-    
-    // Regenerate keywords with AI, grounded on real matching titles when available
+
     try {
         const channelTitles = videos.map(video => getVideoTitle(video)).filter(Boolean);
         const keywords = await generateKeywordsForFormat(newName.trim(), newDescription?.trim() || '', memberTitles, channelTitles);
@@ -166,9 +160,9 @@ async function renameFormat(index) {
     } catch (error) {
         console.error('Error regenerating keywords:', error);
     }
-    
-    saveCustomFormats(formats);
-    renderFormatCards();
+
+    await saveCustomFormats(formats);
+    await renderFormatCards();
 }
 
 function showModal() {
@@ -254,19 +248,18 @@ function getEffectiveAssociatedVideos(format, formats, allVideos) {
 
 }
 
-function viewFormat(index, options = {}) {
-    const formats = loadCustomFormats();
+async function viewFormat(index, options = {}) {
+    const formats = await loadCustomFormats();
     const allVideos = getDashboardData();
-    
-    // Migrate any old IDs to titles before processing
+
     const needsMigration = migrateVideoIdsToTitles(formats, allVideos);
     if (needsMigration) {
-        saveCustomFormats(formats);
+        await saveCustomFormats(formats);
     }
-    
+
     const format = formats[index];
     const associatedVideos = getEffectiveAssociatedVideos(format, formats, allVideos);
-    
+
     createFormatDetailModal(format, associatedVideos, allVideos, index, options.searchQuery || "");
     showFormatDetailModal();
 }
@@ -407,27 +400,19 @@ async function handleCreateFormat(selectedVideos) {
     nameInput.style.borderColor = '';
     createBtn.disabled = true;
     createBtn.textContent = 'Creating...';
-    
+
     try {
-        // Generate keywords with AI using selected videos as context.
-        // Le keyword restano usate internamente dal classificatore ma
-        // non vengono più mostrate all'utente nell'interfaccia.
         const keywords = await generateKeywordsForFormat(name, description, selected);
-        
-        const newFormat = {
-            name,
-            description,
-            keywords,
-            associatedVideos: selected
-        };
-        
-        const formats = loadCustomFormats();
+
+        const newFormat = { name, description, keywords, associatedVideos: selected };
+
+        const formats = await loadCustomFormats();
         formats.push(newFormat);
-        saveCustomFormats(formats);
-        
+        await saveCustomFormats(formats);
+
         hideModal();
-        renderFormatCards();
-        
+        await renderFormatCards();
+
     } catch (error) {
         console.error('Error creating format:', error);
         alert('Failed to create format. Please try again.');
@@ -555,10 +540,10 @@ function createFormatDetailModal(format, associatedVideos, allVideos, formatInde
     }
 
     overlay.querySelectorAll('.video-picker-row').forEach(row => {
-        row.addEventListener('click', () => {
-            const title = row.dataset.videoTitle;
-            const currentSearch = document.getElementById('video-picker-search')?.value || '';
-            toggleAssociatedVideo(formatIndex, title, currentSearch);
+    row.addEventListener('click', async () => {
+        const title = row.dataset.videoTitle;
+        const currentSearch = document.getElementById('video-picker-search')?.value || '';
+        await toggleAssociatedVideo(formatIndex, title, currentSearch);
         });
     });
 
@@ -585,8 +570,8 @@ function showFormatDetailModal() {
  * auto-classificato faceva sparire tutti gli altri video già rilevati
  * via keyword.
  */
-function toggleAssociatedVideo(formatIndex, videoTitle, searchQuery) {
-    const formats = loadCustomFormats();
+async function toggleAssociatedVideo(formatIndex, videoTitle, searchQuery) {
+    const formats = await loadCustomFormats();
     const format = formats[formatIndex];
     const allVideos = getDashboardData();
 
@@ -597,11 +582,10 @@ function toggleAssociatedVideo(formatIndex, videoTitle, searchQuery) {
         ? effectiveVideos.filter(title => title !== videoTitle)
         : [...effectiveVideos, videoTitle];
 
-    saveCustomFormats(formats);
+    await saveCustomFormats(formats);
 
-    // Refresh the modal, preservando il testo di ricerca corrente
-    viewFormat(formatIndex, { searchQuery });
-    renderFormatCards();
+    await viewFormat(formatIndex, { searchQuery });
+    await renderFormatCards();
 }
 
 export { initFormatsManager, renderFormatCards };

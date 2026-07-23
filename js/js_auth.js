@@ -20,6 +20,8 @@
 
 import { getSupabaseClient } from "./js_supabase_client.js";
 
+import { resetStorageCache } from "./js_storage.js";
+
 let currentUser = null;
 let currentSession = null;
 let authInitialized = false;
@@ -262,6 +264,7 @@ async function logout(){
 
         currentUser = null;
         currentSession = null;
+        resetStorageCache();
 
         updateAuthUI();
 

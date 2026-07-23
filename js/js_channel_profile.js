@@ -15,12 +15,12 @@ import { loadCustomFormats } from "./js_storage.js";
  * Builds a Channel Profile from video data and custom formats.
  * This profile represents the historical behavior of the channel.
  */
-export function buildChannelProfile(videos, customFormats = []) {
+export async function buildChannelProfile(videos, customFormats = []) {
     if (!Array.isArray(videos) || videos.length === 0) {
         return createEmptyProfile();
     }
 
-    const formats = customFormats.length > 0 ? customFormats : loadCustomFormats();
+    const formats = customFormats.length > 0 ? customFormats : await loadCustomFormats();
     const classifiedVideos = classifyVideos(videos, formats);
     const formatRanking = getFormatRanking(classifiedVideos, formats);
 

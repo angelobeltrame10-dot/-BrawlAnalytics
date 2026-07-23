@@ -82,9 +82,11 @@ import {
     saveCustomFormats,
     loadCustomFormats,
     saveChannelProfile,
-    loadChannelProfile
+    loadChannelProfile,
+    saveGeneratedIdeas,
+    loadGeneratedIdeas
 
-}
+} 
 from "./js_storage.js";
 
 import { getVideoTitle, getVideoViews, getVideoRetention } from "./js_csv_fields.js";
@@ -110,7 +112,7 @@ let ideaGenerationInitialized = false;
 
 let activeTab = "overview";
 
-let customFormats = [...loadCustomFormats()];
+let customFormats = [];
 
 // ID YouTube: sempre esattamente 11 caratteri alfanumerici (+ "-"/"_").
 // Se getVideoTitle() restituisce sistematicamente qualcosa che rispetta
@@ -119,27 +121,25 @@ let customFormats = [...loadCustomFormats()];
 // anche una colonna "Titolo" separata con il testo leggibile.
 const YOUTUBE_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 
-function cleanupVideoAssociations(currentVideos) {
-    const formats = loadCustomFormats();
+async function cleanupVideoAssociations(currentVideos) {
+    const formats = await loadCustomFormats();
     const currentVideoTitles = new Set(currentVideos.map(v => getVideoTitle(v)));
-    
+
     let hasChanges = false;
-    
+
     formats.forEach(format => {
         if (Array.isArray(format.associatedVideos) && format.associatedVideos.length > 0) {
             const originalCount = format.associatedVideos.length;
-            // Keep only videos that still exist in the current dataset
             format.associatedVideos = format.associatedVideos.filter(title => currentVideoTitles.has(title));
-            
+
             if (format.associatedVideos.length !== originalCount) {
                 hasChanges = true;
-                console.log(`Cleaned up ${originalCount - format.associatedVideos.length} removed videos from format "${format.name}"`);
             }
         }
     });
-    
+
     if (hasChanges) {
-        saveCustomFormats(formats);
+        await saveCustomFormats(formats);
         customFormats = formats;
     }
 }
@@ -160,42 +160,25 @@ let isUploadingCSV = false;
 */
 
 
-function initDashboard(){
+async function initDashboard(){
 
     setupUpload();
-
     setupTabs();
-
     setupCustomFormats();
-
     setupIdeaGeneration();
-
     initFormatsManager();
 
-    /*
-        Piano utente + utilizzi odierni: una sola volta
-        all'avvio, poi tutto resta in cache nel modulo.
-    */
     initSubscription();
 
-    /*
-        Recupera dati salvati
-    */
+    customFormats = await loadCustomFormats();
 
-    const savedData =
-    loadDashboardData();
+    const savedData = await loadDashboardData();
 
-    if(
-    Array.isArray(savedData) &&
-    savedData.length > 0
-    ){
+    // Sempre sovrascritto: [] per un utente nuovo senza CSV,
+    // i suoi dati reali altrimenti. MAI i dati del vecchio utente.
+    dashboardData = Array.isArray(savedData) ? savedData : [];
 
-        dashboardData =
-        savedData;
-
-        refreshDashboard();
-
-    }
+    await refreshDashboard();
 
 }
 
@@ -429,79 +412,96 @@ function renderFormatRows(){
 }
 
 
-async function renderIdeaCards() {
+function renderIdeaHtml(ideas, topFormat) {
+
+    if (!ideas || ideas.length === 0) {
+        return `<div class="p-4 text-center">No ideas yet — click "Generate New Ideas" to create some.</div>`;
+    }
+
+    return ideas.map((idea, index) => `
+        <article class="idea-card fade-up" style="animation-delay: ${index * 0.1}s">
+            <div class="idea-header">
+                <span class="idea-tag">${topFormat || "Format"}</span>
+                <span class="idea-score">${90 - index * 3}</span>
+            </div>
+            <div class="idea-body">
+                ${idea}
+            </div>
+        </article>
+    `).join("");
+
+}
+
+// Chiamata da refreshDashboard()/tab switch: legge SOLO la cache
+// (Supabase), MAI l'AI. Risolve il bug del consumo ad ogni refresh/tab.
+async function renderIdeasFromCache() {
+
     const ideaLists = document.querySelectorAll(".idea-list");
     if (!ideaLists.length) return;
 
-    // Svuotiamo la lista e mostriamo uno stato di caricamento temporaneo
+    const cached = await loadGeneratedIdeas();
+
+    const html = cached && cached.ideas.length > 0
+        ? renderIdeaHtml(cached.ideas, cached.topFormat)
+        : renderIdeaHtml([], null);
+
+    ideaLists.forEach(list => { list.innerHTML = html; });
+
+}
+
+// Chiamata SOLO dal click su "Generate New Ideas" (dopo consumeIdeaGeneration).
+async function generateIdeasWithAI() {
+
+    const ideaLists = document.querySelectorAll(".idea-list");
+    if (!ideaLists.length) return;
+
     const loadingHtml = `<div class="p-4 text-center">Generazione idee personalizzate con l'AI in corso...</div>`;
     ideaLists.forEach(list => { list.innerHTML = loadingHtml; });
 
     const videos = getDashboardData();
     const classified = classifyVideos(videos, customFormats);
     const topFormat = getTopFormat(classified, customFormats) || "Gameplay";
-    
-    // Prendiamo i 5 migliori video per dare contesto all'AI
+
     const topVideos = videos
         .slice()
         .sort((a, b) => getVideoViews(b) - getVideoViews(a))
         .slice(0, 5);
 
-    // Chiamata all'API del Cloudflare Worker
     let ideeGenerate = [];
     if (videos.length > 0) {
         ideeGenerate = await generaIdeeConAI(topVideos, topFormat);
     }
 
-    let resultHtml;
-
-    // Se l'AI ha restituito delle idee con successo, le usiamo!
     if (ideeGenerate && ideeGenerate.length > 0) {
-        resultHtml = ideeGenerate.map((idea, index) => `
-            <article class="idea-card fade-up" style="animation-delay: ${index * 0.1}s">
-                <div class="idea-header">
-                    <span class="idea-tag">${topFormat} Format</span>
-                    <span class="idea-score">${90 - index * 3}</span>
-                </div>
-                <div class="idea-body">
-                    ${idea}
-                </div>
-            </article>
-        `).join("");
+
+        await saveGeneratedIdeas(ideeGenerate, topFormat);
+        ideaLists.forEach(list => { list.innerHTML = renderIdeaHtml(ideeGenerate, topFormat); });
+
     } else {
-        // FALLBACK: Se l'AI è disattivata o la chiamata fallisce, mostriamo le idee statiche standard
-        resultHtml = `
-            <article class="idea-card">
-                <div class="idea-header">
-                    <span class="idea-tag">Trickshot</span>
-                    <span class="idea-score">94</span>
-                </div>
-                <div class="idea-body">
-                    Try a double wall-bounce trickshot using Rico on the new Brawl Ball map.
-                </div>
-            </article>
-            <article class="idea-card">
-                <div class="idea-header">
-                    <span class="idea-tag">Challenge</span>
-                    <span class="idea-score">89</span>
-                </div>
-                <div class="idea-body">
-                    Can you win a Solo Showdown match without picking up a single Power Cube?
-                </div>
-            </article>
-            <article class="idea-card">
-                <div class="idea-header">
-                    <span class="idea-tag">FunnyMoment</span>
-                    <span class="idea-score">88</span>
-                </div>
-                <div class="idea-body">
-                    Compile 3 clips where players accidentally super into the poison gas.
-                </div>
-            </article>
-        `;
+
+        // Fallback statico: NON salvato come "idee del giorno" (non è
+        // un vero risultato AI), quindi il prossimo refresh non lo
+        // riproporrà come cache.
+        const fallback = [
+            ["Trickshot", "Try a double wall-bounce trickshot using Rico on the new Brawl Ball map."],
+            ["Challenge", "Can you win a Solo Showdown match without picking up a single Power Cube?"],
+            ["FunnyMoment", "Compile 3 clips where players accidentally super into the poison gas."]
+        ];
+
+        ideaLists.forEach(list => {
+            list.innerHTML = fallback.map(([tag, body], index) => `
+                <article class="idea-card">
+                    <div class="idea-header">
+                        <span class="idea-tag">${tag}</span>
+                        <span class="idea-score">${94 - index * 3}</span>
+                    </div>
+                    <div class="idea-body">${body}</div>
+                </article>
+            `).join("");
+        });
+
     }
 
-    ideaLists.forEach(list => { list.innerHTML = resultHtml; });
 }
 
 
@@ -705,9 +705,7 @@ async function handleCSVUpload(file){
         */
 
 
-        saveDashboardData(
-            dashboardData
-        );
+        await saveDashboardData(dashboardData);
 
         /*
             Show analysis screen with AI format detection
@@ -722,21 +720,10 @@ async function handleCSVUpload(file){
             la dashboard continuerebbe a mostrare/contare i video con
             i formati vecchi, ignorando quelli appena rilevati.
         */
-        customFormats = loadCustomFormats();
-
-        /*
-            Pulisci le associazioni video nei formati che non esistono più
-            nel nuovo CSV. Questo rimuove automaticamente i video che
-            sono stati eliminati dal dataset mantenendo le associazioni
-            valide.
-        */
-        cleanupVideoAssociations(dashboardData);
-
-        /*
-            Build and save Channel Profile for Virality Engine
-        */
-        const channelProfile = buildChannelProfile(dashboardData, customFormats);
-        saveChannelProfile(channelProfile);
+        customFormats = await loadCustomFormats();
+        await cleanupVideoAssociations(dashboardData);
+        const channelProfile = await buildChannelProfile(dashboardData, customFormats);
+        await saveChannelProfile(channelProfile);
 
         /*
             Aggiorna interfaccia dopo analysis
@@ -822,14 +809,13 @@ function setupCustomFormats(){
 
         formatList.querySelectorAll("[data-remove-format]").forEach(button => {
 
-            button.addEventListener("click", () => {
+            button.addEventListener("click", async () => {
 
                 const index = Number(button.getAttribute("data-remove-format"));
                 customFormats.splice(index, 1);
-                saveCustomFormats(customFormats);
+                await saveCustomFormats(customFormats);
                 renderCustomFormats();
-                refreshDashboard();
-
+                await refreshDashboard();
             });
 
         });
@@ -838,40 +824,33 @@ function setupCustomFormats(){
 
     renderCustomFormats();
 
-    formatInput.addEventListener("keydown", event => {
+    formatInput.addEventListener("keydown", async event => {
 
-        if(event.key === "Enter"){
+    if(event.key === "Enter"){
 
-            event.preventDefault();
+        event.preventDefault();
 
-            const value = formatInput.value.trim();
-            if(!value){
+        const value = formatInput.value.trim();
+        if(!value) return;
 
-                return;
+        const parts = value.split(":");
+        const name = parts[0].trim();
+        const keywords = (parts[1] || "").split(",").map(item => item.trim()).filter(Boolean);
 
-            }
-
-            const parts = value.split(":");
-            const name = parts[0].trim();
-            const keywords = (parts[1] || "").split(",").map(item => item.trim()).filter(Boolean);
-
-            if(!name || keywords.length === 0){
-
-                showMessage("Use Name:keyword1,keyword2");
-
-                return;
-
-            }
-
-            customFormats.push({ name, keywords });
-            saveCustomFormats(customFormats);
-            formatInput.value = "";
-            renderCustomFormats();
-            refreshDashboard();
-
+        if(!name || keywords.length === 0){
+            showMessage("Use Name:keyword1,keyword2");
+            return;
         }
 
-    });
+        customFormats.push({ name, keywords });
+        await saveCustomFormats(customFormats);
+        formatInput.value = "";
+        renderCustomFormats();
+        await refreshDashboard();
+
+    }
+
+});
 
 }
 
@@ -901,36 +880,26 @@ function setupIdeaGeneration(){
 
     button.addEventListener("click", async ()=>{
 
-        if(dashboardData.length === 0){
+    if(dashboardData.length === 0){
+        showMessage("Upload a CSV first");
+        return;
+    }
 
-            showMessage("Upload a CSV first");
-            return;
+    const allowed = await consumeIdeaGeneration();
 
-        }
+    if(!allowed){
+        return;
+    }
 
-        /*
-            Verifica E consuma l'utilizzo in un'unica chiamata
-            atomica su Supabase. Se il piano Free ha già usato le
-            3 generazioni odierne, non parte NESSUNA chiamata AI:
-            consumeIdeaGeneration() apre da sola la Upgrade Modal.
-        */
-        const allowed = await consumeIdeaGeneration();
+    button.disabled = true;
 
-        if(!allowed){
+    await generateIdeasWithAI();
 
-            return;
+    button.disabled = false;
 
-        }
+    showMessage("Ideas updated");
 
-        button.disabled = true;
-
-        await renderIdeaCards();
-
-        button.disabled = false;
-
-        showMessage("Ideas updated");
-
-    });
+});
 
 }
 
@@ -941,7 +910,7 @@ async function refreshDashboard(){
     // da un'altra vista), la dashboard riparte sempre dalla versione
     // più recente invece che da una copia in memoria potenzialmente
     // obsoleta.
-    customFormats = loadCustomFormats();
+    customFormats = await loadCustomFormats();
 
     const count = getVideoCount(dashboardData);
     updateVideoCount(count);
@@ -1027,7 +996,7 @@ async function refreshDashboard(){
     }
 
     renderFormatRows();
-    await renderIdeaCards();
+    await renderIdeasFromCache();
     setActiveTab(activeTab);
 
     if (dashboardData.length > 0) {

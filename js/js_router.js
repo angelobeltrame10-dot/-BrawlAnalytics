@@ -164,7 +164,7 @@ export async function showApp() {
 
     }
 
-    initDashboard();
+    await initDashboard();
 
 }
 

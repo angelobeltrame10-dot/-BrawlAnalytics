@@ -190,7 +190,7 @@ export async function simulateChannelAnalysis(videoData = []){
 
     // Save formats to storage (merge con quelli già esistenti, senza duplicati)
     if (formatsWithKeywords.length > 0) {
-        const existingFormats = loadCustomFormats();
+        const existingFormats = await loadCustomFormats();
         const mergedFormats = [...existingFormats];
 
         for (const newFormat of formatsWithKeywords) {
@@ -200,7 +200,7 @@ export async function simulateChannelAnalysis(videoData = []){
             }
         }
 
-        saveCustomFormats(mergedFormats);
+        await saveCustomFormats(mergedFormats);
     }
 
     await new Promise(resolve => setTimeout(resolve, 1200));

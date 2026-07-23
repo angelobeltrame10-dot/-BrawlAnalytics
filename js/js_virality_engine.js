@@ -25,7 +25,7 @@ import { generateStrengths, generateWeaknesses, generateCriticalIssues, generate
 
 export async function analyzeVirality(proposal, trendsAnalysis = null) {
     // Load Channel Profile
-    const channelProfile = loadChannelProfile();
+    const channelProfile = await loadChannelProfile();
     
     if (!channelProfile) {
         return {
@@ -125,8 +125,9 @@ export async function analyzeVirality(proposal, trendsAnalysis = null) {
  * Simplified analysis for quick predictions (without AI).
  * Uses only statistical features, no LLM analysis.
  */
-export function analyzeViralityQuick(proposal) {
-    const channelProfile = loadChannelProfile();
+export async function analyzeViralityQuick(proposal) {
+
+    const channelProfile = await loadChannelProfile();
     
     if (!channelProfile) {
         return {

@@ -30,6 +30,8 @@ import {
 }
 from "./js_auth.js";
 
+import { resetVideoAnalysisState } from "./js_video_analysis.js";
+
 function initNavigation(){
 
     const navbar =
@@ -166,6 +168,7 @@ function initNavigation(){
         "brawl:login-success",
         ()=>{
 
+            resetVideoAnalysisState();
             showApp();
             switchToAppMode();
 
@@ -176,6 +179,7 @@ function initNavigation(){
         "brawl:logout",
         ()=>{
 
+            resetVideoAnalysisState();
             showLanding();
             switchToHomeMode();
 
