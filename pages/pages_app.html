@@ -397,15 +397,6 @@
             <h2 class="panel-title">
                 Best Performing Formats
             </h2>
-
-            <button
-                id="add-format-btn"
-                class="btn btn-primary btn-sm">
-
-                + Add Format
-
-            </button>
-
         </div>
 
         <div class="format-list" id="format-list">
@@ -436,9 +427,12 @@
     <section id="ideas-section" class="dashboard-section" hidden>
         <section class="panel">
             <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); gap: var(--space-3); flex-wrap: wrap;">
-                <h2 class="panel-title" style="margin: 0;">Suggested Ideas</h2>
+                <div style="display:flex;align-items:center;gap:var(--space-2);">
+                    <h2 class="panel-title" style="margin: 0;">Suggested Ideas</h2>
+                    <span class="usage-badge" id="idea-usage-badge">⚡ 3</span>
+                </div>
                 <button id="generate-ideas-btn" class="btn btn-primary" style="padding: var(--space-2) var(--space-4); font-size: 0.85rem;">
-                    Genera Nuove Idee
+                    Generate New Ideas
                 </button>
             </div>
             <div class="idea-list"></div>
@@ -457,7 +451,7 @@
         <section id="video-analysis" class="video-analysis" hidden aria-live="polite">
             <div class="va-intro">
                 <span class="va-eyebrow">Video intelligence</span>
-                <h2>Know a Short's potential before you publish.</h2>
+                <h2>Know a Short's potential before you publish. <span class="usage-badge" id="video-usage-badge">⚡ 1</span></h2>
                 <p>Upload a Brawl Stars Short to create a simulated report enriched by your channel CSV data.</p>
             </div>
             <div id="va-flow"></div>

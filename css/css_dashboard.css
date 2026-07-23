@@ -926,16 +926,90 @@
 
 }
 
-.format-name{
+/* ==========================================================
+   BRAWL ANALYTICS
+   Buttons (Arcade/SaaS Style per sfondo Blu)
+========================================================== */
 
-    font-size:1.08rem;
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 0.75rem 1.4rem;
+    border-radius: var(--radius-round);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
 
-    font-weight:700;
+.btn:hover {
+    transform: translateY(-2px) scale(1.02);
+}
 
-    color:#dcdcdc;
+.btn:active {
+    transform: translateY(1px) scale(0.98);
+}
 
-    letter-spacing:-0.02em;
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
 
+/* --- PRIMARY (Giallo Brawl) --- */
+.btn-primary {
+    background: linear-gradient(180deg, var(--color-primary-hover) 0%, var(--color-primary) 100%);
+    color: #120A24; /* Scuro profondo per far risaltare il testo sul giallo */
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-weight: 800;
+}
+
+.btn-primary:hover {
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 6px 18px rgba(255, 201, 60, 0.35);
+}
+
+/* --- SECONDARY (Cyan) --- */
+.btn-secondary {
+    background: linear-gradient(180deg, #62e5ff 0%, var(--color-secondary) 100%);
+    color: #0A1224;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-weight: 800;
+}
+
+.btn-secondary:hover {
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 6px 18px rgba(61, 220, 255, 0.35);
+}
+
+/* --- OUTLINE --- */
+.btn-outline {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    backdrop-filter: blur(8px);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.btn-outline:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: var(--color-primary);
+}
+
+/* --- SIZES --- */
+.btn-sm {
+    padding: 0.45rem 1rem;
+    font-size: 0.8rem;
+}
+
+.btn-lg {
+    padding: 0.9rem 2rem;
+    font-size: 1.05rem;
 }
 
 .format-stats{

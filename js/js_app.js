@@ -4,7 +4,8 @@
 
    Responsabilità:
    - Avvio applicazione
-   - Inizializzazione moduli principali
+   - Inizializzazione moduli principali (navbar + auth)
+   - Scelta schermata iniziale in base alla sessione Supabase
 
    NON contiene:
    - Dashboard logic
@@ -17,7 +18,8 @@
 
 import {
 
-    initNavigation
+    initNavigation,
+    switchToAppMode
 
 }
 from "./js_navigation.js";
@@ -26,20 +28,30 @@ from "./js_navigation.js";
 
 import {
 
-    showLanding
+    showLanding,
+    showApp
 
 }
 from "./js_router.js";
 
 
 
+import {
+
+    initializeAuth,
+    isLoggedIn
+
+}
+from "./js_auth.js";
+
+
+
 
 /*
     Avvio applicazione
-
 */
 
-function startApp(){
+async function startApp(){
 
 
 
@@ -53,14 +65,34 @@ function startApp(){
 
 
 
-
-
     /*
-        Mostra schermata iniziale
+        Recupera/ripristina la sessione Supabase (se l'utente era
+        già loggato in una visita precedente, getSession() la
+        trova subito: è questo che rende il login persistente).
     */
 
 
-    showLanding();
+    await initializeAuth();
+
+
+
+
+    /*
+        Mostra la schermata iniziale corretta
+    */
+
+    if(isLoggedIn()){
+
+        showApp();
+
+        switchToAppMode();
+
+    }
+    else{
+
+        showLanding();
+
+    }
 
 
 

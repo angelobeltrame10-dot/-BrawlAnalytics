@@ -1,6 +1,7 @@
 import { loadChannelProfile } from "./js_storage.js";
 import { getAvailableFormats } from "./js_channel_profile.js";
 import { analyzeVirality } from "./js_virality_engine.js";
+import { consumeVideoAnalysis } from "./js_subscription.js";
 
 let initialized = false;
 

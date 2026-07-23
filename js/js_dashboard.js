@@ -31,6 +31,8 @@ import { showAnalysis } from "./js_router.js";
 
 import { initFormatsManager, renderFormatCards } from "./js_formats_manager.js";
 
+import { initSubscription, consumeIdeaGeneration } from "./js_subscription.js";
+
 import {
 
     calculateViralityScore,
@@ -169,6 +171,12 @@ function initDashboard(){
     setupIdeaGeneration();
 
     initFormatsManager();
+
+    /*
+        Piano utente + utilizzi odierni: una sola volta
+        all'avvio, poi tutto resta in cache nel modulo.
+    */
+    initSubscription();
 
     /*
         Recupera dati salvati
@@ -896,6 +904,20 @@ function setupIdeaGeneration(){
         if(dashboardData.length === 0){
 
             showMessage("Upload a CSV first");
+            return;
+
+        }
+
+        /*
+            Verifica E consuma l'utilizzo in un'unica chiamata
+            atomica su Supabase. Se il piano Free ha già usato le
+            3 generazioni odierne, non parte NESSUNA chiamata AI:
+            consumeIdeaGeneration() apre da sola la Upgrade Modal.
+        */
+        const allowed = await consumeIdeaGeneration();
+
+        if(!allowed){
+
             return;
 
         }

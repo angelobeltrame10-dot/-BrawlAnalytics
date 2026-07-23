@@ -7,6 +7,11 @@
    - Cambio link visibili
    - Collegamento Home/App
 
+   Login/Signup/Logout non sono più gestiti qui: il click sui
+   bottoni (#nav-login, #nav-signup, #nav-logout) e lo stato
+   Avatar/Email sono interamente responsabilità di js_auth.js.
+   Qui reagiamo solo al RISULTATO (eventi "brawl:login-success"
+   e "brawl:logout") per decidere quale schermata mostrare.
 ========================================================== */
 
 import {
@@ -16,6 +21,14 @@ import {
 
 }
 from "./js_router.js";
+
+import {
+
+    openAuthModal,
+    isLoggedIn
+
+}
+from "./js_auth.js";
 
 function initNavigation(){
 
@@ -85,6 +98,18 @@ function initNavigation(){
                 Sign up
             </button>
 
+            <div class="user-menu hidden" id="nav-user-menu">
+
+                <span class="user-avatar" id="nav-user-avatar">U</span>
+
+                <span class="user-email" id="nav-user-email"></span>
+
+                <button class="btn btn-outline btn-sm" id="nav-logout">
+                    Logout
+                </button>
+
+            </div>
+
         </div>
 
     </div>
@@ -96,47 +121,9 @@ function initNavigation(){
         "nav-logo"
     );
 
-    const login =
-    document.getElementById(
-        "nav-login"
-    );
-
-    const signup =
-    document.getElementById(
-        "nav-signup"
-    );
-
     const home =
     document.getElementById(
         "nav-home"
-    );
-
-    login?.addEventListener(
-
-        "click",
-
-        ()=>{
-
-            showApp();
-
-            switchToAppMode();
-
-        }
-
-    );
-
-    signup?.addEventListener(
-
-        "click",
-
-        ()=>{
-
-            showApp();
-
-            switchToAppMode();
-
-        }
-
     );
 
     home?.addEventListener(
@@ -169,6 +156,38 @@ function initNavigation(){
 
     );
 
+    /*
+        Risultato dell'autenticazione (dispatchati da js_auth.js):
+        entra in dashboard dopo login/signup riuscito, torna alla
+        landing dopo logout.
+    */
+
+    window.addEventListener(
+        "brawl:login-success",
+        ()=>{
+
+            showApp();
+            switchToAppMode();
+
+        }
+    );
+
+    window.addEventListener(
+        "brawl:logout",
+        ()=>{
+
+            showLanding();
+            switchToHomeMode();
+
+        }
+    );
+
+    /*
+        Bottoni "Login"/"Sign up" fuori dalla navbar (hero landing,
+        link "Dashboard" nel footer): se l'utente è già loggato
+        vanno direttamente in dashboard, altrimenti aprono il modal.
+    */
+
     document.addEventListener(
 
         "click",
@@ -180,8 +199,17 @@ function initNavigation(){
 
             if(action === "login" || action === "signup"){
 
-                showApp();
-                switchToAppMode();
+                if(isLoggedIn()){
+
+                    showApp();
+                    switchToAppMode();
+
+                }
+                else{
+
+                    openAuthModal(action);
+
+                }
 
             }
 
@@ -192,22 +220,6 @@ function initNavigation(){
 }
 
 function switchToAppMode(){
-
-    document
-    .getElementById(
-        "nav-login"
-    )
-    ?.classList.add(
-        "hidden"
-    );
-
-    document
-    .getElementById(
-        "nav-signup"
-    )
-    ?.classList.add(
-        "hidden"
-    );
 
     document
     .getElementById(
@@ -228,22 +240,6 @@ function switchToAppMode(){
 }
 
 function switchToHomeMode(){
-
-    document
-    .getElementById(
-        "nav-login"
-    )
-    ?.classList.remove(
-        "hidden"
-    );
-
-    document
-    .getElementById(
-        "nav-signup"
-    )
-    ?.classList.remove(
-        "hidden"
-    );
 
     document
     .getElementById(

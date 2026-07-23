@@ -1,0 +1,72 @@
+/* ==========================================================
+   BRAWL ANALYTICS
+   SUBSCRIPTION UI
+   Badge utilizzi + confronto piani nella Upgrade Modal
+========================================================== */
+
+.usage-badge{
+
+    display:inline-flex;
+    align-items:center;
+    padding:.25rem .7rem;
+    border-radius:var(--radius-round);
+    background:rgba(255,201,60,.14);
+    color:var(--color-primary);
+    font-family:var(--font-mono);
+    font-size:.78rem;
+    font-weight:700;
+
+}
+
+.plan-compare{
+
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:var(--space-3);
+
+}
+
+.plan-col{
+
+    border:1px solid var(--color-border);
+    border-radius:var(--radius-md);
+    padding:var(--space-4);
+
+}
+
+.plan-col-pro{
+
+    border-color:rgba(255,201,60,.4);
+    background:rgba(255,201,60,.06);
+
+}
+
+.plan-col-title{
+
+    display:block;
+    font-family:var(--font-display);
+    font-size:1rem;
+    margin-bottom:var(--space-2);
+    color:var(--color-text);
+
+}
+
+.plan-features{
+
+    display:flex;
+    flex-direction:column;
+    gap:.4rem;
+    color:var(--color-text-muted);
+    font-size:.82rem;
+
+}
+
+@media(max-width:480px){
+
+    .plan-compare{
+
+        grid-template-columns:1fr;
+
+    }
+
+}
