@@ -1,0 +1,25 @@
+.auth-modal{position:relative;max-width:420px;padding:2.5rem 2.25rem}
+.auth-close{position:absolute;top:1.25rem;right:1.25rem;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.06);color:var(--color-text-muted);font-size:1.3rem;line-height:1}
+.auth-close:hover{background:rgba(255,255,255,.12);color:var(--color-text)}
+.auth-title{font-family:var(--font-display);font-size:1.9rem;margin-bottom:.6rem;padding-right:2rem}
+.auth-switch{color:var(--color-text-muted);font-size:.9rem;margin-bottom:1.75rem}
+.auth-switch a{color:#9B8CFF;font-weight:700}
+.auth-switch a:hover{text-decoration:underline}
+.auth-form{display:flex;flex-direction:column;gap:.9rem}
+.auth-input{width:100%;background:var(--color-surface-light);border:1.5px solid transparent;border-radius:12px;padding:.9rem 1rem;color:var(--color-text);font-size:.95rem;transition:border-color var(--transition-fast)}
+.auth-input:focus{outline:none;border-color:#9B8CFF}
+.auth-input::placeholder{color:var(--color-text-faded)}
+.auth-password-field{position:relative}
+.auth-password-field .auth-input{padding-right:2.75rem}
+.auth-eye-toggle{position:absolute;top:50%;right:.9rem;transform:translateY(-50%);color:var(--color-text-muted);font-size:1rem}
+.auth-eye-toggle:hover{color:var(--color-text)}
+.auth-checkbox{display:flex;align-items:flex-start;gap:.6rem;color:var(--color-text-muted);font-size:.85rem;margin-top:.2rem;cursor:pointer}
+.auth-checkbox input{width:18px;height:18px;flex-shrink:0;margin-top:.1rem;accent-color:#9B8CFF}
+.auth-checkbox a{color:#9B8CFF;font-weight:700}
+.auth-submit-btn{width:100%;margin-top:1.5rem;padding:.95rem;border-radius:12px;border:none;background:linear-gradient(180deg,#8E7BFF,#6E56FF);color:#fff;font-weight:800;font-size:.95rem;box-shadow:0 8px 20px rgba(110,86,255,.35);transition:transform var(--transition-fast),box-shadow var(--transition-fast)}
+.auth-submit-btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(110,86,255,.45)}
+.auth-submit-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.auth-error,.auth-success{border-radius:10px;padding:.7rem 1rem;font-size:.85rem;margin-bottom:1rem}
+.auth-error{background:rgba(255,84,112,.12);color:var(--color-danger);border:1px solid rgba(255,84,112,.25)}
+.auth-success{background:rgba(62,220,154,.12);color:var(--color-success);border:1px solid rgba(62,220,154,.25)}
+@media(max-width:480px){.auth-modal{padding:2rem 1.5rem}}

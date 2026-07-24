@@ -351,49 +351,42 @@ function injectAuthModal(){
     overlay.className = "modal-overlay";
 
     overlay.innerHTML = `
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title" id="auth-modal-title">Login</h3>
-                <p class="modal-subtitle" id="auth-modal-subtitle">Access your Brawl Analytics dashboard.</p>
-            </div>
+        <div class="modal auth-modal">
+            <button type="button" class="auth-close" id="auth-modal-close" aria-label="Close">×</button>
 
-            <div class="auth-tabs">
-                <button type="button" class="auth-tab active" id="auth-tab-login">Login</button>
-                <button type="button" class="auth-tab" id="auth-tab-signup">Sign up</button>
-            </div>
+            <h2 class="auth-title" id="auth-modal-title">Create an account</h2>
+            <p class="auth-switch">
+                <span id="auth-switch-text">Already have an account?</span>
+                <a href="#" id="auth-switch-link">Log in</a>
+            </p>
 
             <div id="auth-message" class="auth-error" hidden></div>
 
-            <form class="modal-body auth-panel" id="auth-login-panel">
-                <div class="modal-field">
-                    <label class="modal-label">Email</label>
-                    <input type="email" class="modal-input" id="login-email" placeholder="you@example.com" required autocomplete="email">
+            <form class="auth-form" id="auth-login-panel" hidden>
+                <input type="email" class="auth-input" id="login-email" placeholder="Email" required autocomplete="email">
+                <div class="auth-password-field">
+                    <input type="password" class="auth-input" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+                    <button type="button" class="auth-eye-toggle" data-target="login-password">👁</button>
                 </div>
-                <div class="modal-field">
-                    <label class="modal-label">Password</label>
-                    <input type="password" class="modal-input" id="login-password" placeholder="••••••••" required autocomplete="current-password">
-                </div>
+                <button type="submit" class="auth-submit-btn" id="auth-submit-btn-login">Login</button>
             </form>
 
-            <form class="modal-body auth-panel" id="auth-signup-panel" hidden>
-                <div class="modal-field">
-                    <label class="modal-label">Email</label>
-                    <input type="email" class="modal-input" id="signup-email" placeholder="you@example.com" required autocomplete="email">
+            <form class="auth-form" id="auth-signup-panel" hidden>
+                <input type="email" class="auth-input" id="signup-email" placeholder="Email" required autocomplete="email">
+                <div class="auth-password-field">
+                    <input type="password" class="auth-input" id="signup-password" placeholder="Enter your password" required autocomplete="new-password">
+                    <button type="button" class="auth-eye-toggle" data-target="signup-password">👁</button>
                 </div>
-                <div class="modal-field">
-                    <label class="modal-label">Password</label>
-                    <input type="password" class="modal-input" id="signup-password" placeholder="••••••••" required autocomplete="new-password">
+                <div class="auth-password-field">
+                    <input type="password" class="auth-input" id="signup-confirm-password" placeholder="Confirm your password" required autocomplete="new-password">
+                    <button type="button" class="auth-eye-toggle" data-target="signup-confirm-password">👁</button>
                 </div>
-                <div class="modal-field">
-                    <label class="modal-label">Confirm password</label>
-                    <input type="password" class="modal-input" id="signup-confirm-password" placeholder="••••••••" required autocomplete="new-password">
-                </div>
+                <label class="auth-checkbox">
+                    <input type="checkbox" id="signup-terms">
+                    <span>I agree to the <a href="#" target="_blank" rel="noopener">Terms &amp; Conditions</a></span>
+                </label>
+                <button type="submit" class="auth-submit-btn" id="auth-submit-btn-signup">Create account</button>
             </form>
-
-            <div class="modal-footer">
-                <button class="modal-btn modal-btn-cancel" id="auth-modal-close">Cancel</button>
-                <button class="modal-btn modal-btn-confirm" id="auth-submit-btn">Login</button>
-            </div>
         </div>
     `;
 
@@ -407,13 +400,11 @@ function injectAuthModal(){
         }
     });
 
-    document.getElementById("auth-tab-login").addEventListener("click", ()=> setAuthMode("login"));
-    document.getElementById("auth-tab-signup").addEventListener("click", ()=> setAuthMode("signup"));
+    document.getElementById("auth-switch-link").addEventListener("click", event=>{
+        event.preventDefault();
+        setAuthMode(modalMode === "login" ? "signup" : "login");
+    });
 
-    document.getElementById("auth-submit-btn").addEventListener("click", handleAuthSubmit);
-
-    // Invio con Enter dentro i campi: intercettiamo il submit
-    // nativo del <form> per evitare il reload della pagina.
     document.getElementById("auth-login-panel").addEventListener("submit", event=>{
         event.preventDefault();
         handleAuthSubmit();
@@ -424,24 +415,29 @@ function injectAuthModal(){
         handleAuthSubmit();
     });
 
+    overlay.querySelectorAll(".auth-eye-toggle").forEach(button=>{
+        button.addEventListener("click", ()=>{
+            const target = document.getElementById(button.dataset.target);
+            if(!target) return;
+            target.type = target.type === "password" ? "text" : "password";
+            button.textContent = target.type === "password" ? "👁" : "🙈";
+        });
+    });
+
+    setAuthMode(modalMode);
+
 }
 
 function setAuthMode(mode){
 
     modalMode = mode;
 
-    document.getElementById("auth-tab-login").classList.toggle("active", mode === "login");
-    document.getElementById("auth-tab-signup").classList.toggle("active", mode === "signup");
-
     document.getElementById("auth-login-panel").hidden = mode !== "login";
     document.getElementById("auth-signup-panel").hidden = mode !== "signup";
 
-    document.getElementById("auth-modal-title").textContent = mode === "login" ? "Login" : "Create account";
-    document.getElementById("auth-modal-subtitle").textContent = mode === "login"
-        ? "Access your Brawl Analytics dashboard."
-        : "Create your account to get started.";
-
-    document.getElementById("auth-submit-btn").textContent = mode === "login" ? "Login" : "Create account";
+    document.getElementById("auth-modal-title").textContent = mode === "login" ? "Welcome back" : "Create an account";
+    document.getElementById("auth-switch-text").textContent = mode === "login" ? "Don't have an account?" : "Already have an account?";
+    document.getElementById("auth-switch-link").textContent = mode === "login" ? "Sign up" : "Log in";
 
     hideAuthMessage();
 
@@ -482,7 +478,7 @@ function hideAuthMessage(){
 
 async function handleAuthSubmit(){
 
-    const submitBtn = document.getElementById("auth-submit-btn");
+    const submitBtn = document.getElementById(modalMode === "login" ? "auth-submit-btn-login" : "auth-submit-btn-signup");
     submitBtn.disabled = true;
 
     hideAuthMessage();
@@ -504,6 +500,14 @@ async function handleAuthSubmit(){
 
     }
     else{
+
+        const termsChecked = document.getElementById("signup-terms")?.checked;
+
+        if(!termsChecked){
+            showAuthMessage("Please accept the Terms & Conditions to continue.");
+            submitBtn.disabled = false;
+            return;
+        }
 
         const email = document.getElementById("signup-email").value.trim();
         const password = document.getElementById("signup-password").value;
@@ -532,6 +536,7 @@ async function handleAuthSubmit(){
     submitBtn.disabled = false;
 
 }
+
 
 function openAuthModal(mode = "login"){
 

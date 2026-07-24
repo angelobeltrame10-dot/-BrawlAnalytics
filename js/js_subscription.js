@@ -246,35 +246,43 @@ function injectUpgradeModal(){
     overlay.className = "modal-overlay";
 
     overlay.innerHTML = `
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title">Upgrade to Pro</h3>
-                <p class="modal-subtitle">You've reached today's limit.</p>
+    <div class="modal upgrade-modal">
+        <div class="upgrade-header">
+            <h3 class="upgrade-title">🚀 Unlock Brawl Analytics Pro</h3>
+            <p class="upgrade-subtitle">Predict viral Shorts before publishing.</p>
+        </div>
+
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <span class="pricing-label">FREE</span>
+                <h4 class="pricing-plan-name">FREE</h4>
+                <div class="pricing-price">€0</div>
+                <ul class="pricing-features">
+                    <li>3 ideas</li>
+                    <li>1 analysis</li>
+                    <li>Basic stats</li>
+                </ul>
+                <button class="pricing-btn pricing-btn-current" disabled>Current Plan</button>
             </div>
-            <div class="modal-body">
-                <div class="plan-compare">
-                    <div class="plan-col">
-                        <span class="plan-col-title">FREE</span>
-                        <ul class="plan-features">
-                            <li>1 AI Video Analysis/day</li>
-                            <li>3 AI Ideas/day</li>
-                        </ul>
-                    </div>
-                    <div class="plan-col plan-col-pro">
-                        <span class="plan-col-title">PRO</span>
-                        <ul class="plan-features">
-                            <li>Unlimited AI Video Analysis</li>
-                            <li>Unlimited AI Ideas</li>
-                            <li>Future Premium Features</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-btn modal-btn-cancel" id="upgrade-modal-later">Maybe Later</button>
-                <button class="modal-btn modal-btn-confirm" id="upgrade-modal-cta">Upgrade to Pro</button>
+
+            <div class="pricing-card pricing-card-pro">
+                <span class="pricing-label pricing-label-pro">⭐ MOST POPULAR</span>
+                <h4 class="pricing-plan-name">PRO</h4>
+                <div class="pricing-price">€6.99<small>/ month</small></div>
+                <ul class="pricing-features">
+                    <li>Unlimited ideas</li>
+                    <li>Unlimited AI</li>
+                    <li>Virality Engine</li>
+                    <li>Future updates</li>
+                </ul>
+                <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta">Upgrade Now</button>
             </div>
         </div>
+
+        <div class="upgrade-footer"><span>Trusted by Brawl Stars creators</span></div>
+
+        <button class="modal-btn modal-btn-cancel" id="upgrade-modal-later" style="width:100%">Maybe Later</button>
+    </div>
     `;
 
     document.body.appendChild(overlay);
