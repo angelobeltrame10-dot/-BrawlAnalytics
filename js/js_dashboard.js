@@ -949,11 +949,12 @@ async function refreshDashboard(){
         avgViewsElement.textContent = formatCompactNumber(avgViewsPerVideo);
     }
 
-    const bestVideo = dashboardData.reduce((best, video) => 
-        getVideoViews(video) > getVideoViews(best) ? video : best, dashboardData[0]);
+    const bestVideo = dashboardData.length > 0
+    ? dashboardData.reduce((best, video) => getVideoViews(video) > getVideoViews(best) ? video : best, dashboardData[0])
+    : null;
     const bestVideoViewsElement = document.querySelector(".best-video-views");
-    if (bestVideoViewsElement && bestVideo) {
-        bestVideoViewsElement.textContent = formatCompactNumber(getVideoViews(bestVideo));
+    if (bestVideoViewsElement) {
+        bestVideoViewsElement.textContent = bestVideo ? formatCompactNumber(getVideoViews(bestVideo)) : "0";
     }
 
     // Calculate growth rate (simple comparison of first half vs second half)

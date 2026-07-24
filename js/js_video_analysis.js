@@ -6,6 +6,12 @@ import { consumeVideoAnalysis } from "./js_subscription.js";
 let initialized = false;
 let cachedChannelProfile = null;
 let activeUploadTimer = null; 
+const baseQuestions = [
+    ["How original is your video?", ["Completely original", "Mostly original", "Mostly reused"]],
+    ["How original is the idea?", ["Completely original", "Inspired by another creator", "Copy of another creator"]],
+    ["Which format best describes this video?", null],
+    ["Write a short description of your video.", null]
+];
 
 // Store user's answers for virality analysis
 let userAnswers = {
@@ -20,7 +26,9 @@ async function getDynamicQuestions() {
         cachedChannelProfile = await loadChannelProfile();
     }
     const availableFormats = getAvailableFormats(cachedChannelProfile);
-    const formatOptions = availableFormats.length > 0 ? availableFormats : [];
+    const formatOptions = availableFormats.length > 0 
+        ? availableFormats 
+        : ["Trickshot", "Challenge", "Funny Moments", "Ranked", "Guide", "Story", "Meme", "Other"];
 
     return [
         baseQuestions[0],
@@ -127,21 +135,37 @@ function startUpload(file, flow){
         return;
     }
 
-    document.getElementById("va-file-name").textContent = file.name;
-    document.getElementById("va-dropzone").hidden = true;
-    document.getElementById("va-upload-progress").hidden = false;
-
-    let value = 0;
-
     if (activeUploadTimer) {
         clearInterval(activeUploadTimer);
+        activeUploadTimer = null;
     }
+
+    const fileNameEl = document.getElementById("va-file-name");
+    const dropzoneEl = document.getElementById("va-dropzone");
+    const progressEl = document.getElementById("va-upload-progress");
+    const barEl = document.getElementById("va-upload-bar");
+    const valueEl = document.getElementById("va-upload-value");
+    const copyEl = document.getElementById("va-upload-copy");
+
+    if (!dropzoneEl || !progressEl || !barEl || !valueEl) {
+        console.error("Video analysis: upload elements not found in DOM");
+        return;
+    }
+
+    fileNameEl.textContent = file.name;
+    dropzoneEl.hidden = true;
+    progressEl.hidden = false;
+
+    let value = 0;
 
     activeUploadTimer = setInterval(()=>{
 
         value = Math.min(100, value + 10 + Math.random() * 12);
-        document.getElementById("va-upload-bar").style.width = `${value}%`;
-        document.getElementById("va-upload-value").textContent = `${Math.round(value)}%`;
+        barEl.style.width = `${value}%`;
+        valueEl.textContent = `${Math.round(value)}%`;
+        if (copyEl) {
+            copyEl.textContent = value < 70 ? "Encrypting upload and preparing workspace…" : "Video ready — opening context wizard…";
+        }
 
         if(value >= 100){
 
@@ -177,7 +201,16 @@ function resetVideoAnalysisState(){
 
 async function renderWizard(flow, index){
 
-    const questions = await getDynamicQuestions();
+    console.log("renderWizard chiamata", index);
+    let questions;
+    try {
+        questions = await getDynamicQuestions();
+        console.log("questions caricate", questions);
+    } catch (error) {
+        console.error("Errore:", error);
+        questions = baseQuestions;
+    }
+
     const [title, options] = questions[index];
     const dots = questions.map((_, dotIndex)=> `<i class="${dotIndex <= index ? "active" : ""}"></i>`).join("");
     let choices = "";
@@ -195,6 +228,12 @@ async function renderWizard(flow, index){
 
     }
 
+    flow.innerHTML = `
+        <div class="va-card va-wizard-card">
+            <div class="va-wizard-top"><span class="va-step">02 — CONTEXT · ${index + 1} OF ${questions.length}</span><div class="va-dots">${dots}</div></div>
+            <div class="va-question"><h3>${title}</h3><p>Quick context lets the scoring engine personalise this report.</p>${choices}</div>
+        </div>`;
+
     flow.querySelectorAll(".va-options button, .va-formats button").forEach(button=>{
         button.addEventListener("click", ()=>{
             button.classList.add("selected");
@@ -207,9 +246,21 @@ async function renderWizard(flow, index){
         });
     });
 
-    document.getElementById("va-report")?.addEventListener("click", ()=> {
+    document.getElementById("va-report")?.addEventListener("click", async ()=> {
+
+        const reportBtn = document.getElementById("va-report");
         const descElement = document.getElementById("va-description");
         if (descElement) userAnswers.description = descElement.value.trim();
+
+        reportBtn.disabled = true;
+
+        const allowed = await consumeVideoAnalysis();
+
+        if(!allowed){
+            reportBtn.disabled = false;
+            return;
+        }
+
         renderAnalysis(flow);
     });
 
@@ -253,18 +304,7 @@ function renderAnalysis(flow){
 
 async function renderResults(flow){
 
-    let trendsAnalysis = null;
-
-    try {
-
-        trendsAnalysis = await fetchTrendAnalysis(userAnswers);
-
-    }
-    catch (error) {
-
-        console.warn("Unable to load trend analysis:", error);
-
-    }
+    const trendsAnalysis = null;
 
     const result = await analyzeVirality(
         userAnswers,

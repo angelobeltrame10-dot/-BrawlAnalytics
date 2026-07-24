@@ -1,0 +1,158 @@
+const ALLOWED_ORIGIN = "*";
+
+function corsHeaders() {
+    return {
+        "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+        "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+        "Access-Control-Allow-Headers": "Content-Type"
+    };
+}
+
+function json(body, status = 200) {
+    return new Response(JSON.stringify(body, null, 2), {
+        status,
+        headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders()
+        }
+    });
+}
+
+// 1. RECUPERO TREND (Invariato, ma essenziale)
+async function getDailyTrends(env) {
+    const fallbackTrends = [
+        { query: "brawl stars meta tier list" },
+        { query: "ranked mode global leaderboard" },
+        { query: "best brawlers hypercharge" }
+    ];
+
+    try {
+        const targetUrl = "https://trends.angeskicollab10.workers.dev/trends";
+        const response = await fetch(targetUrl);
+        if (!response.ok) return { trends: fallbackTrends };
+        
+        const data = await response.json();
+        if (!data?.trends || !Array.isArray(data.trends) || data.trends.length === 0) {
+            return { trends: fallbackTrends };
+        }
+        return data;
+    } catch (e) {
+        return { trends: fallbackTrends };
+    }
+}
+
+// 2. PROMPT BUILDER: Ora include il Channel Profile per un reasoning reale
+function buildPrompt(proposal, channelProfile, trends) {
+    const rawTrends = trends?.trends || [];
+    const listaTrends = rawTrends.map(t => typeof t === 'object' && t !== null ? t.query : t).join(", ");
+    
+    // Estrazione sicura dei dati storici del canale
+    const avgViews = channelProfile?.averageViews || "Nessun dato storico";
+    const bestFormats = channelProfile?.bestFormats ? channelProfile.bestFormats.join(", ") : "Nessun dato";
+    const worstFormats = channelProfile?.worstFormats ? channelProfile.worstFormats.join(", ") : "Nessun dato";
+
+    return `Sei l'intelligenza analitica di Brawl Analytics.
+Il tuo compito è estrarre parametri qualitativi confrontando una nuova idea video con i trend attuali e lo storico del canale.
+NON devi calcolare un punteggio numerico. Rispondi rigorosamente in formato JSON.
+
+=== STORICO DEL CANALE (CHANNEL PROFILE) ===
+- View medie: ${avgViews}
+- Migliori formati: ${bestFormats}
+- Peggiori formati: ${worstFormats}
+
+=== NUOVA PROPOSTA VIDEO ===
+- Descrizione: "${proposal?.description || 'Non fornita'}"
+- Originalità Idea: "${proposal?.ideaOriginality || 'Standard'}"
+- Originalità Video: "${proposal?.videoOriginality || 'Standard'}"
+- Formato Scelto: "${proposal?.format || 'Non definito'}"
+
+=== TREND DEL GIORNO (BRAWL STARS) ===
+[${listaTrends}]
+
+Genera un JSON con questa ESATTA struttura. Usa valori come "high", "medium", "low" dove appropriato, oppure brevi stringhe descrittive:
+{
+  "trendAlignment": "high/medium/low",
+  "semanticTrendSimilarity": "spiegazione breve della sovrapposizione semantica coi trend",
+  "formatSuitability": "high/medium/low (basato sul successo storico del canale)",
+  "historicalFit": "high/medium/low (quanto l'idea rispetta l'identità del creator)",
+  "innovation": "high/medium/low",
+  "competition": "high/medium/low (livello di saturazione stimato)",
+  "topicFreshness": "quanto è fresco l'argomento (breve frase)",
+  "formatNovelty": "high/medium/low (se è un format totalmente nuovo per il canale)"
+}`;
+}
+
+// 3. GROQ LLM (Upgrade a llama-3.3-70b-versatile)
+async function callLlama(prompt, env) {
+    if (!env.CHIAVE_API_AI) {
+        throw new Error("Manca la variabile CHIAVE_API_AI");
+    }
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${env.CHIAVE_API_AI}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            model: "llama-3.3-70b-versatile", // Il modello di reasoning superiore
+            messages: [
+                { role: "system", content: "Rispondi sempre e solo con un oggetto JSON valido, senza markdown, senza testo introduttivo." },
+                { role: "user", content: prompt }
+            ],
+            temperature: 0.2, // Più basso per maggiore determinismo
+            response_format: { type: "json_object" }
+        })
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Groq API Error: ${response.status} - ${errText}`);
+    }
+
+    const result = await response.json();
+    return JSON.parse(result.choices[0].message.content);
+}
+
+// 4. MAIN FETCH (L'Orchestratore)
+export default {
+    async fetch(request, env) {
+        if (request.method === "OPTIONS") {
+            return new Response(null, { headers: corsHeaders() });
+        }
+
+        const url = new URL(request.url);
+
+        if (request.method === "POST" && url.pathname === "/analyze") {
+            try {
+                // Il browser invia un payload pulito contenente proposal e profile
+                const body = await request.json();
+                const { proposal, channelProfile } = body;
+
+                if (!proposal) {
+                    return json({ success: false, error: "Dati Proposal mancanti" }, 400);
+                }
+
+                // Esecuzione orchestrata
+                const trends = await getDailyTrends(env);
+                const prompt = buildPrompt(proposal, channelProfile, trends);
+                const aiFeatures = await callLlama(prompt, env);
+                
+                // Il Worker restituisce solo le feature AI. 
+                // Nessun punteggio. Nessun array di consigli. Tutto passa al Feature Engine locale.
+                return json({
+                    success: true,
+                    aiFeatures: aiFeatures,
+                    metadata: {
+                        model: "llama-3.3-70b-versatile",
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (error) {
+                return json({ success: false, error: error.message }, 500);
+            }
+        }
+
+        return json({ success: false, error: "Route not found." }, 404);
+    }
+};

@@ -198,24 +198,17 @@ function applyFinalScaling(score, features) {
  */
 export function calculateScoreBreakdown(features) {
     const criticalFailure = checkCriticalFailures(features);
-    
-    if (criticalFailure) {
-        return {
-            criticalFailure: {
-                reason: criticalFailure.reason,
-                maxScore: criticalFailure.maxScore
-            },
-            originality: { score: 0, multiplier: 0 },
-            trend: { score: 0, multiplier: 0 },
-            format: { score: 0, multiplier: 0 },
-            channel: { score: 0, multiplier: 0 },
-            competition: { score: 0, multiplier: 0 },
-            innovation: { score: 0, multiplier: 0 }
-        };
-    }
-    
+
+    // I punteggi per singolo fattore vengono SEMPRE calcolati dai dati
+    // reali, anche quando un critical failure limita il punteggio totale:
+    // il critical failure impone solo un tetto massimo al risultato
+    // finale (vedi calculateViralityScore), non annulla il significato
+    // dei singoli fattori mostrati in dashboard.
     return {
-        criticalFailure: null,
+        criticalFailure: criticalFailure ? {
+            reason: criticalFailure.reason,
+            maxScore: criticalFailure.maxScore
+        } : null,
         originality: {
             score: Math.round(((features.videoOriginality + features.ideaOriginality) / 2) * 100),
             multiplier: getOriginalityMultiplier(features)
