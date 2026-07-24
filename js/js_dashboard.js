@@ -33,6 +33,8 @@ import { initFormatsManager, renderFormatCards } from "./js_formats_manager.js";
 
 import { initSubscription, consumeIdeaGeneration } from "./js_subscription.js";
 
+import { initTrends, setupTrendsRefresh } from "./js_trends.js";
+
 import {
 
     calculateViralityScore,
@@ -167,7 +169,7 @@ async function initDashboard(){
     setupCustomFormats();
     setupIdeaGeneration();
     initFormatsManager();
-
+    setupTrendsRefresh();
     initSubscription();
 
     customFormats = await loadCustomFormats();
@@ -236,7 +238,9 @@ function setActiveTab(tab){
 
         formats: document.getElementById("formats-section"),
 
-        ideas: document.getElementById("ideas-section")
+        ideas: document.getElementById("ideas-section"),
+
+        trends: document.getElementById("trends-section")
 
     };
 
@@ -302,6 +306,10 @@ function setActiveTab(tab){
             }
         }
 
+    }
+
+    if(tab === "trends"){
+        initTrends();
     }
 
 }

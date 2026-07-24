@@ -32,6 +32,8 @@ from "./js_auth.js";
 
 import { resetVideoAnalysisState } from "./js_video_analysis.js";
 
+import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
+
 function initNavigation(){
 
     const navbar =
@@ -106,6 +108,8 @@ function initNavigation(){
 
                 <span class="user-email" id="nav-user-email"></span>
 
+                <button class="btn btn-outline btn-sm plan-badge" id="nav-plan-badge" type="button">FREE</button>
+
                 <button class="btn btn-outline btn-sm" id="nav-logout">
                     Logout
                 </button>
@@ -127,6 +131,12 @@ function initNavigation(){
     document.getElementById(
         "nav-home"
     );
+
+    document.getElementById("nav-plan-badge")?.addEventListener("click", ()=>{
+        if(getCurrentPlan() !== "pro"){
+            openUpgradeModal();
+        }
+    });
 
     home?.addEventListener(
 

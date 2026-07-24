@@ -221,6 +221,11 @@ export function refreshUsageIndicators(){
 
     const videoLabel = state.plan === "pro" ? "∞" : `⚡ ${Math.max(0, state.videoRemaining)}`;
     const ideaLabel = state.plan === "pro" ? "∞" : `⚡ ${Math.max(0, state.ideaRemaining)}`;
+    const planLabel = state.plan === "pro" ? "PRO" : "FREE";
+    document.querySelectorAll("#nav-plan-badge").forEach(el=>{
+        el.textContent = planLabel;
+        el.classList.toggle("plan-badge-pro", state.plan === "pro");
+    });
 
     document.querySelectorAll("#video-usage-badge").forEach(el => { el.textContent = videoLabel; });
     document.querySelectorAll("#idea-usage-badge").forEach(el => { el.textContent = ideaLabel; });

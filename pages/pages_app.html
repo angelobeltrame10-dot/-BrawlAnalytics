@@ -85,6 +85,12 @@
 
         </button>
 
+        <button class="app-tab" 
+            data-tab="trends">
+            
+            Trends
+        
+        </button>
 
 
     </nav>
@@ -443,6 +449,18 @@
                     <p>You need to upload your YouTube Studio CSV to generate AI-powered content ideas.</p>
                 </div>
             </section>
+        </section>
+    </section>
+
+    <section id="trends-section" class="dashboard-section" hidden>
+        <section class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">🔥 Brawl Stars Trends</h2>
+                <button id="refresh-trends-btn" class="btn btn-outline btn-sm">Refresh</button>
+            </div>
+            <div id="trends-list" class="trends-list">
+                <div class="trends-loading">Loading trends...</div>
+            </div>
         </section>
     </section>
 

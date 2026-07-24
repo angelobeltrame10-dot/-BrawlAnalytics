@@ -71,6 +71,8 @@
 
 }
 
+.plan-badge{font-family:var(--font-mono);letter-spacing:.05em;pointer-events:auto}
+.plan-badge-pro{background:linear-gradient(180deg,var(--color-primary-hover),var(--color-primary));color:#120A24;border-color:transparent}
 .upgrade-modal{max-width:600px;padding:2.25rem}
 .upgrade-header{text-align:center;margin-bottom:1.75rem}
 .upgrade-title{font-family:var(--font-display);font-size:1.6rem;margin-bottom:.5rem}
