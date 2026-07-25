@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSV Upload Tutorial | Brawl Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+    --bg:#150B2E;
+    --surface:#1F1240;
+    --primary:#FFC93C;
+    --primary-hover:#FFD668;
+    --secondary:#3DDCFF;
+    --success:#3EDC9A;
+    --text:#F4F0FF;
+    --muted:#A79BC9;
+    --faded:rgba(167,155,201,.55);
+    --border:rgba(244,240,255,.12);
+    --font-display:'Lilita One',sans-serif;
+    --font-body:'Manrope',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+    background:
+        radial-gradient(circle at 12% -10%, rgba(255,201,60,.10), transparent 45%),
+        radial-gradient(circle at 100% 10%, rgba(61,220,255,.08), transparent 40%),
+        var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+}
+a{color:var(--secondary);text-decoration:none}
+a:hover{text-decoration:underline}
+img{display:block;max-width:100%;border-radius:14px;border:1px solid var(--border)}
+.container{width:min(100% - 2.5rem,880px);margin-inline:auto}
+
+.hero{padding:4rem 0 2.5rem;text-align:center}
+.eyebrow{display:inline-block;font-family:var(--font-mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--secondary);margin-bottom:1rem}
+.hero h1{font-family:var(--font-display);font-size:clamp(2rem,5vw,3rem);line-height:1.05;margin-bottom:.9rem}
+.hero p{color:var(--muted);max-width:520px;margin:0 auto;font-size:1rem}
+
+.steps{display:flex;flex-direction:column;gap:1.1rem;padding-bottom:5rem}
+.step{
+    display:flex;gap:1.3rem;
+    background:linear-gradient(160deg,rgba(31,18,64,.7),rgba(22,13,47,.7));
+    border:1px solid var(--border);border-radius:18px;padding:1.7rem 1.9rem;
+}
+.step-num{
+    flex-shrink:0;width:44px;height:44px;border-radius:12px;
+    background:rgba(255,201,60,.12);border:1px solid rgba(255,201,60,.3);
+    color:var(--primary);font-family:var(--font-mono);font-weight:700;font-size:1.05rem;
+    display:grid;place-items:center;
+}
+.step-body{flex:1;min-width:0}
+.step-body h2{font-family:var(--font-display);font-size:1.2rem;margin-bottom:.5rem;letter-spacing:.01em}
+.step-body p{color:var(--muted);font-size:.95rem;margin-bottom:.9rem}
+.step-body p:last-child{margin-bottom:0}
+.step-body a{font-weight:700}
+.step-body ul{margin:.3rem 0 .9rem 1.2rem;color:var(--muted);font-size:.92rem}
+.step-body li{margin-bottom:.35rem}
+.code{
+    font-family:var(--font-mono);font-size:.82rem;color:var(--secondary);
+    background:rgba(61,220,255,.08);border:1px solid rgba(61,220,255,.22);
+    padding:.15rem .5rem;border-radius:6px;
+}
+.tip{
+    display:flex;gap:.6rem;align-items:flex-start;margin-top:1rem;
+    background:rgba(255,201,60,.08);border:1px solid rgba(255,201,60,.25);
+    border-radius:12px;padding:.85rem 1rem;font-size:.88rem;color:var(--muted);
+}
+.tip b{color:var(--primary)}
+
+.done-banner{
+    text-align:center;margin-top:.5rem;
+    background:linear-gradient(135deg,rgba(62,220,154,.12),rgba(255,255,255,.02));
+    border:1px solid rgba(62,220,154,.3);border-radius:18px;padding:2rem;
+}
+.done-banner h2{font-family:var(--font-display);font-size:1.4rem;margin-bottom:.6rem;color:var(--success)}
+.done-banner p{color:var(--muted);margin-bottom:1.2rem;font-size:.95rem}
+.cta{
+    display:inline-flex;align-items:center;gap:.5rem;
+    background:linear-gradient(180deg,var(--primary-hover),var(--primary));
+    color:#150B2E;font-weight:800;font-size:.9rem;padding:.8rem 1.5rem;border-radius:999px;text-decoration:none;
+}
+
+footer{border-top:1px solid var(--border);padding:2rem 0;color:var(--faded);font-size:.82rem;text-align:center}
+</style>
+</head>
+<body>
+
+<section class="hero">
+    <div class="container">
+        <span class="eyebrow">Guide</span>
+        <h1>How to export your YouTube Studio CSV</h1>
+        <p>Follow these steps to export the exact data Brawl Analytics needs, then upload it straight into your dashboard.</p>
+    </div>
+</section>
+
+<div class="container steps">
+
+    <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+            <h2>Open YouTube Studio</h2>
+            <p>Go to <a href="https://studio.youtube.com/" target="_blank" rel="noopener">studio.youtube.com</a> and sign in with the channel you want to analyze.</p>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+            <h2>Open Analytics</h2>
+            <p>Click on the <strong>Analytics</strong> tab in the left-hand menu.</p>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+            <h2>Switch to Advanced mode</h2>
+            <p>Click the <strong>Advanced mode</strong> button in the top-right corner to unlock full export options.</p>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+            <h2>Set the date range to Lifetime</h2>
+            <p>In the date selector, choose <strong>Lifetime</strong> so the export covers your channel's full history.</p>
+            <img src="date.png" alt="Selecting Lifetime as the date range in YouTube Studio">
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+            <h2>Select the required metrics</h2>
+            <p>Enable exactly these metrics, then click <strong>Apply</strong>:</p>
+            <ul>
+                <li>Views</li>
+                <li>Engaged views</li>
+                <li>Watch time (hours)</li>
+                <li>Subscribers</li>
+                <li>Average view duration</li>
+                <li>Average percentage viewed</li>
+            </ul>
+            <img src="metrics.png" alt="Selecting the required metrics in YouTube Studio">
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+            <h2>Download the CSV</h2>
+            <p>Click the download icon in the top-right corner and choose the second option: <span class="code">Comma-separated values (.csv)</span>.</p>
+            <img src="final-step.png" alt="Downloading the CSV export from YouTube Studio">
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-body">
+            <h2>Extract the .zip file</h2>
+            <p>YouTube Studio downloads a .zip folder — extract it on your device before uploading.</p>
+            <img src="extract.png" alt="Extracting the downloaded zip folder">
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-body">
+            <h2>Upload it to Brawl Analytics</h2>
+            <p>Inside the extracted folder, find <span class="code">Table data.csv</span> and upload it in your Brawl Analytics dashboard.</p>
+            <div class="tip"><b>Tip:</b> <p>your data stays in your account and is only used to power your own dashboard — see our <a href="../legal/privacy.html">Privacy Policy</a> for details.</p></div>
+        </div>
+    </div>
+
+    <div class="done-banner">
+        <h2>✅ You're all set</h2>
+        <p>Head back to your dashboard and drop the CSV file into the upload area to generate your first report.</p>
+        <a class="cta" href="../HTML/index.html">Go to Brawl Analytics →</a>
+    </div>
+
+</div>
+
+<footer>© 2026 Brawl Analytics · Not a YouTube/Supercell product.</footer>
+
+</body>
+</html>

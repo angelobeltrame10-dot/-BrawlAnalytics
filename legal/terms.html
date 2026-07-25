@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms & Conditions | Brawl Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+    --bg:#150B2E;
+    --surface:#1F1240;
+    --surface-light:#2A1856;
+    --primary:#FFC93C;
+    --primary-hover:#FFD668;
+    --secondary:#3DDCFF;
+    --accent:#FF3D7F;
+    --success:#3EDC9A;
+    --text:#F4F0FF;
+    --muted:#A79BC9;
+    --faded:rgba(167,155,201,.55);
+    --border:rgba(244,240,255,.12);
+    --font-display:'Lilita One',sans-serif;
+    --font-body:'Manrope',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+    background:
+        radial-gradient(circle at 12% -10%, rgba(61,220,255,.09), transparent 45%),
+        radial-gradient(circle at 100% 0%, rgba(255,201,60,.08), transparent 40%),
+        var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+}
+a{color:inherit}
+.container{width:min(100% - 2.5rem,1180px);margin-inline:auto}
+
+.legal-hero{padding:4.5rem 0 3rem;text-align:center}
+.eyebrow{display:inline-block;font-family:var(--font-mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--primary);margin-bottom:1rem}
+.legal-hero h1{font-family:var(--font-display);font-size:clamp(2.2rem,5vw,3.4rem);line-height:1.05;letter-spacing:.01em;margin-bottom:1rem}
+.legal-hero p{color:var(--muted);max-width:560px;margin:0 auto 1.25rem;font-size:1rem}
+.updated-badge{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--font-mono);font-size:.75rem;color:var(--secondary);background:rgba(61,220,255,.1);border:1px solid rgba(61,220,255,.28);padding:.4rem .9rem;border-radius:999px}
+
+.legal-layout{display:grid;grid-template-columns:240px 1fr;gap:3rem;padding-bottom:6rem;align-items:start}
+.toc{position:sticky;top:100px;display:flex;flex-direction:column;gap:.15rem;border-left:1px solid var(--border);padding-left:1.1rem;max-height:calc(100vh - 140px);overflow-y:auto}
+.toc span{font-family:var(--font-mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--faded);margin-bottom:.6rem}
+.toc a{font-size:.85rem;color:var(--muted);text-decoration:none;padding:.4rem 0;border-left:2px solid transparent;margin-left:-1.12rem;padding-left:1rem;transition:.15s ease}
+.toc a:hover{color:var(--text);border-left-color:var(--primary)}
+
+.content{display:flex;flex-direction:column;gap:1.1rem}
+section.card{scroll-margin-top:100px;background:linear-gradient(160deg,rgba(31,18,64,.7),rgba(22,13,47,.7));border:1px solid var(--border);border-radius:18px;padding:1.9rem 2rem}
+section.card h2{font-family:var(--font-display);font-size:1.35rem;letter-spacing:.01em;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem}
+section.card h2 .num{font-family:var(--font-mono);font-size:.72rem;color:var(--secondary);background:rgba(61,220,255,.12);border:1px solid rgba(61,220,255,.3);border-radius:8px;padding:.2rem .55rem}
+section.card p{color:var(--muted);margin-bottom:.85rem;font-size:.95rem}
+section.card p:last-child{margin-bottom:0}
+section.card ul{margin:0 0 .85rem 1.2rem;color:var(--muted);font-size:.95rem}
+section.card li{margin-bottom:.5rem}
+section.card li:last-child{margin-bottom:0}
+section.card strong{color:var(--text)}
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-top:.5rem}
+.plan-box{border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;background:rgba(255,255,255,.02)}
+.plan-box.pro{border-color:rgba(255,201,60,.4);background:rgba(255,201,60,.06)}
+.plan-box strong{display:block;font-family:var(--font-display);font-size:1rem;margin-bottom:.5rem;color:var(--text)}
+.plan-box ul{margin:0 0 0 1.1rem;font-size:.88rem}
+.mail-btn{display:inline-flex;align-items:center;gap:.5rem;margin-top:.4rem;background:linear-gradient(180deg,var(--primary-hover),var(--primary));color:#150B2E;font-weight:800;font-size:.85rem;padding:.65rem 1.2rem;border-radius:999px;text-decoration:none}
+
+footer{border-top:1px solid var(--border);padding:2rem 0;color:var(--faded);font-size:.82rem}
+footer .container{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+footer a{color:var(--muted);text-decoration:none;font-weight:700}
+footer a:hover{color:var(--primary)}
+
+@media(max-width:880px){
+    .legal-layout{grid-template-columns:1fr}
+    .toc{position:static;border-left:none;padding-left:0;flex-direction:row;flex-wrap:wrap;gap:.5rem;max-height:none}
+    .toc span{display:none}
+    .toc a{border:1px solid var(--border);border-radius:999px;margin:0;padding:.4rem .8rem}
+    .toc a:hover{border-color:var(--primary)}
+    .plan-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<section class="legal-hero">
+    <div class="container">
+        <span class="eyebrow">Legal</span>
+        <h1>Terms &amp; Conditions</h1>
+        <p>The rules for using Brawl Analytics — please read before creating an account.</p>
+        <span class="updated-badge">🕓 Last updated: July 2026</span>
+    </div>
+</section>
+
+<div class="container legal-layout">
+
+    <nav class="toc">
+        <span>On this page</span>
+        <a href="#acceptance">1. Acceptance</a>
+        <a href="#about">2. About the service</a>
+        <a href="#eligibility">3. Eligibility</a>
+        <a href="#accounts">4. User accounts</a>
+        <a href="#plans">5. Free & Pro plans</a>
+        <a href="#payments">6. Payments</a>
+        <a href="#acceptable-use">7. Acceptable use</a>
+        <a href="#ai-content">8. AI generated content</a>
+        <a href="#ip">9. Intellectual property</a>
+        <a href="#user-content">10. User content</a>
+        <a href="#availability">11. Service availability</a>
+        <a href="#liability">12. Limitation of liability</a>
+        <a href="#termination">13. Account termination</a>
+        <a href="#privacy">14. Privacy</a>
+        <a href="#changes">15. Changes to these terms</a>
+        <a href="#disclaimer">16. Independent service disclaimer</a>
+        <a href="#contact">17. Contact</a>
+    </nav>
+
+    <div class="content">
+
+        <section class="card" id="acceptance">
+            <h2><span class="num">01</span>Acceptance of terms</h2>
+            <p>By creating an account or using Brawl Analytics, you agree to be bound by these Terms &amp; Conditions. If you do not agree with any part of these terms, you must not use the Service.</p>
+        </section>
+
+        <section class="card" id="about">
+            <h2><span class="num">02</span>About the service</h2>
+            <p>Brawl Analytics is an analytics platform designed to help Brawl Stars content creators improve their YouTube Shorts through AI-powered insights, trend analysis, channel analytics, and idea generation.</p>
+            <p>The Service provides predictions and recommendations only. Results are estimates and do not guarantee video performance.</p>
+        </section>
+
+        <section class="card" id="eligibility">
+            <h2><span class="num">03</span>Eligibility</h2>
+            <p>You must be at least 13 years old to use this Service. If you are under the age required in your country, you must have permission from a parent or legal guardian.</p>
+        </section>
+
+        <section class="card" id="accounts">
+            <h2><span class="num">04</span>User accounts</h2>
+            <p>You are responsible for:</p>
+            <ul>
+                <li>Keeping your login credentials secure.</li>
+                <li>Providing accurate registration information.</li>
+                <li>All activity performed through your account.</li>
+            </ul>
+            <p>You must not share your account with other users.</p>
+        </section>
+
+        <section class="card" id="plans">
+            <h2><span class="num">05</span>Free &amp; Pro plans</h2>
+            <p>Brawl Analytics offers different subscription plans. Limits may change over time.</p>
+            <div class="plan-grid">
+                <div class="plan-box">
+                    <strong>FREE</strong>
+                    <ul>
+                        <li>1 AI video analysis / day</li>
+                        <li>3 AI idea generations / day</li>
+                        <li>Basic stats</li>
+                    </ul>
+                </div>
+                <div class="plan-box pro">
+                    <strong>PRO — €6.99/month</strong>
+                    <ul>
+                        <li>Unlimited AI video analysis</li>
+                        <li>Unlimited idea generation</li>
+                        <li>Full Virality Engine access</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="card" id="payments">
+            <h2><span class="num">06</span>Payments</h2>
+            <p>Paid subscriptions renew automatically unless cancelled before the renewal date. You may cancel your subscription at any time. No refunds are provided for partial billing periods unless required by applicable law.</p>
+        </section>
+
+        <section class="card" id="acceptable-use">
+            <h2><span class="num">07</span>Acceptable use</h2>
+            <p>You agree not to:</p>
+            <ul>
+                <li>Use the Service for illegal purposes.</li>
+                <li>Attempt to reverse engineer the platform.</li>
+                <li>Abuse, overload, or interfere with the Service.</li>
+                <li>Use bots or automated scripts to bypass usage limits.</li>
+                <li>Share or resell your account.</li>
+            </ul>
+            <p>Violation of these rules may result in account suspension or termination.</p>
+        </section>
+
+        <section class="card" id="ai-content">
+            <h2><span class="num">08</span>AI generated content</h2>
+            <p>The Service uses artificial intelligence to generate analyses, predictions, recommendations, and content ideas. AI-generated responses:</p>
+            <ul>
+                <li>Are informational only.</li>
+                <li>May contain inaccuracies.</li>
+                <li>Should not be considered guaranteed outcomes.</li>
+            </ul>
+            <p>Users remain solely responsible for any content they publish.</p>
+        </section>
+
+        <section class="card" id="ip">
+            <h2><span class="num">09</span>Intellectual property</h2>
+            <p>All software, design, branding, algorithms, and original content of Brawl Analytics remain the exclusive property of the Service owner. You may not copy, distribute, or reproduce any part of the platform without permission. You retain ownership of the content you upload.</p>
+        </section>
+
+        <section class="card" id="user-content">
+            <h2><span class="num">10</span>User content</h2>
+            <p>When using the Service, you may submit video descriptions, titles, channel analytics, and CSV files exported from YouTube Studio. You confirm that you have the right to upload such information. We do not claim ownership of your content.</p>
+        </section>
+
+        <section class="card" id="availability">
+            <h2><span class="num">11</span>Service availability</h2>
+            <p>We strive to keep the Service available at all times. However, we do not guarantee uninterrupted availability and may perform maintenance, updates, or temporary downtime without prior notice.</p>
+        </section>
+
+        <section class="card" id="liability">
+            <h2><span class="num">12</span>Limitation of liability</h2>
+            <p>To the maximum extent permitted by law, Brawl Analytics shall not be liable for loss of revenue, loss of subscribers, loss of views, business interruption, or indirect/consequential damages. The Service provides estimates and analytical tools only.</p>
+        </section>
+
+        <section class="card" id="termination">
+            <h2><span class="num">13</span>Account termination</h2>
+            <p>We reserve the right to suspend or terminate accounts that violate these Terms or abuse the platform. Users may request deletion of their account by contacting us.</p>
+        </section>
+
+        <section class="card" id="privacy">
+            <h2><span class="num">14</span>Privacy</h2>
+            <p>Your use of the Service is also governed by our <a href="privacy.html" style="color:var(--secondary)">Privacy Policy</a>. Please review it to understand how your data is collected and processed.</p>
+        </section>
+
+        <section class="card" id="changes">
+            <h2><span class="num">15</span>Changes to these terms</h2>
+            <p>We may update these Terms from time to time. Continued use of the Service after changes means you accept the updated Terms.</p>
+        </section>
+
+
+        <section class="card" id="disclaimer">
+
+        <h2><span class="num">16</span>Independent Service Disclaimer</h2>
+
+            <p>
+                Brawl Analytics is an independent software platform created for Brawl Stars content
+                creators. It is not affiliated with, endorsed by, sponsored by, or associated with
+                Supercell, YouTube, Google, or any of their affiliates.
+            </p>
+
+            <p>
+                Brawl Stars is a trademark of Supercell. All trademarks, logos, and brand names are
+                the property of their respective owners and are used for identification purposes only.
+            </p>
+
+        </section>
+
+        <section class="card" id="contact">
+            <h2><span class="num">17</span>Contact</h2>
+            <p>For questions regarding these Terms, reach out any time.</p>
+            <a class="mail-btn" href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener">✉ angeskicollab10@gmail.com</a>
+        </section>
+
+    </div>
+</div>
+
+<footer>
+    <div class="container">
+        <span>© 2026 Brawl Analytics</span>
+        <span><a href="privacy.html">Privacy Policy</a></span>
+    </div>
+</footer>
+
+</body>
+</html>

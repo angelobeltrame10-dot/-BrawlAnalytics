@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy | Brawl Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+    --bg:#150B2E;
+    --surface:#1F1240;
+    --surface-light:#2A1856;
+    --primary:#FFC93C;
+    --primary-hover:#FFD668;
+    --secondary:#3DDCFF;
+    --accent:#FF3D7F;
+    --success:#3EDC9A;
+    --text:#F4F0FF;
+    --muted:#A79BC9;
+    --faded:rgba(167,155,201,.55);
+    --border:rgba(244,240,255,.12);
+    --font-display:'Lilita One',sans-serif;
+    --font-body:'Manrope',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+    background:
+        radial-gradient(circle at 12% -10%, rgba(255,201,60,.10), transparent 45%),
+        radial-gradient(circle at 100% 0%, rgba(61,220,255,.08), transparent 40%),
+        var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+}
+a{color:inherit}
+.container{width:min(100% - 2.5rem,1180px);margin-inline:auto}
+
+
+/* ---------- Hero ---------- */
+.legal-hero{padding:4.5rem 0 3rem;text-align:center}
+.eyebrow{
+    display:inline-block;font-family:var(--font-mono);font-size:.75rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--secondary);margin-bottom:1rem;
+}
+.legal-hero h1{
+    font-family:var(--font-display);font-size:clamp(2.2rem,5vw,3.4rem);line-height:1.05;
+    letter-spacing:.01em;margin-bottom:1rem;
+}
+.legal-hero p{color:var(--muted);max-width:560px;margin:0 auto 1.25rem;font-size:1rem}
+.updated-badge{
+    display:inline-flex;align-items:center;gap:.5rem;font-family:var(--font-mono);font-size:.75rem;
+    color:var(--primary);background:rgba(255,201,60,.1);border:1px solid rgba(255,201,60,.28);
+    padding:.4rem .9rem;border-radius:999px;
+}
+
+/* ---------- Layout ---------- */
+.legal-layout{
+    display:grid;grid-template-columns:240px 1fr;gap:3rem;
+    padding-bottom:6rem;align-items:start;
+}
+.toc{
+    position:sticky;top:100px;
+    display:flex;flex-direction:column;gap:.15rem;
+    border-left:1px solid var(--border);padding-left:1.1rem;
+}
+.toc span{
+    font-family:var(--font-mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--faded);margin-bottom:.6rem;
+}
+.toc a{
+    font-size:.85rem;color:var(--muted);text-decoration:none;padding:.4rem 0;
+    border-left:2px solid transparent;margin-left:-1.12rem;padding-left:1rem;transition:.15s ease;
+}
+.toc a:hover{color:var(--text);border-left-color:var(--secondary)}
+
+.content{display:flex;flex-direction:column;gap:1.1rem}
+section.card{
+    scroll-margin-top:100px;
+    background:linear-gradient(160deg,rgba(31,18,64,.7),rgba(22,13,47,.7));
+    border:1px solid var(--border);border-radius:18px;padding:1.9rem 2rem;
+}
+section.card h2{
+    font-family:var(--font-display);font-size:1.35rem;letter-spacing:.01em;margin-bottom:.85rem;
+    display:flex;align-items:center;gap:.6rem;
+}
+section.card h2 .num{
+    font-family:var(--font-mono);font-size:.72rem;color:var(--primary);
+    background:rgba(255,201,60,.12);border:1px solid rgba(255,201,60,.3);
+    border-radius:8px;padding:.2rem .55rem;
+}
+section.card p{color:var(--muted);margin-bottom:.85rem;font-size:.95rem}
+section.card p:last-child{margin-bottom:0}
+section.card ul{margin:0 0 .85rem 1.2rem;color:var(--muted);font-size:.95rem}
+section.card li{margin-bottom:.5rem}
+section.card li:last-child{margin-bottom:0}
+section.card strong{color:var(--text)}
+.mail-btn{
+    display:inline-flex;align-items:center;gap:.5rem;margin-top:.4rem;
+    background:linear-gradient(180deg,var(--primary-hover),var(--primary));
+    color:#150B2E;font-weight:800;font-size:.85rem;padding:.65rem 1.2rem;
+    border-radius:999px;text-decoration:none;
+}
+.tag-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.9rem}
+.tag{
+    font-family:var(--font-mono);font-size:.72rem;color:var(--secondary);
+    background:rgba(61,220,255,.1);border:1px solid rgba(61,220,255,.28);
+    border-radius:999px;padding:.3rem .7rem;
+}
+
+/* ---------- Footer ---------- */
+footer{border-top:1px solid var(--border);padding:2rem 0;color:var(--faded);font-size:.82rem}
+footer .container{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+footer a{color:var(--muted);text-decoration:none;font-weight:700}
+footer a:hover{color:var(--primary)}
+
+@media(max-width:880px){
+    .legal-layout{grid-template-columns:1fr}
+    .toc{position:static;border-left:none;padding-left:0;flex-direction:row;flex-wrap:wrap;gap:.5rem}
+    .toc span{display:none}
+    .toc a{border:1px solid var(--border);border-radius:999px;margin:0;padding:.4rem .8rem}
+    .toc a:hover{border-color:var(--secondary)}
+}
+</style>
+</head>
+<body>
+
+<section class="legal-hero">
+    <div class="container">
+        <span class="eyebrow">Legal</span>
+        <h1>Privacy Policy</h1>
+        <p>How Brawl Analytics collects, uses and protects the information tied to your account and your uploaded YouTube Studio data.</p>
+        <span class="updated-badge">🕓 Last updated: July 2026</span>
+    </div>
+</section>
+
+<div class="container legal-layout">
+
+    <nav class="toc">
+        <span>On this page</span>
+        <a href="#information">1. Information we collect</a>
+        <a href="#account">2. Account information</a>
+        <a href="#uploaded-data">3. Your uploaded CSV data</a>
+        <a href="#ai">4. AI processing</a>
+        <a href="#storage">5. Where data is stored</a>
+        <a href="#cookies">6. Cookies & local storage</a>
+        <a href="#third-party">7. Third-party services</a>
+        <a href="#security">8. Data security</a>
+        <a href="#rights">9. Your rights</a>
+        <a href="#retention">10. Data retention</a>
+        <a href="#children">11. Children's privacy</a>
+        <a href="#changes">12. Changes to this policy</a>
+        <a href="#deletion">13. Data deletion</a>
+        <a href="#contact">14. Contact</a>
+    </nav>
+
+    <div class="content">
+
+        <section class="card" id="information">
+            <h2><span class="num">01</span>Information we collect</h2>
+            <p>We collect only what's needed to run your dashboard:</p>
+            <ul>
+                <li><strong>Account data</strong> — the email address and password you use to sign up (password never reaches our servers in plain text; it's handled by our authentication provider, Supabase).</li>
+                <li><strong>Uploaded channel data</strong> — the YouTube Studio CSV export you upload, including video titles, view counts, retention percentages, watch time and publish dates.</li>
+                <li><strong>Content you create in the app</strong> — custom formats, generated video ideas, and the answers you give in the Video Analysis questionnaire (originality, format, description).</li>
+                <li><strong>Basic usage data</strong> — your current plan (Free or Pro) and how many AI actions (video analyses, idea generations) you've used today, needed to enforce daily limits.</li>
+            </ul>
+        </section>
+
+        <section class="card" id="account">
+            <h2><span class="num">02</span>Account information</h2>
+            <p>Accounts are created and managed through <strong>Supabase Authentication</strong>. We store your email address and an encrypted session token used to keep you logged in across visits. We never see or store your raw password.</p>
+        </section>
+
+        <section class="card" id="uploaded-data">
+            <h2><span class="num">03</span>Your uploaded CSV data</h2>
+            <div class="tag-row"><span class="tag">titles</span><span class="tag">views</span><span class="tag">retention</span><span class="tag">watch time</span><span class="tag">publish date</span></div>
+            <p>When you upload your YouTube Studio CSV, the parsed data is saved to your account so your dashboard, formats and score persist between sessions. This data is used exclusively to power your own analytics — it is never combined with or shown to other users, and it is never sold.</p>
+            <p>Uploading a new CSV replaces your previously stored data for the affected videos; you can also start over at any time via "Upload another CSV" in your dashboard.</p>
+        </section>
+
+        <section class="card" id="ai">
+            <h2><span class="num">04</span>AI processing</h2>
+            <p>Some features — automatic format detection and personalized idea generation — send a limited amount of text (video titles and short descriptions, never raw video files) to a Cloudflare Worker we operate, which forwards the request to our AI provider, <strong>Groq</strong>.</p>
+            <p>The Worker keeps our AI provider credentials server-side; your browser never talks to Groq directly. Only the text needed for the specific analysis is sent — never your email, password, or full account data.</p>
+        </section>
+
+        <section class="card" id="storage">
+            <h2><span class="num">05</span>Where data is stored</h2>
+            <p>Your account, uploaded videos, custom formats, channel profile and generated ideas are stored in a <strong>Supabase</strong> (PostgreSQL) database, protected by row-level security policies that restrict every record to the user who owns it.</p>
+        </section>
+
+        <section class="card" id="cookies">
+            <h2><span class="num">06</span>Cookies & local storage</h2>
+            <p>We don't use advertising or tracking cookies. Your browser's local storage keeps your Supabase session token so you stay logged in between visits — this is functional storage only, required for the Service to work, not for analytics or ads.</p>
+        </section>
+
+        <section class="card" id="third-party">
+            <h2><span class="num">07</span>Third-party services</h2>
+            <ul>
+                <li><strong>Supabase</strong> — authentication and database hosting.</li>
+                <li><strong>Cloudflare Workers</strong> — hosts the API endpoints that relay AI requests and fetch trend data.</li>
+                <li><strong>Groq</strong> — processes video titles/descriptions to power AI features.</li>
+            </ul>
+            <p>We only share the minimum amount of information required for these services to operate.</p>
+        </section>
+
+        <section class="card" id="security">
+            <h2><span class="num">08</span>Data security</h2>
+            <p>Access to your data is protected by authenticated sessions and Supabase row-level security, meaning database queries are scoped to your user ID at the database layer, not just in the app's front-end code. Traffic between your browser and our services is encrypted in transit (HTTPS).</p>
+        </section>
+
+        <section class="card" id="rights">
+            <h2><span class="num">09</span>Your rights</h2>
+            <p>You can, at any time:</p>
+            <ul>
+                <li>Delete your uploaded CSV data from your dashboard.</li>
+                <li>Delete individual custom formats or generated ideas.</li>
+                <li>Request a full export or deletion of your account data by emailing us.</li>
+            </ul>
+        </section>
+
+        <section class="card" id="retention">
+            <h2><span class="num">10</span>Data retention</h2>
+            <p>We keep your account and channel data for as long as your account is active. Generated ideas are cached per day and naturally replaced the next time you generate new ones. If you delete your account, associated data is removed from our database.</p>
+        </section>
+
+        <section class="card" id="children">
+            <h2><span class="num">11</span>Children's privacy</h2>
+            <p>Brawl Analytics is not directed at children under 13, in line with our <a href="terms.html" style="color:var(--secondary)">Terms & Conditions</a>. We do not knowingly collect data from users under this age.</p>
+        </section>
+
+        <section class="card" id="changes">
+            <h2><span class="num">12</span>Changes to this policy</h2>
+            <p>We may update this Privacy Policy as the Service evolves. Continued use of Brawl Analytics after an update means you accept the revised policy.</p>
+        </section>
+
+        <section class="card" id="deletion">
+
+            <h2><span class="num">13</span>Data deletion</h2>
+
+            <p>
+                You may request the permanent deletion of your account and all associated personal
+                data at any time by contacting us at the email address below.
+            </p>
+
+            <p>
+                Once your request has been verified, we will permanently remove your account and
+                associated data from our systems, unless we are required by law to retain certain
+                information.
+            </p>
+
+        </section>
+
+        <section class="card" id="contact">
+            <h2><span class="num">14</span>Contact</h2>
+            <p>Questions about this Privacy Policy or your data? Reach out any time.</p>
+            <a class="mail-btn" href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener">✉ angeskicollab10@gmail.com</a>
+        </section>
+
+    </div>
+</div>
+
+<footer>
+    <div class="container">
+        <span>© 2026 Brawl Analytics · Not a YouTube/Supercell product.</span>
+        <span><a href="terms.html">Terms & Conditions</a></span>
+    </div>
+</footer>
+
+</body>
+</html>

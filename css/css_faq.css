@@ -252,7 +252,10 @@
 
 }
 
-
+.faq-answer a:hover {
+    color: #FFD668;
+    
+}
 
 @keyframes faqOpen{
 

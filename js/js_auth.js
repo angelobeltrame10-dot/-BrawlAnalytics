@@ -385,7 +385,7 @@ function injectAuthModal(){
                 </div>
                 <label class="auth-checkbox">
                     <input type="checkbox" id="signup-terms">
-                    <span>I agree to the <a href="#" target="_blank" rel="noopener">Terms &amp; Conditions</a></span>
+                    <span>I agree to the <a href="../legal/terms.html" target="_blank" rel="noopener">Terms &amp; Conditions</a></span>
                 </label>
                 <button type="submit" class="auth-submit-btn" id="auth-submit-btn-signup">Create account</button>
             </form>
