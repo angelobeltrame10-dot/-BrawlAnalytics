@@ -58,9 +58,7 @@ function initNavigation(){
             id="nav-logo"
         >
 
-            <span class="logo__mark">
-                B
-            </span>
+                <img src="assets/favicon.ico" alt="Brawl Analytics logo" width="32" height="32">
 
             <span class="logo__text">
                 Brawl<strong>Analytics</strong> - BETA
