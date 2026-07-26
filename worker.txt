@@ -110,6 +110,14 @@ function ensureString(value, defaultValue = "") {
     return str || defaultValue;
 }
 
+/**
+ * Ensures value is one of the allowed enum options (case-insensitive).
+ */
+function ensureEnum(value, allowed, defaultValue) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return allowed.includes(normalized) ? normalized : defaultValue;
+}
+
 // ============================================================
 // GROQ API CLIENT
 // ============================================================
@@ -292,7 +300,7 @@ Analyze this opening concept following the process above. Consider how it aligns
 // HANDLER: PERSONAL AI COACH (PRO ONLY)
 // ============================================================
 
-const PERSONAL_COACH_PROMPT = `You are an experienced YouTube consultant who has studied this creator's entire channel.
+const PERSONAL_COACH_PROMPT = `You are an experienced YouTube Shorts consultant who has studied this creator's entire channel, specializing in Brawl Stars content.
 
 You analyze:
 - Historical performance data
@@ -301,9 +309,15 @@ You analyze:
 - Upload frequency
 - Audience preferences
 
+You give REAL, concrete advice grounded in how the YouTube Shorts algorithm and the Brawl Stars creator space actually work — never generic platitudes like "post more" or "engage with your audience" without specifics. In particular, weave in these two realities whenever they are relevant to this creator's data:
+
+1. PUBLISHING TIMING: uploading a Short the instant it's edited is rarely optimal. Scheduling uploads for consistent time slots when the target audience is active (evenings, weekends, right after game updates/balance changes) usually outperforms immediate publishing, and a predictable rhythm helps build a returning audience.
+
+2. ORIGINALITY CEILING: reusing another Brawl Stars creator's IDEA caps a Short's realistic performance — a copied idea alone (different footage, own voice/edit) usually tops out somewhere in the low tens of thousands of views (roughly ~30K as a rough ceiling). If the creator also copies the STRUCTURE (pacing, script beats, punchline placement) or reuses actual CLIPS from the original video, performance is typically even lower than that, because both the algorithm and the audience recognize unoriginal content and suppress or skip it. The only durable path to consistently higher, growing views is combining the creator's OWN idea, OWN format, and OWN editing style — inspiration from trends is fine, duplication is not.
+
 Generate insight cards that are:
 - Specific and actionable
-- Based on real data patterns
+- Based on real data patterns from this channel
 - Personalized to this creator
 - Concise and impactful
 
@@ -317,6 +331,11 @@ Return ONLY valid JSON with this exact structure. Never omit any field.
   "nextWeekRecommendation": "specific action for next week",
   "aiStrategy": "strategic insight about audience preferences",
   "overallCreatorRating": "A+/A/B/C based on consistency, originality, execution",
+  "uploadTimingAdvice": "concrete recommendation about WHEN and HOW OFTEN to publish for this channel, mentioning scheduling instead of instant publishing when relevant",
+  "originalityRisk": {
+    "level": "low/medium/high",
+    "explanation": "assessment of how original this channel's content looks based on its formats/titles; if medium or high risk, explain the view ceiling that comes from copying ideas/structure/clips from other creators and what specifically to change"
+  },
   "keyInsights": ["insight 1", "insight 2", "insight 3"],
   "performancePatterns": {
     "bestDay": "day of week with best performance",
@@ -369,7 +388,9 @@ Focus on:
 2. What's holding them back
 3. Specific opportunities they're missing
 4. Actionable recommendations for next week
-5. Long-term strategic insights`;
+5. Long-term strategic insights
+6. Whether publishing timing/scheduling could be improved
+7. Whether there's any sign of low originality (reused ideas/formats) that could be capping performance`;
 
     try {
         const response = await callGroq(
@@ -398,6 +419,17 @@ Focus on:
             nextWeekRecommendation: ensureString(parsed.nextWeekRecommendation, "Maintain upload schedule"),
             aiStrategy: ensureString(parsed.aiStrategy, "Developing strategy..."),
             overallCreatorRating: ensureString(parsed.overallCreatorRating, "B"),
+            uploadTimingAdvice: ensureString(
+                parsed.uploadTimingAdvice,
+                "Try scheduling your Shorts for a consistent time slot (evenings/weekends) instead of publishing immediately after editing."
+            ),
+            originalityRisk: {
+                level: ensureEnum(parsed.originalityRisk?.level, ["low", "medium", "high"], "medium"),
+                explanation: ensureString(
+                    parsed.originalityRisk?.explanation,
+                    "Not enough data to assess originality risk yet. As a rule of thumb: copying another creator's idea caps performance around the low tens of thousands of views, and copying structure or clips too pushes it even lower — your own idea, format and style is what compounds over time."
+                )
+            },
             keyInsights: ensureArray(parsed.keyInsights, ["More data needed"]),
             performancePatterns: {
                 bestDay: ensureString(parsed.performancePatterns?.bestDay, "Unknown"),

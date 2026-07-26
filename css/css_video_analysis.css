@@ -89,3 +89,41 @@
     font-size: 1.25rem;
     color: #f6f5f2;
 }
+
+
+/* ============================================================
+   AI COACH — ENHANCED SECTIONS (alerts, timing box, list cards, playbook)
+   ============================================================ */
+
+.coach-alert{display:flex;gap:1rem;align-items:flex-start;border-radius:16px;padding:1.25rem 1.4rem;margin-bottom:1.25rem;border:1px solid}
+.coach-alert-icon{font-size:1.4rem;flex-shrink:0;line-height:1}
+.coach-alert h4{font-size:1rem;margin-bottom:.4rem;color:#f6f5f2}
+.coach-alert p{font-size:.88rem;color:#c7c8d4;line-height:1.6;margin:0}
+.coach-alert-low{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3)}
+.coach-alert-low .coach-alert-icon{color:#10b981}
+.coach-alert-medium{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.32)}
+.coach-alert-medium .coach-alert-icon{color:#f59e0b}
+.coach-alert-high{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.35)}
+.coach-alert-high .coach-alert-icon{color:#ef4444}
+
+.coach-timing-box{display:flex;gap:1rem;align-items:flex-start;background:linear-gradient(145deg,rgba(61,220,255,.08),rgba(61,220,255,.02));border:1px solid rgba(61,220,255,.25);border-radius:16px;padding:1.25rem 1.4rem;margin-bottom:2rem}
+.coach-timing-icon{font-size:1.4rem;flex-shrink:0}
+.coach-timing-box h4{font-size:1rem;margin-bottom:.4rem;color:#f6f5f2}
+.coach-timing-box p{font-size:.88rem;color:#c7c8d4;line-height:1.6;margin:0}
+
+.coach-list-card{border:1px solid rgba(255,255,255,.09);border-radius:16px;background:linear-gradient(145deg,rgba(28,29,40,.94),rgba(18,19,27,.94));padding:1.4rem 1.5rem;margin-bottom:1.25rem}
+.coach-list-card h4{display:flex;align-items:center;gap:.5rem;font-size:1rem;color:#f6f5f2;margin-bottom:1rem}
+.coach-list-card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.7rem}
+.coach-list-card li{display:flex;gap:.65rem;align-items:flex-start;font-size:.88rem;color:#c7c8d4;line-height:1.55}
+.coach-list-card li::before{content:'✓';color:#7ee8b0;flex-shrink:0;font-weight:800}
+.coach-list-card.weak li::before{content:'⚠';color:#ffc875}
+
+.coach-playbook{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:1.5rem}
+.coach-playbook-item{border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(28,29,40,.6);padding:1.1rem 1.2rem;display:flex;gap:.75rem}
+.coach-playbook-item span{font-size:1.3rem;flex-shrink:0}
+.coach-playbook-item h5{font-size:.88rem;color:#f6f5f2;margin-bottom:.3rem}
+.coach-playbook-item p{font-size:.78rem;color:#a2a4b2;line-height:1.5;margin:0}
+
+@media(max-width:760px){
+    .coach-alert,.coach-timing-box{flex-direction:column}
+}

@@ -17,6 +17,37 @@ const LOADING_MESSAGES = [
     "Almost done..."
 ];
 
+// Static, always-true best-practice tips. These are NOT AI generated:
+// they encode facts about how Shorts/the BS creator space behave, so
+// they show up reliably even if the LLM output skips them.
+const PLAYBOOK_TIPS = [
+    {
+        icon: "📅",
+        title: "Schedule, don't rush",
+        text: "Finishing the edit doesn't mean it's time to publish. Queue the Short for a consistent time slot — evenings and weekends usually perform best — instead of posting the moment it's ready."
+    },
+    {
+        icon: "🧬",
+        title: "Copied ideas have a ceiling",
+        text: "Reusing another Brawl Stars creator's idea caps performance — roughly the low tens of thousands of views at best. Copy the structure or the clips too, and it usually performs even worse."
+    },
+    {
+        icon: "🎯",
+        title: "Own idea, own format, own style",
+        text: "Inspiration from trends is fine — duplication isn't. Channels that break out consistently combine a personal angle with a format and edit viewers recognize as theirs."
+    },
+    {
+        icon: "🔁",
+        title: "Consistency beats perfection",
+        text: "A predictable upload rhythm trains both the algorithm and your audience faster than occasional 'perfect' uploads with long gaps in between."
+    },
+    {
+        icon: "⏱",
+        title: "Win the first 2 seconds",
+        text: "Most retention drop-off on Shorts happens almost immediately. Lead with the payoff or the hook — don't build up to it."
+    }
+];
+
 let initialized = false;
 let loadingTimer = null;
 let channelProfileCache = null;
@@ -169,11 +200,32 @@ function renderError(message){
 
 }
 
+/*
+    Renders a single list card (formats / insights / recommendations)
+    with a consistent, styled look instead of a raw <ul> dropped inside
+    a generic banner.
+*/
+function listCard(title, icon, items, variant = ""){
+
+    if(!items || items.length === 0) return "";
+
+    return `
+        <div class="coach-list-card ${variant}">
+            <h4>${icon ? `<span>${icon}</span>` : ""}${title}</h4>
+            <ul>${items.map(item => `<li>${item}</li>`).join("")}</ul>
+        </div>`;
+
+}
+
 function renderResults(result){
 
     if(loadingTimer) clearInterval(loadingTimer);
 
     const flow = document.getElementById("coach-flow");
+
+    const originalityLevel = (result.originalityRisk?.level || "medium").toLowerCase();
+    const originalityLabel = { low: "Low risk", medium: "Medium risk", high: "High risk" }[originalityLevel] || "Medium risk";
+    const originalityIcon = { low: "✓", medium: "⚠", high: "⛔" }[originalityLevel] || "⚠";
 
     flow.innerHTML = `
         <div class="va-results">
@@ -224,6 +276,24 @@ function renderResults(result){
                 </article>
             </div>
 
+            <!-- Originality Risk -->
+            <div class="coach-alert coach-alert-${originalityLevel}">
+                <span class="coach-alert-icon">${originalityIcon}</span>
+                <div>
+                    <h4>Originality Risk — ${originalityLabel}</h4>
+                    <p>${result.originalityRisk?.explanation || ""}</p>
+                </div>
+            </div>
+
+            <!-- Upload Timing -->
+            <div class="coach-timing-box">
+                <span class="coach-timing-icon">📅</span>
+                <div>
+                    <h4>Publishing & Scheduling</h4>
+                    <p>${result.uploadTimingAdvice || ""}</p>
+                </div>
+            </div>
+
             <!-- Strategy Section -->
             <div class="va-section-title"><div><span class="va-step">STRATEGY</span><h3>AI Strategy</h3></div></div>
             <section class="banner" style="margin-bottom:1.5rem">
@@ -249,30 +319,25 @@ function renderResults(result){
                 </article>
             </div>
 
-            ${(result.performancePatterns?.winningFormats?.length > 0) ? `
-            <div class="va-section-title"><div><span class="va-step">FORMATS</span><h3>Winning Formats</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <ul style="margin-top:.5rem">${result.performancePatterns.winningFormats.map(f => `<li>${f}</li>`).join("")}</ul>
-            </section>` : ""}
+            ${listCard("Winning Formats", "✅", result.performancePatterns?.winningFormats)}
+            ${listCard("Formats to Avoid", "⚠", result.performancePatterns?.weakFormats, "weak")}
+            ${listCard("Key Insights", "💡", result.keyInsights)}
 
-            ${(result.performancePatterns?.weakFormats?.length > 0) ? `
-            <div class="va-section-title"><div><span class="va-step">FORMATS</span><h3>Formats to Avoid</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <ul style="margin-top:.5rem">${result.performancePatterns.weakFormats.map(f => `<li>${f}</li>`).join("")}</ul>
-            </section>` : ""}
+            <!-- Platform Playbook (static, always-true advice) -->
+            <div class="va-section-title"><div><span class="va-step">PLAYBOOK</span><h3>What Actually Moves the Needle</h3></div><p>Battle-tested principles, not generic tips.</p></div>
+            <div class="coach-playbook">
+                ${PLAYBOOK_TIPS.map(tip => `
+                    <article class="coach-playbook-item">
+                        <span>${tip.icon}</span>
+                        <div>
+                            <h5>${tip.title}</h5>
+                            <p>${tip.text}</p>
+                        </div>
+                    </article>
+                `).join("")}
+            </div>
 
-            <!-- Key Insights -->
-            <div class="va-section-title"><div><span class="va-step">INSIGHTS</span><h3>Key Insights</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <ul style="margin-top:.5rem">${(result.keyInsights || []).map(i => `<li>${i}</li>`).join("")}</ul>
-            </section>
-
-            <!-- Long-term Recommendations -->
-            ${(result.longTermRecommendations?.length > 0) ? `
-            <div class="va-section-title"><div><span class="va-step">LONG-TERM</span><h3>Strategic Recommendations</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <ul style="margin-top:.5rem">${result.longTermRecommendations.map(r => `<li>${r}</li>`).join("")}</ul>
-            </section>` : ""}
+            ${listCard("Strategic Recommendations", "🧭", result.longTermRecommendations)}
         </div>`;
 
     document.getElementById("coach-restart").addEventListener("click", handleAnalyzeClick);
