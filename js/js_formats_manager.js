@@ -6,7 +6,7 @@
 
 import { loadCustomFormats, saveCustomFormats } from "./js_storage.js";
 import { generateKeywordsForFormat } from "./js_api.js";
-import { classifyVideos, getFormatRanking } from "./js_fomats.js";
+import { classifyVideos } from "./js_fomats.js";
 import { getDashboardData } from "./js_dashboard.js";
 import { getVideoTitle } from "./js_csv_fields.js";
 
@@ -36,16 +36,18 @@ async function renderFormatCards() {
 
     const formats = await loadCustomFormats();
     const videos = getDashboardData();
-    
-    // Get video counts for each format
-    const classified = classifyVideos(videos, formats);
-    const ranking = getFormatRanking(classified, formats);
-    
-    // Sort by video count (descending)
+
+    // Conteggio video per formato: usa SEMPRE getEffectiveAssociatedVideos
+    // (manuale se format.associatedVideos è presente/non vuoto, altrimenti
+    // auto-classificazione via keyword) — è la STESSA funzione usata dal
+    // modal "View" per decidere quali video sono spuntati. Prima qui si
+    // usava getFormatRanking() (solo keyword matching), quindi aggiungere
+    // o togliere video a mano nel modal non cambiava mai il numero
+    // mostrato sotto il titolo della card.
     const sortedFormats = formats
         .map((format, index) => ({
             ...format,
-            videoCount: ranking[format.name] || 0,
+            videoCount: getEffectiveAssociatedVideos(format, formats, videos).length,
             originalIndex: index
         }))
         .sort((a, b) => b.videoCount - a.videoCount);
@@ -231,6 +233,11 @@ function migrateVideoIdsToTitles(formats, allVideos) {
  * video a un formato ancora "auto-classificato" (senza associatedVideos
  * salvati) creava un associatedVideos con SOLO il nuovo video, facendo
  * sparire tutti i video già trovati via keyword dalla vista successiva.
+ *
+ * È anche la fonte di verità per il conteggio "N videos" mostrato nella
+ * card del formato (vedi renderFormatCards): così il numero riflette
+ * sempre lo stato reale, incluse le modifiche manuali fatte nel modal
+ * "View", invece di restare legato solo al keyword-matching automatico.
  */
 function getEffectiveAssociatedVideos(format, formats, allVideos) {
 

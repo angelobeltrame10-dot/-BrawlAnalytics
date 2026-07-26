@@ -90,3 +90,40 @@ export function setupTrendsRefresh(){
     button.dataset.bound = "true";
     button.addEventListener("click", ()=> initTrends(true));
 }
+
+/*
+    Restituisce l'ultimo set di trend caricato in cache (es. dalla tab
+    "Trends" o da una chiamata precedente). NON esegue un fetch: se
+    nessun trend è mai stato caricato in questa sessione, ritorna [].
+
+    Usata dal Virality Engine (js_video_analysis.js) per confrontare
+    titolo/descrizione del video proposto con i trend reali di Brawl
+    Stars, invece di analizzare sempre con trendsAnalysis = null.
+*/
+export function getCachedTrends(){
+    return [...cachedTrends];
+}
+
+/*
+    Garantisce che i trend siano disponibili prima di un'analisi che ne
+    ha bisogno (es. Video Analysis), anche se l'utente non ha mai aperto
+    la tab "Trends" in questa sessione. Se sono già stati caricati,
+    riusa la cache senza rifare la richiesta di rete.
+*/
+export async function ensureTrendsLoaded(){
+
+    if(trendsLoaded){
+        return getCachedTrends();
+    }
+
+    try{
+        cachedTrends = await fetchTrends();
+        trendsLoaded = true;
+    }
+    catch(error){
+        console.error("Trends fetch failed (ensureTrendsLoaded):", error);
+    }
+
+    return getCachedTrends();
+
+}

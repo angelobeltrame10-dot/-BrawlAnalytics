@@ -2,6 +2,7 @@ import { loadChannelProfile } from "./js_storage.js";
 import { getAvailableFormats } from "./js_channel_profile.js";
 import { analyzeVirality } from "./js_virality_engine.js";
 import { consumeVideoAnalysis } from "./js_subscription.js";
+import { ensureTrendsLoaded } from "./js_trends.js";
 
 let initialized = false;
 let cachedChannelProfile = null;
@@ -304,7 +305,12 @@ function renderAnalysis(flow){
 
 async function renderResults(flow){
 
-    const trendsAnalysis = null;
+    // Recupera i trend reali (dalla cache se già caricati in questa
+    // sessione, altrimenti li scarica ora): prima questo valore era
+    // SEMPRE null, quindi l'AI non confrontava mai titolo/descrizione
+    // del video con i trend attuali di Brawl Stars — trendAlignment e
+    // semanticTrendSimilarity restavano sempre sui valori di default.
+    const trendsAnalysis = await ensureTrendsLoaded();
 
     const result = await analyzeVirality(
         userAnswers,

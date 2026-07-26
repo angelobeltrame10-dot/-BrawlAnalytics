@@ -980,15 +980,33 @@ async function refreshDashboard(){
         bestVideoViewsElement.textContent = bestVideo ? formatCompactNumber(getVideoViews(bestVideo)) : "0";
     }
 
-    // Calculate growth rate (simple comparison of first half vs second half)
+    // Calculate growth rate (prima metà vs seconda metà, ORDINATE per
+    // data di pubblicazione crescente — non nell'ordine grezzo del CSV,
+    // che non è garantito essere cronologico e in passato produceva
+    // percentuali negative/casuali indipendenti dalla reale crescita
+    // del canale). I video senza data valida vengono spinti in fondo
+    // (trattati come più recenti) invece di essere lasciati nella
+    // posizione originale del CSV, per non falsare comunque lo split.
     let growthRate = 0;
     if (dashboardData.length >= 4) {
-        const midPoint = Math.floor(dashboardData.length / 2);
-        const firstHalfViews = dashboardData.slice(0, midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
-        const secondHalfViews = dashboardData.slice(midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
+
+        const sortedByDate = [...dashboardData].sort((a, b) => {
+
+            const timeA = a["Data pubblicazione"] instanceof Date ? a["Data pubblicazione"].getTime() : Infinity;
+            const timeB = b["Data pubblicazione"] instanceof Date ? b["Data pubblicazione"].getTime() : Infinity;
+
+            return timeA - timeB;
+
+        });
+
+        const midPoint = Math.floor(sortedByDate.length / 2);
+        const firstHalfViews = sortedByDate.slice(0, midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
+        const secondHalfViews = sortedByDate.slice(midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
+
         if (firstHalfViews > 0) {
             growthRate = ((secondHalfViews - firstHalfViews) / firstHalfViews) * 100;
         }
+
     }
     const growthRateElement = document.querySelector(".growth-rate");
     if (growthRateElement) {
