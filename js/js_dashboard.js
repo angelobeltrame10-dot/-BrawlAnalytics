@@ -44,6 +44,9 @@ import {
 }
 from "./js_analytics.js";
 
+import { initHookAnalyzer } from "./js_hook_analyzer.js";
+
+import { initAICoach } from "./js_ai_coach.js";
 
 import {
 
@@ -240,7 +243,11 @@ function setActiveTab(tab){
 
         ideas: document.getElementById("ideas-section"),
 
-        trends: document.getElementById("trends-section")
+        trends: document.getElementById("trends-section"),
+
+        hook: document.getElementById("hook-section"),
+
+        coach: document.getElementById("coach-section")
 
     };
 
@@ -310,6 +317,14 @@ function setActiveTab(tab){
 
     if(tab === "trends"){
         initTrends();
+    }
+
+    if(tab === "hook"){
+        initHookAnalyzer();
+    }
+
+    if(tab === "coach"){
+        initAICoach();
     }
 
 }

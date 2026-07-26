@@ -1763,3 +1763,22 @@
     color: var(--color-text-faded);
     margin: 0;
 }
+
+.hook-textarea{
+    width:100%;
+    min-height:180px;
+    resize:vertical;
+    border-radius:var(--radius-md);
+    border:var(--border);
+    background:var(--color-background);
+    color:var(--color-text);
+    padding:1rem;
+    font:inherit;
+    outline:0;
+    margin-bottom:1rem;
+    transition:border-color var(--transition-fast);
+}
+
+.hook-textarea:focus{
+    border-color:var(--color-primary);
+}

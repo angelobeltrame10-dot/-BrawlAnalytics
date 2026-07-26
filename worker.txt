@@ -1,158 +1,485 @@
+/* ==========================================================
+
+   BRAWL ANALYTICS — AI ROUTER (Cloudflare Worker)
+
+   Central AI backend with dedicated handlers for each feature:
+   - Hook & Concept Analyzer
+   - Personal AI Coach
+   - Future: Virality Analysis, Idea Generation, etc.
+
+   Robust JSON validation, repair, and field completion.
+   Never returns incomplete data to frontend.
+
+========================================================== */
+
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const ALLOWED_ORIGIN = "*";
+
+// ============================================================
+// CORS & RESPONSE HELPERS
+// ============================================================
 
 function corsHeaders() {
     return {
         "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-        "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type"
     };
 }
 
-function json(body, status = 200) {
-    return new Response(JSON.stringify(body, null, 2), {
-        status,
-        headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders()
+function jsonResponse(body, status = 200) {
+    return new Response(
+        JSON.stringify(body),
+        {
+            status,
+            headers: {
+                "Content-Type": "application/json",
+                ...corsHeaders()
+            }
         }
-    });
+    );
 }
 
-// 1. RECUPERO TREND (Invariato, ma essenziale)
-async function getDailyTrends(env) {
-    const fallbackTrends = [
-        { query: "brawl stars meta tier list" },
-        { query: "ranked mode global leaderboard" },
-        { query: "best brawlers hypercharge" }
-    ];
+// ============================================================
+// ROBUST JSON VALIDATION & REPAIR
+// ============================================================
+
+/**
+ * Extracts and repairs JSON from LLM output.
+ * Handles markdown, extra text, malformed JSON.
+ */
+function extractAndRepairJSON(text) {
+    if (!text) return null;
+
+    // Remove markdown code blocks
+    let cleaned = text
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+
+    // Find first valid JSON object
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+
+    if (start === -1 || end === -1 || end < start) {
+        return null;
+    }
+
+    const jsonStr = cleaned.slice(start, end + 1);
 
     try {
-        const targetUrl = "https://trends.angeskicollab10.workers.dev/trends";
-        const response = await fetch(targetUrl);
-        if (!response.ok) return { trends: fallbackTrends };
-        
-        const data = await response.json();
-        if (!data?.trends || !Array.isArray(data.trends) || data.trends.length === 0) {
-            return { trends: fallbackTrends };
-        }
-        return data;
+        return JSON.parse(jsonStr);
     } catch (e) {
-        return { trends: fallbackTrends };
+        // Attempt basic repair: fix trailing commas
+        const repaired = jsonStr
+            .replace(/,\s*}/g, "}")
+            .replace(/,\s*]/g, "]");
+        
+        try {
+            return JSON.parse(repaired);
+        } catch {
+            return null;
+        }
     }
 }
 
-// 2. PROMPT BUILDER: Ora include il Channel Profile per un reasoning reale
-function buildPrompt(proposal, channelProfile, trends) {
-    const rawTrends = trends?.trends || [];
-    const listaTrends = rawTrends.map(t => typeof t === 'object' && t !== null ? t.query : t).join(", ");
-    
-    // Estrazione sicura dei dati storici del canale
-    const avgViews = channelProfile?.averageViews || "Nessun dato storico";
-    const bestFormats = channelProfile?.bestFormats ? channelProfile.bestFormats.join(", ") : "Nessun dato";
-    const worstFormats = channelProfile?.worstFormats ? channelProfile.worstFormats.join(", ") : "Nessun dato";
-
-    return `Sei l'intelligenza analitica di Brawl Analytics.
-Il tuo compito è estrarre parametri qualitativi confrontando una nuova idea video con i trend attuali e lo storico del canale.
-NON devi calcolare un punteggio numerico. Rispondi rigorosamente in formato JSON.
-
-=== STORICO DEL CANALE (CHANNEL PROFILE) ===
-- View medie: ${avgViews}
-- Migliori formati: ${bestFormats}
-- Peggiori formati: ${worstFormats}
-
-=== NUOVA PROPOSTA VIDEO ===
-- Descrizione: "${proposal?.description || 'Non fornita'}"
-- Originalità Idea: "${proposal?.ideaOriginality || 'Standard'}"
-- Originalità Video: "${proposal?.videoOriginality || 'Standard'}"
-- Formato Scelto: "${proposal?.format || 'Non definito'}"
-
-=== TREND DEL GIORNO (BRAWL STARS) ===
-[${listaTrends}]
-
-Genera un JSON con questa ESATTA struttura. Usa valori come "high", "medium", "low" dove appropriato, oppure brevi stringhe descrittive:
-{
-  "trendAlignment": "high/medium/low",
-  "semanticTrendSimilarity": "spiegazione breve della sovrapposizione semantica coi trend",
-  "formatSuitability": "high/medium/low (basato sul successo storico del canale)",
-  "historicalFit": "high/medium/low (quanto l'idea rispetta l'identità del creator)",
-  "innovation": "high/medium/low",
-  "competition": "high/medium/low (livello di saturazione stimato)",
-  "topicFreshness": "quanto è fresco l'argomento (breve frase)",
-  "formatNovelty": "high/medium/low (se è un format totalmente nuovo per il canale)"
-}`;
+/**
+ * Clamps numeric values between min and max.
+ */
+function clampValue(value, min, max, defaultValue) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return defaultValue;
+    return Math.max(min, Math.min(max, num));
 }
 
-// 3. GROQ LLM (Upgrade a llama-3.3-70b-versatile)
-async function callLlama(prompt, env) {
+/**
+ * Ensures array is never empty or null.
+ */
+function ensureArray(value, defaultValue = []) {
+    if (Array.isArray(value) && value.length > 0) {
+        return value;
+    }
+    return defaultValue;
+}
+
+/**
+ * Ensures string is never empty or null.
+ */
+function ensureString(value, defaultValue = "") {
+    const str = String(value || "").trim();
+    return str || defaultValue;
+}
+
+// ============================================================
+// GROQ API CLIENT
+// ============================================================
+
+async function callGroq(messages, env, temperature = 0.2, maxTokens = 3000) {
     if (!env.CHIAVE_API_AI) {
-        throw new Error("Manca la variabile CHIAVE_API_AI");
+        throw new Error("Missing AI key");
     }
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const response = await fetch(GROQ_ENDPOINT, {
         method: "POST",
         headers: {
-            "Authorization": `Bearer ${env.CHIAVE_API_AI}`,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.CHIAVE_API_AI}`
         },
         body: JSON.stringify({
-            model: "llama-3.3-70b-versatile", // Il modello di reasoning superiore
-            messages: [
-                { role: "system", content: "Rispondi sempre e solo con un oggetto JSON valido, senza markdown, senza testo introduttivo." },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.2, // Più basso per maggiore determinismo
+            model: "llama-3.3-70b-versatile",
+            messages,
+            temperature,
+            max_tokens: maxTokens,
             response_format: { type: "json_object" }
         })
     });
 
     if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Groq API Error: ${response.status} - ${errText}`);
+        const errorText = await response.text();
+        throw new Error(`Groq API Error: ${response.status} - ${errorText}`);
     }
 
-    const result = await response.json();
-    return JSON.parse(result.choices[0].message.content);
+    const data = await response.json();
+    return data;
 }
 
-// 4. MAIN FETCH (L'Orchestratore)
+// ============================================================
+// HANDLER: HOOK & CONCEPT ANALYZER
+// ============================================================
+
+const HOOK_ANALYZER_PROMPT = `You are a world-class YouTube Shorts strategist specializing in hook analysis.
+
+Follow this exact process:
+
+STEP 1
+Understand the creator's opening concept. Read the description carefully.
+
+STEP 2
+Identify the strongest emotional trigger (curiosity, surprise, shock, humor, etc.).
+
+STEP 3
+Evaluate whether the first seconds would stop scrolling on TikTok/YouTube Shorts.
+
+STEP 4
+Estimate curiosity level (0-100). How much does it make the viewer want to know more?
+
+STEP 5
+Estimate clarity level (0-100). How quickly does the viewer understand what's happening?
+
+STEP 6
+Estimate originality level (0-100). How unique is this opening compared to typical content?
+
+STEP 7
+Identify 3-5 specific strengths.
+
+STEP 8
+Identify 3-5 specific weaknesses or missed opportunities.
+
+STEP 9
+Suggest 3-5 concrete improvements.
+
+STEP 10
+Generate 3 improved hook versions:
+- Version A: Safe improvement (conservative, reliable)
+- Version B: More aggressive (bold, attention-grabbing)
+- Version C: Highest viral potential (riskier but maximum impact)
+
+STEP 11
+Write a final summary (max 60 words).
+
+Return ONLY valid JSON with this exact structure. Never omit any field. Never use markdown.
+
+{
+  "hookScore": 0-100,
+  "curiosityScore": 0-100,
+  "scrollStopScore": 0-100,
+  "originalityScore": 0-100,
+  "clarityScore": 0-100,
+  "emotionalTrigger": "brief description",
+  "viewerCuriosity": "high/medium/low",
+  "expectedRetention": "high/medium/low",
+  "predictedFirstImpression": "brief description",
+  "strengths": ["strength 1", "strength 2"],
+  "weaknesses": ["weakness 1", "weakness 2"],
+  "missedOpportunities": ["opportunity 1", "opportunity 2"],
+  "recommendedImprovements": ["improvement 1", "improvement 2"],
+  "improvedHookVersionA": "safe improvement",
+  "improvedHookVersionB": "aggressive improvement",
+  "improvedHookVersionC": "viral improvement",
+  "finalSummary": "brief summary"
+}`;
+
+async function handleHookAnalysis(payload, env) {
+    const { concept, channelProfile } = payload;
+
+    if (!concept || typeof concept !== "string") {
+        return { error: "Missing concept description" };
+    }
+
+    // Build context from channel profile
+    let context = "";
+    if (channelProfile) {
+        const avgViews = channelProfile.averageViews || 0;
+        const bestFormats = Array.isArray(channelProfile.bestFormats) 
+            ? channelProfile.bestFormats.slice(0, 3).join(", ") 
+            : "None";
+        const worstFormats = Array.isArray(channelProfile.worstFormats)
+            ? channelProfile.worstFormats.slice(0, 3).join(", ")
+            : "None";
+
+        context = `
+CHANNEL CONTEXT:
+- Average views: ${avgViews}
+- Best performing formats: ${bestFormats}
+- Underperforming formats: ${worstFormats}
+
+Use this context to personalize your analysis. Reference historical performance when relevant.
+`;
+    }
+
+    const userPrompt = `${context}
+
+OPENING CONCEPT TO ANALYZE:
+"${concept}"
+
+Analyze this opening concept following the process above. Consider how it aligns with the channel's historical performance if available.`;
+
+    try {
+        const response = await callGroq(
+            [
+                { role: "system", content: HOOK_ANALYZER_PROMPT },
+                { role: "user", content: userPrompt }
+            ],
+            env,
+            0.18,
+            3000
+        );
+
+        const content = response.choices?.[0]?.message?.content || "";
+        const parsed = extractAndRepairJSON(content);
+
+        if (!parsed) {
+            return { error: "AI returned invalid JSON" };
+        }
+
+        // Validate and complete all fields
+        return {
+            hookScore: clampValue(parsed.hookScore, 0, 100, 50),
+            curiosityScore: clampValue(parsed.curiosityScore, 0, 100, 50),
+            scrollStopScore: clampValue(parsed.scrollStopScore, 0, 100, 50),
+            originalityScore: clampValue(parsed.originalityScore, 0, 100, 50),
+            clarityScore: clampValue(parsed.clarityScore, 0, 100, 50),
+            emotionalTrigger: ensureString(parsed.emotionalTrigger, "Not detected"),
+            viewerCuriosity: ensureString(parsed.viewerCuriosity, "medium"),
+            expectedRetention: ensureString(parsed.expectedRetention, "medium"),
+            predictedFirstImpression: ensureString(parsed.predictedFirstImpression, "Unknown"),
+            strengths: ensureArray(parsed.strengths, ["No specific strengths detected"]),
+            weaknesses: ensureArray(parsed.weaknesses, ["No specific weaknesses detected"]),
+            missedOpportunities: ensureArray(parsed.missedOpportunities, ["No missed opportunities identified"]),
+            recommendedImprovements: ensureArray(parsed.recommendedImprovements, ["No specific recommendations"]),
+            improvedHookVersionA: ensureString(parsed.improvedHookVersionA, concept),
+            improvedHookVersionB: ensureString(parsed.improvedHookVersionB, concept),
+            improvedHookVersionC: ensureString(parsed.improvedHookVersionC, concept),
+            finalSummary: ensureString(parsed.finalSummary, "Analysis complete")
+        };
+
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
+// ============================================================
+// HANDLER: PERSONAL AI COACH (PRO ONLY)
+// ============================================================
+
+const PERSONAL_COACH_PROMPT = `You are an experienced YouTube consultant who has studied this creator's entire channel.
+
+You analyze:
+- Historical performance data
+- Format success patterns
+- Retention trends
+- Upload frequency
+- Audience preferences
+
+Generate insight cards that are:
+- Specific and actionable
+- Based on real data patterns
+- Personalized to this creator
+- Concise and impactful
+
+Return ONLY valid JSON with this exact structure. Never omit any field.
+
+{
+  "biggestStrength": "specific strength with example",
+  "biggestWeakness": "specific weakness with example",
+  "recentProgress": "quantified progress (e.g., +12% retention)",
+  "currentOpportunity": "specific opportunity with format recommendation",
+  "nextWeekRecommendation": "specific action for next week",
+  "aiStrategy": "strategic insight about audience preferences",
+  "overallCreatorRating": "A+/A/B/C based on consistency, originality, execution",
+  "keyInsights": ["insight 1", "insight 2", "insight 3"],
+  "performancePatterns": {
+    "bestDay": "day of week with best performance",
+    "idealDuration": "optimal video length in seconds",
+    "winningFormats": ["format 1", "format 2"],
+    "weakFormats": ["format 1", "format 2"]
+  },
+  "longTermRecommendations": ["recommendation 1", "recommendation 2"]
+}`;
+
+async function handlePersonalCoach(payload, env) {
+    const { channelProfile, historicalData, recentAnalyses } = payload;
+
+    if (!channelProfile) {
+        return { error: "Missing channel profile data" };
+    }
+
+    // Build comprehensive context
+    let context = `CHANNEL PROFILE:
+- Total videos: ${channelProfile.totalVideos || 0}
+- Average views: ${channelProfile.averageViews || 0}
+- Average retention: ${channelProfile.averageRetention || 0}%
+- Average duration: ${channelProfile.averageDuration || 0}s
+- Best formats: ${Array.isArray(channelProfile.bestFormats) ? channelProfile.bestFormats.join(", ") : "None"}
+- Worst formats: ${Array.isArray(channelProfile.worstFormats) ? channelProfile.worstFormats.join(", ") : "None"}
+`;
+
+    if (historicalData && Array.isArray(historicalData.videos)) {
+        const recentVideos = historicalData.videos.slice(-10);
+        const avgRecentViews = recentVideos.reduce((sum, v) => sum + (v.views || 0), 0) / recentVideos.length;
+        context += `\nRECENT PERFORMANCE (last 10 videos):
+- Average views: ${Math.round(avgRecentViews)}
+- Upload frequency: ${historicalData.uploadFrequency || "Unknown"}
+`;
+    }
+
+    if (recentAnalyses && Array.isArray(recentAnalyses)) {
+        context += `\nRECENT AI ANALYSES:
+- Hook analyses: ${recentAnalyses.filter(a => a.type === "hook").length}
+- Virality analyses: ${recentAnalyses.filter(a => a.type === "virality").length}
+`;
+    }
+
+    const userPrompt = `${context}
+
+Based on this comprehensive channel data, generate personalized insight cards as an experienced YouTube consultant would.
+
+Focus on:
+1. What makes this creator successful
+2. What's holding them back
+3. Specific opportunities they're missing
+4. Actionable recommendations for next week
+5. Long-term strategic insights`;
+
+    try {
+        const response = await callGroq(
+            [
+                { role: "system", content: PERSONAL_COACH_PROMPT },
+                { role: "user", content: userPrompt }
+            ],
+            env,
+            0.15,
+            2500
+        );
+
+        const content = response.choices?.[0]?.message?.content || "";
+        const parsed = extractAndRepairJSON(content);
+
+        if (!parsed) {
+            return { error: "AI returned invalid JSON" };
+        }
+
+        // Validate and complete all fields
+        return {
+            biggestStrength: ensureString(parsed.biggestStrength, "Analyzing..."),
+            biggestWeakness: ensureString(parsed.biggestWeakness, "Analyzing..."),
+            recentProgress: ensureString(parsed.recentProgress, "Insufficient data"),
+            currentOpportunity: ensureString(parsed.currentOpportunity, "Continue current strategy"),
+            nextWeekRecommendation: ensureString(parsed.nextWeekRecommendation, "Maintain upload schedule"),
+            aiStrategy: ensureString(parsed.aiStrategy, "Developing strategy..."),
+            overallCreatorRating: ensureString(parsed.overallCreatorRating, "B"),
+            keyInsights: ensureArray(parsed.keyInsights, ["More data needed"]),
+            performancePatterns: {
+                bestDay: ensureString(parsed.performancePatterns?.bestDay, "Unknown"),
+                idealDuration: clampValue(parsed.performancePatterns?.idealDuration, 30, 60, 58),
+                winningFormats: ensureArray(parsed.performancePatterns?.winningFormats, []),
+                weakFormats: ensureArray(parsed.performancePatterns?.weakFormats, [])
+            },
+            longTermRecommendations: ensureArray(parsed.longTermRecommendations, ["Continue analyzing"])
+        };
+
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
+// ============================================================
+// AI ROUTER - MAIN DISPATCHER
+// ============================================================
+
 export default {
     async fetch(request, env) {
+        // Handle CORS preflight
         if (request.method === "OPTIONS") {
             return new Response(null, { headers: corsHeaders() });
         }
 
-        const url = new URL(request.url);
-
-        if (request.method === "POST" && url.pathname === "/analyze") {
-            try {
-                // Il browser invia un payload pulito contenente proposal e profile
-                const body = await request.json();
-                const { proposal, channelProfile } = body;
-
-                if (!proposal) {
-                    return json({ success: false, error: "Dati Proposal mancanti" }, 400);
-                }
-
-                // Esecuzione orchestrata
-                const trends = await getDailyTrends(env);
-                const prompt = buildPrompt(proposal, channelProfile, trends);
-                const aiFeatures = await callLlama(prompt, env);
-                
-                // Il Worker restituisce solo le feature AI. 
-                // Nessun punteggio. Nessun array di consigli. Tutto passa al Feature Engine locale.
-                return json({
-                    success: true,
-                    aiFeatures: aiFeatures,
-                    metadata: {
-                        model: "llama-3.3-70b-versatile",
-                        timestamp: new Date().toISOString()
-                    }
-                });
-            } catch (error) {
-                return json({ success: false, error: error.message }, 500);
-            }
+        // Only POST allowed
+        if (request.method !== "POST") {
+            return jsonResponse({ error: "Method not allowed" }, 405);
         }
 
-        return json({ success: false, error: "Route not found." }, 404);
+        // Validate API key
+        if (!env.CHIAVE_API_AI) {
+            return jsonResponse({ error: "Missing AI key" }, 500);
+        }
+
+        let payload;
+        try {
+            payload = await request.json();
+        } catch {
+            return jsonResponse({ error: "Invalid JSON" }, 400);
+        }
+
+        const { type } = payload;
+
+        try {
+            // =============================
+            // ROUTE: HOOK & CONCEPT ANALYZER
+            // =============================
+            if (type === "hook_analysis") {
+                const result = await handleHookAnalysis(payload, env);
+                return jsonResponse(result);
+            }
+
+            // =============================
+            // ROUTE: PERSONAL AI COACH
+            // =============================
+            if (type === "personal_coach") {
+                const result = await handlePersonalCoach(payload, env);
+                return jsonResponse(result);
+            }
+
+            // =============================
+            // ROUTE: GENERIC OPENAI COMPATIBLE (fallback)
+            // =============================
+            const { messages, model, temperature, max_tokens } = payload;
+
+            if (!Array.isArray(messages) || messages.length === 0) {
+                return jsonResponse({ error: "Missing messages" }, 400);
+            }
+
+            const data = await callGroq(
+                messages,
+                env,
+                temperature ?? 0.7,
+                max_tokens ?? 2000
+            );
+
+            return jsonResponse(data);
+
+        } catch (error) {
+            return jsonResponse({ error: error.message }, 500);
+        }
     }
 };
