@@ -18,6 +18,8 @@ import {
     simulateChannelAnalysis
 } from "./js_channel_analysis.js";
 
+import { loadPublicStats } from "./js_public_stats.js";
+
 
 let currentScreen = "landing";
 
@@ -80,6 +82,7 @@ export async function showLanding() {
     hideAllScreens();
 
     landing.hidden = false;
+    loadPublicStats();
 
     currentScreen = "landing";
 
@@ -97,6 +100,7 @@ export async function showLanding() {
         );
 
         homeLoaded = true;
+        loadPublicStats();
 
     }
 

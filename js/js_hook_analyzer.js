@@ -4,9 +4,7 @@
 ========================================================== */
 
 import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
-import { buildChannelProfile } from "./js_channel_profile.js";
-import { loadCustomFormats } from "./js_storage.js";
-import { parseCSV } from "./js_csv-parser.js";
+import { loadChannelProfile } from "./js_storage.js";
 
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
 
@@ -59,24 +57,9 @@ The AI will evaluate how strong this opening concept is.'></textarea>
 }
 
 async function getChannelProfile() {
-    if (channelProfileCache) {
-        return channelProfileCache;
-    }
-
-    try {
-        const csvData = localStorage.getItem("csvData");
-        if (!csvData) {
-            return null;
-        }
-
-        const videos = parseCSV(csvData);
-        const customFormats = await loadCustomFormats();
-        channelProfileCache = await buildChannelProfile(videos, customFormats);
-        return channelProfileCache;
-    } catch (error) {
-        console.error("Error building channel profile:", error);
-        return null;
-    }
+    if (channelProfileCache) return channelProfileCache;
+    channelProfileCache = await loadChannelProfile();
+    return channelProfileCache;
 }
 
 async function handleAnalyzeClick(){
@@ -110,22 +93,40 @@ async function handleAnalyzeClick(){
             })
         });
 
-        const data = await response.json();
+        if (response.status === 429) {
+            renderRateLimitError();
+            return;
+        }
 
+        const data = await response.json();
         if(!response.ok || data?.error){
-            throw new Error(data?.error?.message || data?.error || `HTTP ${response.status}`);
+            const msg = String(data?.error?.message || data?.error || "");
+            if (msg.toLowerCase().includes("rate limit")) {
+                renderRateLimitError();
+                return;
+            }
+            throw new Error(msg || `HTTP ${response.status}`);
         }
 
         renderResults(data);
-
     }
     catch(error){
-
-        console.error("Hook Analyzer error:", error);
+        console.error("AI Coach error:", error);
         renderError();
-
     }
+}
 
+function renderRateLimitError(){
+    if(loadingTimer) clearInterval(loadingTimer);
+    const flow = document.getElementById("hook-flow");
+    flow.innerHTML = `
+        <div class="va-card" style="text-align:center">
+            <span style="font-size:2rem;display:block;margin-bottom:1rem">⏳</span>
+            <h3 style="margin-bottom:.75rem">High demand right now</h3>
+            <p style="color:var(--color-text-muted)">Lots of creators are using the AI right now. Please wait a minute and try again.</p>
+            <button class="va-outline" id="coach-retry-btn" type="button" style="margin-top:1rem">Try again</button>
+        </div>`;
+    document.getElementById("coach-retry-btn").addEventListener("click", renderInput);
 }
 
 function renderLoading(){

@@ -478,7 +478,7 @@ async function generateIdeasWithAI() {
     const ideaLists = document.querySelectorAll(".idea-list");
     if (!ideaLists.length) return;
 
-    const loadingHtml = `<div class="p-4 text-center">Generazione idee personalizzate con l'AI in corso...</div>`;
+    const loadingHtml = `<div class="p-4 text-center">Generating personalized ideas with AI...</div>`;
     ideaLists.forEach(list => { list.innerHTML = loadingHtml; });
 
     const videos = getDashboardData();

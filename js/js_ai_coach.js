@@ -4,9 +4,8 @@
 ========================================================== */
 
 import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
-import { buildChannelProfile } from "./js_channel_profile.js";
-import { loadCustomFormats } from "./js_storage.js";
-import { parseCSV } from "./js_csv-parser.js";
+import { loadChannelProfile, loadDashboardData } from "./js_storage.js";
+
 
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
 
@@ -22,6 +21,7 @@ let initialized = false;
 let loadingTimer = null;
 let channelProfileCache = null;
 
+
 export function initAICoach(){
 
     if(initialized){
@@ -32,6 +32,7 @@ export function initAICoach(){
     renderInput();
 
 }
+
 
 function renderInput(){
 
@@ -50,24 +51,9 @@ function renderInput(){
 }
 
 async function getChannelProfile() {
-    if (channelProfileCache) {
-        return channelProfileCache;
-    }
-
-    try {
-        const csvData = localStorage.getItem("csvData");
-        if (!csvData) {
-            return null;
-        }
-
-        const videos = parseCSV(csvData);
-        const customFormats = await loadCustomFormats();
-        channelProfileCache = await buildChannelProfile(videos, customFormats);
-        return channelProfileCache;
-    } catch (error) {
-        console.error("Error building channel profile:", error);
-        return null;
-    }
+    if (channelProfileCache) return channelProfileCache;
+    channelProfileCache = await loadChannelProfile();
+    return channelProfileCache;
 }
 
 async function handleAnalyzeClick(){
@@ -89,8 +75,7 @@ async function handleAnalyzeClick(){
         }
 
         // Prepare historical data
-        const csvData = localStorage.getItem("csvData");
-        const videos = csvData ? parseCSV(csvData) : [];
+        const videos = await loadDashboardData();
         
         const historicalData = {
             videos: videos.slice(-20), // Last 20 videos for recent performance

@@ -63,7 +63,7 @@ function initNavigation(){
             </span>
 
             <span class="logo__text">
-                Brawl<strong>Analytics</strong>
+                Brawl<strong>Analytics</strong> - BETA
             </span>
 
         </a>
