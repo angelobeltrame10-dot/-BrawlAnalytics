@@ -5,10 +5,22 @@
    Central AI backend with dedicated handlers for each feature:
    - Hook & Concept Analyzer
    - Personal AI Coach
-   - Future: Virality Analysis, Idea Generation, etc.
+   - Generic passthrough (idea generation, format detection,
+     keyword generation — used by js_api.js)
 
    Robust JSON validation, repair, and field completion.
    Never returns incomplete data to frontend.
+
+   FIX (root cause of "tutte le chiamate AI vanno male"):
+   callGroq() forzava SEMPRE response_format: json_object, anche
+   sulla route generica. Groq in quella modalità richiede che
+   l'intero output sia un oggetto JSON {}: qualunque prompt che
+   chieda testo semplice (idee separate da "|") o un array JSON
+   nudo ([...]) — cioè discoverChannelFormats, expandFormatCoverage,
+   generateKeywordsForFormat, generaIdeeConAI in js_api.js — veniva
+   rotto o rifiutato dal modello. Ora json_object è opt-in: attivo
+   SOLO per hook_analysis e personal_coach (che dichiarano davvero
+   uno schema a oggetto), mai per la route generica.
 
 ========================================================== */
 
@@ -44,20 +56,14 @@ function jsonResponse(body, status = 200) {
 // ROBUST JSON VALIDATION & REPAIR
 // ============================================================
 
-/**
- * Extracts and repairs JSON from LLM output.
- * Handles markdown, extra text, malformed JSON.
- */
 function extractAndRepairJSON(text) {
     if (!text) return null;
 
-    // Remove markdown code blocks
     let cleaned = text
         .replace(/```json/gi, "")
         .replace(/```/g, "")
         .trim();
 
-    // Find first valid JSON object
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
 
@@ -70,11 +76,10 @@ function extractAndRepairJSON(text) {
     try {
         return JSON.parse(jsonStr);
     } catch (e) {
-        // Attempt basic repair: fix trailing commas
         const repaired = jsonStr
             .replace(/,\s*}/g, "}")
             .replace(/,\s*]/g, "]");
-        
+
         try {
             return JSON.parse(repaired);
         } catch {
@@ -83,18 +88,12 @@ function extractAndRepairJSON(text) {
     }
 }
 
-/**
- * Clamps numeric values between min and max.
- */
 function clampValue(value, min, max, defaultValue) {
     const num = Number(value);
     if (!Number.isFinite(num)) return defaultValue;
     return Math.max(min, Math.min(max, num));
 }
 
-/**
- * Ensures array is never empty or null.
- */
 function ensureArray(value, defaultValue = []) {
     if (Array.isArray(value) && value.length > 0) {
         return value;
@@ -102,17 +101,11 @@ function ensureArray(value, defaultValue = []) {
     return defaultValue;
 }
 
-/**
- * Ensures string is never empty or null.
- */
 function ensureString(value, defaultValue = "") {
     const str = String(value || "").trim();
     return str || defaultValue;
 }
 
-/**
- * Ensures value is one of the allowed enum options (case-insensitive).
- */
 function ensureEnum(value, allowed, defaultValue) {
     const normalized = String(value || "").trim().toLowerCase();
     return allowed.includes(normalized) ? normalized : defaultValue;
@@ -122,9 +115,28 @@ function ensureEnum(value, allowed, defaultValue) {
 // GROQ API CLIENT
 // ============================================================
 
-async function callGroq(messages, env, temperature = 0.2, maxTokens = 3000) {
+/**
+ * jsonMode è ora un parametro esplicito, non più sempre true.
+ * - true  → usato SOLO da handleHookAnalysis/handlePersonalCoach,
+ *           che dichiarano uno schema a oggetto {} nel prompt.
+ * - false → route generica (js_api.js): idee separate da "|",
+ *           array JSON nudi [...], testo libero. Forzare json_object
+ *           qui rompeva/rifiutava sistematicamente l'output di Groq.
+ */
+async function callGroq(messages, env, temperature = 0.2, maxTokens = 3000, jsonMode = false) {
     if (!env.CHIAVE_API_AI) {
         throw new Error("Missing AI key");
+    }
+
+    const body = {
+        model: "llama-3.3-70b-versatile",
+        messages,
+        temperature,
+        max_tokens: maxTokens
+    };
+
+    if (jsonMode) {
+        body.response_format = { type: "json_object" };
     }
 
     const response = await fetch(GROQ_ENDPOINT, {
@@ -133,13 +145,7 @@ async function callGroq(messages, env, temperature = 0.2, maxTokens = 3000) {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${env.CHIAVE_API_AI}`
         },
-        body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-            response_format: { type: "json_object" }
-        })
+        body: JSON.stringify(body)
     });
 
     if (!response.ok) {
@@ -224,12 +230,11 @@ async function handleHookAnalysis(payload, env) {
         return { error: "Missing concept description" };
     }
 
-    // Build context from channel profile
     let context = "";
     if (channelProfile) {
         const avgViews = channelProfile.averageViews || 0;
-        const bestFormats = Array.isArray(channelProfile.bestFormats) 
-            ? channelProfile.bestFormats.slice(0, 3).join(", ") 
+        const bestFormats = Array.isArray(channelProfile.bestFormats)
+            ? channelProfile.bestFormats.slice(0, 3).join(", ")
             : "None";
         const worstFormats = Array.isArray(channelProfile.worstFormats)
             ? channelProfile.worstFormats.slice(0, 3).join(", ")
@@ -260,7 +265,8 @@ Analyze this opening concept following the process above. Consider how it aligns
             ],
             env,
             0.18,
-            3000
+            3000,
+            true // jsonMode: questo handler dichiara davvero uno schema a oggetto
         );
 
         const content = response.choices?.[0]?.message?.content || "";
@@ -270,7 +276,6 @@ Analyze this opening concept following the process above. Consider how it aligns
             return { error: "AI returned invalid JSON" };
         }
 
-        // Validate and complete all fields
         return {
             hookScore: clampValue(parsed.hookScore, 0, 100, 50),
             curiosityScore: clampValue(parsed.curiosityScore, 0, 100, 50),
@@ -297,6 +302,240 @@ Analyze this opening concept following the process above. Consider how it aligns
 }
 
 // ============================================================
+// HANDLER: TITLE OPTIMIZER (PRO ONLY)
+// ============================================================
+
+const TITLE_OPTIMIZER_PROMPT = `You are a world-class YouTube Shorts strategist specializing in Brawl Stars content and title optimization.
+
+Your goal is NOT to generate random clickbait. Your goal is to behave like an experienced strategist who uses the creator's historical channel profile to optimize titles that fit that specific creator's style and audience.
+
+Follow this exact process:
+
+STEP 1
+Understand the creator's title. Read it carefully.
+
+STEP 2
+Evaluate the title across multiple dimensions. Do NOT invent random values. Each score must be justified.
+
+STEP 3
+Calculate Overall Title Score (0-100). This is a composite of all other metrics.
+
+STEP 4
+Estimate CTR Prediction (0-100). How likely is this title to generate clicks? Also return a qualitative level: Low, Medium, High, or Very High.
+
+STEP 5
+Evaluate Curiosity (0-100). Does the title create curiosity? Does it encourage people to click? Explain WHY in the curiosityExplanation field.
+
+STEP 6
+Evaluate Emotional Impact (0-100). Does the title create emotion? Consider: surprise, excitement, urgency, fear of missing out, competition, etc. Explain the dominant emotion in emotionType.
+
+STEP 7
+Evaluate Clarity (0-100). Is the title immediately understandable? Could people understand it in less than one second?
+
+STEP 8
+Evaluate SEO (0-100). Consider: important keywords, searchable terms, Brawl Stars entities, updates, brawlers, hypercharges, events, etc. Return a qualitative level: Poor, Good, or Excellent.
+
+STEP 9
+Evaluate Length. Is it too long, too short, or ideal? Suggest improvements if needed.
+
+STEP 10
+Evaluate Mobile Friendliness. Remember that Shorts are mostly watched on mobile. Is the title readable? Would it get truncated? Return boolean.
+
+STEP 11
+Evaluate Audience Match. Is this title suitable for: competitive players, casual players, kids, general audience? Explain why in audienceExplanation.
+
+STEP 12
+Write a brief summary (max 80 words) explaining the overall assessment.
+
+STEP 13
+Generate 8-10 alternative titles divided into categories:
+- Curiosity (2 titles): Create mystery and intrigue
+- Emotional (2 titles): Evoke strong feelings
+- Competitive (2 titles): Appeal to competitive players
+- Funny (2 titles): Humorous or unexpected
+- Viral (1-2 titles): Maximum viral potential
+- Safe (1-2 titles): Conservative but effective
+
+Each alternative should briefly explain WHY it may outperform the original in the reason field.
+
+STEP 14
+Provide historical insights. If the channel profile shows certain title styles perform better, mention this. For example: "Your historical data shows that competitive titles perform around 23% better than funny titles."
+
+STEP 15
+Detect trends. If the title contains current trending topics, mention which ones. If it ignores important trends, suggest including them when appropriate.
+
+Return ONLY valid JSON with this exact structure. Never omit any field. Never use markdown.
+
+{
+  "overallScore": 0-100,
+  "ctrPrediction": 0-100,
+  "ctrLevel": "Low|Medium|High|Very High",
+  "curiosity": 0-100,
+  "curiosityExplanation": "brief explanation",
+  "emotion": 0-100,
+  "emotionType": "surprise|excitement|urgency|fomo|competition|other",
+  "clarity": 0-100,
+  "seo": 0-100,
+  "seoLevel": "Poor|Good|Excellent",
+  "length": "Too Short|Ideal|Too Long",
+  "lengthSuggestion": "suggestion if needed",
+  "mobileFriendly": true/false,
+  "audience": "Competitive|Casual|Kids|General",
+  "audienceExplanation": "brief explanation",
+  "summary": "brief summary",
+  "historicalInsights": "personalized insights based on channel profile",
+  "trendsDetected": ["trend1", "trend2"],
+  "trendsMissed": ["trend1", "trend2"],
+  "alternatives": {
+    "curiosity": [
+      {"title": "alternative title", "reason": "why it may perform better"}
+    ],
+    "emotional": [
+      {"title": "alternative title", "reason": "why it may perform better"}
+    ],
+    "competitive": [
+      {"title": "alternative title", "reason": "why it may perform better"}
+    ],
+    "funny": [
+      {"title": "alternative title", "reason": "why it may perform better"}
+    ],
+    "viral": [
+      {"title": "alternative title", "reason": "why it may perform better"}
+    ],
+    "safe": [
+      {"title": "alternative title", "reason": "why it may perform better"}
+    ]
+  }
+}`;
+
+async function handleTitleOptimizer(payload, env) {
+    const { title, channelProfile, currentTrends } = payload;
+
+    if (!title || typeof title !== "string") {
+        return { error: "Missing title" };
+    }
+
+    // Build context from channel profile
+    let context = "";
+    if (channelProfile) {
+        const avgViews = channelProfile.averageViews || 0;
+        const bestFormats = Array.isArray(channelProfile.bestFormats) 
+            ? channelProfile.bestFormats.slice(0, 3).join(", ") 
+            : "None";
+        const worstFormats = Array.isArray(channelProfile.worstFormats)
+            ? channelProfile.worstFormats.slice(0, 3).join(", ")
+            : "None";
+
+        // Analyze historical title performance if available
+        let titleStyleInsights = "";
+        if (channelProfile.historicalVideos && channelProfile.historicalVideos.length > 0) {
+            const titles = channelProfile.historicalVideos.map(v => v.title).filter(Boolean);
+            if (titles.length > 0) {
+                // Simple heuristic: count titles with competitive vs funny keywords
+                const competitiveKeywords = ["best", "strongest", "op", "meta", "rank", "tier", "pro", "guide"];
+                const funnyKeywords = ["funny", "crazy", "insane", "lol", "hilarious", "meme", "lost mind"];
+                
+                const competitiveCount = titles.filter(t => 
+                    competitiveKeywords.some(k => t.toLowerCase().includes(k))
+                ).length;
+                const funnyCount = titles.filter(t => 
+                    funnyKeywords.some(k => t.toLowerCase().includes(k))
+                ).length;
+                
+                if (competitiveCount > funnyCount) {
+                    titleStyleInsights = "Your historical data shows that competitive-style titles tend to perform better for this channel. ";
+                } else if (funnyCount > competitiveCount) {
+                    titleStyleInsights = "Your historical data shows that humorous/entertainment-style titles tend to perform better for this channel. ";
+                }
+            }
+        }
+
+        context = `
+CHANNEL CONTEXT:
+- Average views: ${avgViews}
+- Best performing formats: ${bestFormats}
+- Underperforming formats: ${worstFormats}
+${titleStyleInsights}
+
+Use this context to personalize your analysis and recommendations. Reference historical performance when relevant.
+`;
+    }
+
+    // Build trends context
+    let trendsContext = "";
+    if (currentTrends && Array.isArray(currentTrends) && currentTrends.length > 0) {
+        trendsContext = `
+CURRENT BRAWL STARS TRENDS:
+${currentTrends.slice(0, 10).join(", ")}
+
+Check if the title mentions any of these trends. If not, consider suggesting alternatives that incorporate relevant trends.
+`;
+    }
+
+    const userPrompt = `${context}
+
+${trendsContext}
+
+TITLE TO ANALYZE:
+"${title}"
+
+Analyze this title following the process above. Consider how it aligns with the channel's historical performance and current Brawl Stars trends.`;
+
+    try {
+        const response = await callGroq(
+            [
+                { role: "system", content: TITLE_OPTIMIZER_PROMPT },
+                { role: "user", content: userPrompt }
+            ],
+            env,
+            0.18,
+            3500
+        );
+
+        const content = response.choices?.[0]?.message?.content || "";
+        const parsed = extractAndRepairJSON(content);
+
+        if (!parsed) {
+            return { error: "AI returned invalid JSON" };
+        }
+
+        // Validate and complete all fields
+        return {
+            overallScore: clampValue(parsed.overallScore, 0, 100, 50),
+            ctrPrediction: clampValue(parsed.ctrPrediction, 0, 100, 50),
+            ctrLevel: ensureEnum(parsed.ctrLevel, ["low", "medium", "high", "very high"], "medium"),
+            curiosity: clampValue(parsed.curiosity, 0, 100, 50),
+            curiosityExplanation: ensureString(parsed.curiosityExplanation, "No explanation provided"),
+            emotion: clampValue(parsed.emotion, 0, 100, 50),
+            emotionType: ensureEnum(parsed.emotionType, ["surprise", "excitement", "urgency", "fomo", "competition", "other"], "other"),
+            clarity: clampValue(parsed.clarity, 0, 100, 50),
+            seo: clampValue(parsed.seo, 0, 100, 50),
+            seoLevel: ensureEnum(parsed.seoLevel, ["poor", "good", "excellent"], "good"),
+            length: ensureEnum(parsed.length, ["too short", "ideal", "too long"], "ideal"),
+            lengthSuggestion: ensureString(parsed.lengthSuggestion, ""),
+            mobileFriendly: typeof parsed.mobileFriendly === "boolean" ? parsed.mobileFriendly : true,
+            audience: ensureEnum(parsed.audience, ["competitive", "casual", "kids", "general"], "general"),
+            audienceExplanation: ensureString(parsed.audienceExplanation, "No explanation provided"),
+            summary: ensureString(parsed.summary, "Analysis complete"),
+            historicalInsights: ensureString(parsed.historicalInsights, "No historical data available"),
+            trendsDetected: ensureArray(parsed.trendsDetected, []),
+            trendsMissed: ensureArray(parsed.trendsMissed, []),
+            alternatives: {
+                curiosity: ensureArray(parsed.alternatives?.curiosity, []),
+                emotional: ensureArray(parsed.alternatives?.emotional, []),
+                competitive: ensureArray(parsed.alternatives?.competitive, []),
+                funny: ensureArray(parsed.alternatives?.funny, []),
+                viral: ensureArray(parsed.alternatives?.viral, []),
+                safe: ensureArray(parsed.alternatives?.safe, [])
+            }
+        };
+
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
+// ============================================================
 // HANDLER: PERSONAL AI COACH (PRO ONLY)
 // ============================================================
 
@@ -308,6 +547,8 @@ You analyze:
 - Retention trends
 - Upload frequency
 - Audience preferences
+
+CRITICAL DATA RULE: only state a specific number, percentage, or trend (e.g. "+12%", "-30% drop", "0 views") if it is explicitly present in the data provided to you below. If recent-performance fields are missing, null, or say "insufficient data", you MUST NOT describe this as a drop, decline, or crisis — a missing number is NOT the same as a zero or a negative trend. In that case say something like "Not enough recent upload data yet to measure a trend" instead of inventing a percentage.
 
 You give REAL, concrete advice grounded in how the YouTube Shorts algorithm and the Brawl Stars creator space actually work — never generic platitudes like "post more" or "engage with your audience" without specifics. In particular, weave in these two realities whenever they are relevant to this creator's data:
 
@@ -326,7 +567,7 @@ Return ONLY valid JSON with this exact structure. Never omit any field.
 {
   "biggestStrength": "specific strength with example",
   "biggestWeakness": "specific weakness with example",
-  "recentProgress": "quantified progress (e.g., +12% retention)",
+  "recentProgress": "quantified progress ONLY if real recent numbers were provided (e.g., 'Views are up 12% over your last 10 uploads'); otherwise say recent data is too limited to measure a trend — never invent a percentage",
   "currentOpportunity": "specific opportunity with format recommendation",
   "nextWeekRecommendation": "specific action for next week",
   "aiStrategy": "strategic insight about audience preferences",
@@ -353,23 +594,24 @@ async function handlePersonalCoach(payload, env) {
         return { error: "Missing channel profile data" };
     }
 
-    // Build comprehensive context
     let context = `CHANNEL PROFILE:
 - Total videos: ${channelProfile.totalVideos || 0}
-- Average views: ${channelProfile.averageViews || 0}
+- Average views (all-time): ${channelProfile.averageViews || 0}
 - Average retention: ${channelProfile.averageRetention || 0}%
 - Average duration: ${channelProfile.averageDuration || 0}s
 - Best formats: ${Array.isArray(channelProfile.bestFormats) ? channelProfile.bestFormats.join(", ") : "None"}
 - Worst formats: ${Array.isArray(channelProfile.worstFormats) ? channelProfile.worstFormats.join(", ") : "None"}
 `;
 
-    if (historicalData && Array.isArray(historicalData.videos)) {
-        const recentVideos = historicalData.videos.slice(-10);
-        const avgRecentViews = recentVideos.reduce((sum, v) => sum + (v.views || 0), 0) / recentVideos.length;
-        context += `\nRECENT PERFORMANCE (last 10 videos):
-- Average views: ${Math.round(avgRecentViews)}
+    if (historicalData && historicalData.hasSufficientRecentData && Number.isFinite(historicalData.averageRecentViews)) {
+        context += `\nRECENT PERFORMANCE (last ${historicalData.recentVideoCount || 0} videos):
+- Average views: ${historicalData.averageRecentViews}
 - Upload frequency: ${historicalData.uploadFrequency || "Unknown"}
+
+Compare this recent average to the all-time average above and describe the trend ONLY based on these real numbers.
 `;
+    } else {
+        context += `\nRECENT PERFORMANCE: Not enough reliable recent-upload data was provided. Do NOT claim a drop, a decline, or a "0 views" trend — simply note that recent trend data is limited.\n`;
     }
 
     if (recentAnalyses && Array.isArray(recentAnalyses)) {
@@ -390,7 +632,9 @@ Focus on:
 4. Actionable recommendations for next week
 5. Long-term strategic insights
 6. Whether publishing timing/scheduling could be improved
-7. Whether there's any sign of low originality (reused ideas/formats) that could be capping performance`;
+7. Whether there's any sign of low originality (reused ideas/formats) that could be capping performance
+
+Remember: never fabricate a percentage or trend that isn't backed by the numbers above.`;
 
     try {
         const response = await callGroq(
@@ -400,7 +644,8 @@ Focus on:
             ],
             env,
             0.15,
-            2500
+            2500,
+            true // jsonMode: questo handler dichiara davvero uno schema a oggetto
         );
 
         const content = response.choices?.[0]?.message?.content || "";
@@ -410,11 +655,10 @@ Focus on:
             return { error: "AI returned invalid JSON" };
         }
 
-        // Validate and complete all fields
         return {
             biggestStrength: ensureString(parsed.biggestStrength, "Analyzing..."),
             biggestWeakness: ensureString(parsed.biggestWeakness, "Analyzing..."),
-            recentProgress: ensureString(parsed.recentProgress, "Insufficient data"),
+            recentProgress: ensureString(parsed.recentProgress, "Not enough recent upload data yet to measure a trend."),
             currentOpportunity: ensureString(parsed.currentOpportunity, "Continue current strategy"),
             nextWeekRecommendation: ensureString(parsed.nextWeekRecommendation, "Maintain upload schedule"),
             aiStrategy: ensureString(parsed.aiStrategy, "Developing strategy..."),
@@ -451,17 +695,14 @@ Focus on:
 
 export default {
     async fetch(request, env) {
-        // Handle CORS preflight
         if (request.method === "OPTIONS") {
             return new Response(null, { headers: corsHeaders() });
         }
 
-        // Only POST allowed
         if (request.method !== "POST") {
             return jsonResponse({ error: "Method not allowed" }, 405);
         }
 
-        // Validate API key
         if (!env.CHIAVE_API_AI) {
             return jsonResponse({ error: "Missing AI key" }, 500);
         }
@@ -493,7 +734,22 @@ export default {
             }
 
             // =============================
+            // ROUTE: TITLE OPTIMIZER
+            // =============================
+            if (type === "title_optimizer") {
+                const result = await handleTitleOptimizer(payload, env);
+                return jsonResponse(result);
+            }
+
+
+            // =============================
             // ROUTE: GENERIC OPENAI COMPATIBLE (fallback)
+            // Usata da js_api.js per: generazione idee (testo con "|"),
+            // discoverChannelFormats/expandFormatCoverage (array JSON
+            // nudo), generateKeywordsForFormat (array JSON nudo).
+            // NON deve mai forzare json_object: nessuno di questi
+            // payload è un oggetto {} — forzarlo fa scartare/rompere
+            // la risposta da Groq quasi sistematicamente.
             // =============================
             const { messages, model, temperature, max_tokens } = payload;
 
@@ -505,7 +761,8 @@ export default {
                 messages,
                 env,
                 temperature ?? 0.7,
-                max_tokens ?? 2000
+                max_tokens ?? 2000,
+                false // jsonMode disattivato: vedi nota sopra
             );
 
             return jsonResponse(data);

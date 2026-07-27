@@ -48,6 +48,8 @@ import { initHookAnalyzer } from "./js_hook_analyzer.js";
 
 import { initAICoach } from "./js_ai_coach.js";
 
+import { initTitleOptimizer } from "./js_title_optimizer.js";
+
 import {
 
     classifyVideos,
@@ -247,7 +249,9 @@ function setActiveTab(tab){
 
         hook: document.getElementById("hook-section"),
 
-        coach: document.getElementById("coach-section")
+        coach: document.getElementById("coach-section"),
+
+        title: document.getElementById("title-section")
 
     };
 
@@ -325,6 +329,10 @@ function setActiveTab(tab){
 
     if(tab === "coach"){
         initAICoach();
+    }
+
+    if(tab === "title"){
+        initTitleOptimizer();
     }
 
 }
@@ -474,57 +482,53 @@ async function renderIdeasFromCache() {
 
 // Chiamata SOLO dal click su "Generate New Ideas" (dopo consumeIdeaGeneration).
 async function generateIdeasWithAI() {
-
+ 
     const ideaLists = document.querySelectorAll(".idea-list");
     if (!ideaLists.length) return;
-
+ 
     const loadingHtml = `<div class="p-4 text-center">Generating personalized ideas with AI...</div>`;
     ideaLists.forEach(list => { list.innerHTML = loadingHtml; });
-
+ 
     const videos = getDashboardData();
     const classified = classifyVideos(videos, customFormats);
     const topFormat = getTopFormat(classified, customFormats) || "Gameplay";
-
+ 
     const topVideos = videos
         .slice()
         .sort((a, b) => getVideoViews(b) - getVideoViews(a))
         .slice(0, 5);
-
+ 
     let ideeGenerate = [];
     if (videos.length > 0) {
         ideeGenerate = await generaIdeeConAI(topVideos, topFormat);
     }
-
+ 
     if (ideeGenerate && ideeGenerate.length > 0) {
-
+ 
         await saveGeneratedIdeas(ideeGenerate, topFormat);
         ideaLists.forEach(list => { list.innerHTML = renderIdeaHtml(ideeGenerate, topFormat); });
-
+ 
     } else {
-
-        // Fallback statico: NON salvato come "idee del giorno" (non è
-        // un vero risultato AI), quindi il prossimo refresh non lo
-        // riproporrà come cache.
+ 
+        // L'AI non ha restituito nulla di utilizzabile: usiamo un
+        // fallback statico, ma — a differenza di prima — lo SALVIAMO
+        // comunque. L'utilizzo giornaliero è già stato consumato per
+        // questa generazione, quindi lo stato mostrato ora deve
+        // rimanere coerente anche dopo un refresh/ritorno sul sito,
+        // invece di sparire lasciando "No ideas yet".
+        console.warn("generaIdeeConAI ha restituito 0 idee: uso fallback statico (verrà comunque salvato).");
+ 
         const fallback = [
-            ["Trickshot", "Try a double wall-bounce trickshot using Rico on the new Brawl Ball map."],
-            ["Challenge", "Can you win a Solo Showdown match without picking up a single Power Cube?"],
-            ["FunnyMoment", "Compile 3 clips where players accidentally super into the poison gas."]
+            "Try a double wall-bounce trickshot using Rico on the new Brawl Ball map.",
+            "Can you win a Solo Showdown match without picking up a single Power Cube?",
+            "Compile 3 clips where players accidentally super into the poison gas."
         ];
-
-        ideaLists.forEach(list => {
-            list.innerHTML = fallback.map(([tag, body], index) => `
-                <article class="idea-card">
-                    <div class="idea-header">
-                        <span class="idea-tag">${tag}</span>
-                        <span class="idea-score">${94 - index * 3}</span>
-                    </div>
-                    <div class="idea-body">${body}</div>
-                </article>
-            `).join("");
-        });
-
+ 
+        await saveGeneratedIdeas(fallback, topFormat || "Mixed");
+        ideaLists.forEach(list => { list.innerHTML = renderIdeaHtml(fallback, topFormat || "Mixed"); });
+ 
     }
-
+ 
 }
 
 
@@ -984,16 +988,18 @@ async function refreshDashboard(){
     // data di pubblicazione crescente — non nell'ordine grezzo del CSV,
     // che non è garantito essere cronologico e in passato produceva
     // percentuali negative/casuali indipendenti dalla reale crescita
-    // del canale). I video senza data valida vengono spinti in fondo
-    // (trattati come più recenti) invece di essere lasciati nella
-    // posizione originale del CSV, per non falsare comunque lo split.
+    // del canale). I video senza data valida vengono ESCLUSI dal calcolo
+    // per evitare che falsino la statistica (venivano trattati come
+    // più recenti con Infinity, finendo sempre nella seconda metà).
     let growthRate = 0;
-    if (dashboardData.length >= 4) {
+    const videosWithDate = dashboardData.filter(v => v["Data pubblicazione"] instanceof Date);
+    
+    if (videosWithDate.length >= 4) {
 
-        const sortedByDate = [...dashboardData].sort((a, b) => {
+        const sortedByDate = [...videosWithDate].sort((a, b) => {
 
-            const timeA = a["Data pubblicazione"] instanceof Date ? a["Data pubblicazione"].getTime() : Infinity;
-            const timeB = b["Data pubblicazione"] instanceof Date ? b["Data pubblicazione"].getTime() : Infinity;
+            const timeA = a["Data pubblicazione"].getTime();
+            const timeB = b["Data pubblicazione"].getTime();
 
             return timeA - timeB;
 

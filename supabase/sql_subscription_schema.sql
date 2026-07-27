@@ -8,6 +8,15 @@
 -- current_date, quindi una nuova riga per "oggi" parte sempre
 -- da zero. Le righe dei giorni passati restano (utile per
 -- storico/analytics) ma non influenzano i limiti correnti.
+--
+-- NOVITÀ: try_consume_usage() ora incrementa anche i contatori
+-- reali in public.public_stats (total_videos_analyzed /
+-- total_ideas_generated) ad ogni consumo effettivamente concesso
+-- (allowed = true), sia Free che Pro. Questo sostituisce il
+-- vecchio approccio che ricalcolava le stats dal contenuto di
+-- channel_data/generated_ideas (vedi sql_public_stats.sql v2).
+-- Richiede che public.public_stats esista già (eseguire questo
+-- file DOPO sql_public_stats.sql).
 -- ==========================================================
 
 create table if not exists public.profiles (
@@ -27,13 +36,11 @@ create table if not exists public.daily_usage (
 alter table public.profiles enable row level security;
 alter table public.daily_usage enable row level security;
 
--- Il client può leggere solo la propria riga. Nessuna policy di
--- insert/update diretta: piano e contatori si modificano SOLO
--- tramite le funzioni "security definer" qui sotto (o dal Dashboard
--- Supabase / da un futuro webhook Stripe per il campo "plan").
+drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
     for select using (auth.uid() = id);
 
+drop policy if exists "usage_select_own" on public.daily_usage;
 create policy "usage_select_own" on public.daily_usage
     for select using (auth.uid() = user_id);
 
@@ -91,6 +98,11 @@ grant execute on function public.get_usage_status() to authenticated;
 -- Verifica E incrementa in un'unica transazione atomica: è
 -- l'UNICO punto che decide se una chiamata AI può partire.
 -- p_kind: 'video_analysis' | 'idea_generation'
+--
+-- Ad ogni consumo REALMENTE concesso (allowed = true, incluso il
+-- caso Pro senza limiti) incrementa anche il contatore pubblico
+-- corrispondente in public_stats: è la fonte di verità per la
+-- homepage, non più derivata da altre tabelle.
 -- ==========================================================
 create or replace function public.try_consume_usage(p_kind text)
 returns table(allowed boolean, remaining int, plan text)
@@ -127,9 +139,19 @@ begin
         if p_kind = 'video_analysis' then
             update daily_usage set video_analysis_used = video_analysis_used + 1
                 where user_id = v_uid and usage_date = v_today;
+
+            update public.public_stats
+                set total_videos_analyzed = total_videos_analyzed + 1,
+                    updated_at = now()
+                where id = 1;
         else
             update daily_usage set idea_generation_used = idea_generation_used + 1
                 where user_id = v_uid and usage_date = v_today;
+
+            update public.public_stats
+                set total_ideas_generated = total_ideas_generated + 1,
+                    updated_at = now()
+                where id = 1;
         end if;
 
         return query select true, -1, v_plan;
@@ -155,9 +177,19 @@ begin
     if p_kind = 'video_analysis' then
         update daily_usage set video_analysis_used = video_analysis_used + 1
             where user_id = v_uid and usage_date = v_today;
+
+        update public.public_stats
+            set total_videos_analyzed = total_videos_analyzed + 1,
+                updated_at = now()
+            where id = 1;
     else
         update daily_usage set idea_generation_used = idea_generation_used + 1
             where user_id = v_uid and usage_date = v_today;
+
+        update public.public_stats
+            set total_ideas_generated = total_ideas_generated + 1,
+                updated_at = now()
+            where id = 1;
     end if;
 
     return query select true, (v_limit - coalesce(v_used, 0) - 1), v_plan;
