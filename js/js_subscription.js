@@ -280,6 +280,7 @@ function injectUpgradeModal(){
                     <li>Virality Engine</li>
                     <li>Hook Analyzer</li>
                     <li>AI Coach</li>
+                    <li>Title Optimizer</li>
                     <li>Future updates</li>
                 </ul>
                 <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta">Pro is coming soon</button>
