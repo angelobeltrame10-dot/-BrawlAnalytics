@@ -7,25 +7,25 @@
     <priority>1.0</priority>
   </url>
    <url>
-    <loc>https://brawl-analytics-official.vercel.app/features.html</loc>
+    <loc>https://brawl-analytics-official.vercel.app/SEO/features.html</loc>
     <lastmod>2026-07-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://brawl-analytics-official.vercel.app/about.html</loc>
+    <loc>https://brawl-analytics-official.vercel.app/SEO/about.html</loc>
     <lastmod>2026-07-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://brawl-analytics-official.vercel.app/upload-csv.html</loc>
+    <loc>https://brawl-analytics-official.vercel.app/tutorials/upload-csv.html</loc>
     <lastmod>2026-07-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://brawl-analytics-official.vercel.app/privacy.html</loc>
+    <loc>https://brawl-analytics-official.vercel.app/legal/privacy.html</loc>
     <lastmod>2026-07-27</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
