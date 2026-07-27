@@ -3,11 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brawl Analytics</title>
-    <meta name="description" content="AI-powered analytics for Brawl Stars creators. Predict virality before you publish.">
+    <title>Brawl Analytics — AI Virality Predictor for Brawl Stars YouTube Shorts</title>
+    <meta name="description" content="Upload your YouTube Studio CSV and let AI predict which Brawl Stars Shorts will go viral, detect your best formats, analyze hooks, optimize titles, and generate new video ideas.">
+    <link rel="canonical" href="https://brawlanalytics.com/">
     <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Brawl Analytics — AI Virality Predictor for Brawl Stars YouTube Shorts">
+    <meta property="og:description" content="Predict viral Shorts, detect your best content formats, analyze hooks, optimize titles, and generate ideas — powered by your own channel's YouTube Studio data.">
+    <meta property="og:url" content="https://brawlanalytics.com/">
     <meta property="og:image" content="https://brawlanalytics.com/favicon.ico">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Brawl Analytics — AI Virality Predictor for Brawl Stars Shorts">
+    <meta name="twitter:description" content="Upload your YouTube Studio CSV and let AI predict which Shorts will go viral.">
     <meta name="twitter:image" content="https://brawlanalytics.com/favicon.ico">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -26,11 +39,163 @@
     <link rel="stylesheet" href="css/css_subscription.css">
     <link rel="stylesheet" href="css/css_auth.css">
     <link rel="stylesheet" href="css/css_video_analysis.css">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Brawl Analytics",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "url": "https://brawlanalytics.com/",
+      "image": "https://brawlanalytics.com/favicon.ico",
+      "description": "AI-powered analytics platform for Brawl Stars YouTube Shorts creators. Predicts viral Shorts, detects content formats, analyzes hooks, optimizes titles, and generates video ideas from YouTube Studio CSV data.",
+      "offers": [
+        { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "EUR" },
+        { "@type": "Offer", "name": "Pro", "price": "6.99", "priceCurrency": "EUR" }
+      ]
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Brawl Analytics?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Brawl Analytics reads your YouTube Studio CSV export and transforms raw statistics into clear patterns about what makes your Shorts successful." }
+        },
+        {
+          "@type": "Question",
+          "name": "What data do I need to upload?",
+          "acceptedAnswer": { "@type": "Answer", "text": "You only need the CSV export from YouTube Studio. No account connection is required." }
+        },
+        {
+          "@type": "Question",
+          "name": "How are videos categorized?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Videos are grouped by format so you can compare similar Shorts and understand what works best." }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the prediction work?",
+          "acceptedAnswer": { "@type": "Answer", "text": "The system analyses previous performance, retention signals and content patterns to estimate viral potential." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the data I upload collected?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. The data you upload is securely stored and used only to provide the features of Brawl Analytics. It is never sold or shared with third parties for marketing purposes." }
+        }
+      ]
+    }
+    </script>
 </head>
 <body>
     <header id="navbar" class="navbar"></header>
     <main class="app-root">
-        <section id="landing-screen" class="screen"></section>
+
+        <!-- ==========================================================
+             LANDING — contenuto statico (non caricato via fetch/JS)
+             per essere visibile ai crawler senza eseguire JavaScript.
+             js_router.js non lo sovrascrive più (homeLoaded = true).
+        ========================================================== -->
+        <section id="landing-screen" class="screen">
+
+            <section class="hero">
+                <div class="hero-burst" aria-hidden="true"></div>
+                <div class="hero-content">
+                    <p class="hero-eyebrow">For Brawl Stars creators on YouTube Shorts</p>
+                    <h1 class="hero-title">Every Short hides a pattern.<br>We find it before it goes viral.</h1>
+                    <p class="hero-description">Upload your YouTube Studio CSV export, discover what makes your Shorts perform, and predict which videos have the highest viral potential.</p>
+
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-lg" data-action="login">Login</button>
+                        <button class="btn btn-outline btn-lg" data-action="signup">Sign up</button>
+                    </div>
+
+                    <div class="hero-stats">
+                        <div class="stat-chip"><span class="stat-chip-label">Virality Score</span><span class="stat-chip-value">92</span></div>
+                        <div class="stat-chip accent"><span class="stat-chip-label">Hook Strength</span><span class="stat-chip-value">87%</span></div>
+                        <div class="stat-chip blue"><span class="stat-chip-label">Top Format</span><span class="stat-chip-value">Trickshot</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="stats-bar">
+                <div class="stats-bar__inner">
+                    <div class="stat-mini"><strong id="stat-creators">0+</strong><span>Creators</span></div>
+                    <div class="stat-mini"><strong id="stat-videos">0+</strong><span>Videos analyzed</span></div>
+                    <div class="stat-mini"><strong id="stat-ideas">0+</strong><span>AI ideas generated</span></div>
+                    <div class="stat-mini"><strong id="stat-feedback">98%</strong><span>Positive feedback</span></div>
+                </div>
+            </section>
+
+            <section class="before-after">
+                <div class="ba-col ba-without">
+                    <span class="ba-label">Without Brawl Analytics</span>
+                    <ul><li>❌ Guess the title</li><li>❌ Guess the format</li><li>❌ Hope it goes viral</li></ul>
+                </div>
+                <div class="ba-arrow">→</div>
+                <div class="ba-col ba-with">
+                    <span class="ba-label">With Brawl Analytics</span>
+                    <ul><li>✅ AI predicts virality</li><li>✅ AI analyzes the hook</li><li>✅ Personalized coach</li><li>✅ Current trends</li><li>✅ Channel-specific advice</li></ul>
+                </div>
+            </section>
+
+            <div class="torn-divider"></div>
+
+            <section class="faq" id="faq">
+                <div class="faq-header">
+                    <p class="section-eyebrow">Frequently asked questions</p>
+                    <h2 class="section-title">Before you upload your data</h2>
+                </div>
+
+                <div class="faq-list">
+                    <details class="faq-item" open>
+                        <summary><span>What is Brawl Analytics?</span><span class="faq-icon"></span></summary>
+                        <p class="faq-answer">Brawl Analytics reads your YouTube Studio CSV export and transforms raw statistics into clear patterns about what makes your Shorts successful.</p>
+                    </details>
+
+                    <details class="faq-item">
+                        <summary><span>What data do I need to upload?</span><span class="faq-icon"></span></summary>
+                        <p class="faq-answer">You only need the CSV export from YouTube Studio. No account connection is required. If you need a tutorial on uploading CSV, <a href="tutorials/upload-csv.html" target="_blank" rel="noopener">click here</a>.</p>
+                    </details>
+
+                    <details class="faq-item">
+                        <summary><span>How are videos categorized?</span><span class="faq-icon"></span></summary>
+                        <p class="faq-answer">Videos are grouped by format so you can compare similar Shorts and understand what works best.</p>
+                    </details>
+
+                    <details class="faq-item">
+                        <summary><span>How does the prediction work?</span><span class="faq-icon"></span></summary>
+                        <p class="faq-answer">The system analyses previous performance, retention signals and content patterns to estimate viral potential.</p>
+                    </details>
+
+                    <details class="faq-item">
+                        <summary><span>Is the data I upload collected?</span><span class="faq-icon"></span></summary>
+                        <p class="faq-answer">Yes. The data you upload is securely stored and used only to provide the features of Brawl Analytics, such as channel analytics, AI-powered predictions, and personalized recommendations. <strong>Your data is never sold or shared with third parties for marketing purposes.</strong> For more information, please read our <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+                    </details>
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <div class="site-footer__brand">
+                    <strong>Brawl Analytics</strong>
+                    <p>Not a YouTube/Supercell product.</p>
+                </div>
+                <nav class="site-footer__links" aria-label="Footer navigation">
+                    <a href="SEO/features.html">Features</a>
+                    <a href="SEO/about.html">About</a>
+                    <a href="legal/terms.html" target="_blank" rel="noopener">Terms & Conditions</a>
+                    <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener">Contact</a>
+                </nav>
+                <p class="site-footer__legal">© 2026 Brawl Analytics · BETA</p>
+            </footer>
+
+        </section>
+
         <section id="app-screen" class="screen" hidden></section>
         <section id="analysis-screen" class="screen" hidden></section>
     </main>

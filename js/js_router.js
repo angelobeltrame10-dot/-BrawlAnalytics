@@ -23,7 +23,10 @@ import { loadPublicStats } from "./js_public_stats.js";
 
 let currentScreen = "landing";
 
-let homeLoaded = false;
+// La landing è ora renderizzata staticamente dentro index.html (per SEO
+// e crawler AI, vedi llms.txt/robots.txt/sitemap.xml), quindi non va
+// più caricata via fetch: homeLoaded parte già a true.
+let homeLoaded = true;
 let appLoaded = false;
 let analysisLoaded = false;
 
@@ -86,7 +89,10 @@ export async function showLanding() {
 
     currentScreen = "landing";
 
-    if (homeLoaded) {
+    // Contenuto già presente staticamente in index.html: nessun fetch
+    // necessario. Rimane come rete di sicurezza nel caso landing-screen
+    // risultasse vuoto (es. markup rimosso manualmente da index.html).
+    if (homeLoaded && landing.innerHTML.trim() !== "") {
 
         return;
 
