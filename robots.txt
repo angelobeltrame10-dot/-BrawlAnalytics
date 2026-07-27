@@ -3,6 +3,7 @@ Allow: /
 
 Sitemap: https://brawl-analytics-official.vercel.app/sitemap.xml
 
+
 # AI Crawlers
 User-agent: GPTBot
 Allow: /
