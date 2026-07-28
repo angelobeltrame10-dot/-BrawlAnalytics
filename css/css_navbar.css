@@ -230,6 +230,12 @@
 
         gap:var(--space-3);
 
+        padding-block:var(--space-2);
+
+        height:auto;
+
+        min-height:var(--navbar-height);
+
     }
 
     .navlinks{
