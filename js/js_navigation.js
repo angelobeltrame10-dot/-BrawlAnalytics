@@ -75,12 +75,21 @@ function initNavigation(){
                 FAQ
             </a>
 
+
             <button
                 class="btn btn-ghost hidden"
                 id="nav-home"
             >
                 Home
             </button>
+
+
+            <a
+                href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener"
+                id="nav-faq"
+            >
+                contact
+            </a>
 
         </nav>
 
@@ -101,8 +110,6 @@ function initNavigation(){
             </button>
 
             <div class="user-menu hidden" id="nav-user-menu">
-
-                <span class="user-avatar" id="nav-user-avatar">U</span>
 
                 <span class="user-email" id="nav-user-email"></span>
 

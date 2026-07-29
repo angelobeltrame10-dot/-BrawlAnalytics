@@ -99,6 +99,18 @@ async function startApp(){
     initScrollReveal();
     loadPublicStats();
 
+    // Prevent default browser behavior for file drops globally
+    // This stops the browser from downloading files when dragged
+    document.addEventListener("dragover", event => {
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
+    document.addEventListener("drop", event => {
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
 
 
 

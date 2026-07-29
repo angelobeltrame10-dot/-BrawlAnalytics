@@ -631,6 +631,80 @@ function setupUpload(){
 
     );
 
+    /*
+        Drag and drop events
+    */
+
+    dropzone.addEventListener(
+
+        "dragover",
+
+        event=>{
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+            dropzone.classList.add("drag-over");
+
+        }
+
+    );
+
+    dropzone.addEventListener(
+
+        "dragleave",
+
+        event=>{
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+            dropzone.classList.remove("drag-over");
+
+        }
+
+    );
+
+    dropzone.addEventListener(
+
+        "drop",
+
+        event=>{
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+            dropzone.classList.remove("drag-over");
+
+            const files = event.dataTransfer?.files;
+
+            console.log("Drop event triggered, files:", files);
+
+            if(files && files.length > 0){
+
+                const file = files[0];
+
+                console.log("Processing file:", file.name, file.type);
+
+                handleCSVUpload(
+
+                    file
+
+                );
+
+            } else {
+
+                console.log("No files found in drop event");
+
+            }
+
+        }
+
+    );
+
     uploadInitialized = true;
 
 }

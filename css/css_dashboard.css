@@ -221,7 +221,9 @@
 
 .upload-box:hover,
 
-.upload-box.dragging{
+.upload-box.dragging,
+
+.upload-box.drag-over{
 
     border-color:var(--color-secondary);
 

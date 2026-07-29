@@ -23,3 +23,65 @@
 .auth-error{background:rgba(255,84,112,.12);color:var(--color-danger);border:1px solid rgba(255,84,112,.25)}
 .auth-success{background:rgba(62,220,154,.12);color:var(--color-success);border:1px solid rgba(62,220,154,.25)}
 @media(max-width:480px){.auth-modal{padding:2rem 1.5rem}}
+
+/* ---------- Transition system ---------- */
+.auth-modal{overflow:hidden}
+.auth-panels{position:relative;display:grid}
+.auth-panels>.auth-form{grid-column:1;grid-row:1}
+.auth-form{
+    transition:opacity .3s cubic-bezier(.22,.61,.36,1),transform .3s cubic-bezier(.22,.61,.36,1);
+    opacity:1;transform:translateX(0) scale(1);
+    backface-visibility:hidden;
+    will-change:transform,opacity;
+}
+.auth-form.auth-form-exit-left{opacity:0;transform:translateX(-24px) scale(.98);pointer-events:none}
+.auth-form.auth-form-exit-right{opacity:0;transform:translateX(24px) scale(.98);pointer-events:none}
+.auth-form.auth-form-enter-from-left{opacity:0;transform:translateX(-24px) scale(.98)}
+.auth-form.auth-form-enter-from-right{opacity:0;transform:translateX(24px) scale(.98)}
+
+@media(prefers-reduced-motion:reduce){
+    .auth-form{transition:opacity .15s linear !important;transform:none !important}
+    .auth-form.auth-form-exit-left,.auth-form.auth-form-exit-right,
+    .auth-form.auth-form-enter-from-left,.auth-form.auth-form-enter-from-right{transform:none !important}
+}
+
+/* ---------- Buttons lift ---------- */
+.auth-submit-btn{transition:transform .18s cubic-bezier(.22,.61,.36,1),box-shadow .18s ease,filter .18s ease}
+.auth-submit-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 26px rgba(110,86,255,.5)}
+.auth-submit-btn:active:not(:disabled){transform:translateY(0) scale(.98)}
+
+.auth-switch-link,#auth-switch-link{transition:color .18s ease}
+
+/* ---------- Input focus polish ---------- */
+.auth-input{transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}
+.auth-input:focus{transform:scale(1.01);box-shadow:0 0 0 4px rgba(155,140,255,.15)}
+
+/* ---------- Error / success message animation ---------- */
+.auth-error,.auth-success{
+    animation:authMsgIn .28s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes authMsgIn{
+    from{opacity:0;transform:translateY(-6px)}
+    to{opacity:1;transform:translateY(0)}
+}
+@media(prefers-reduced-motion:reduce){
+    .auth-error,.auth-success{animation:none}
+}
+
+/* ---------- Success overlay (spinner before dashboard) ---------- */
+.auth-success-overlay{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:var(--color-surface,#1F1240);border-radius:inherit;
+    opacity:0;transform:scale(.96);pointer-events:none;
+    transition:opacity .25s cubic-bezier(.22,.61,.36,1),transform .25s cubic-bezier(.22,.61,.36,1);
+}
+.auth-success-overlay.active{opacity:1;transform:scale(1);pointer-events:all}
+.auth-success-spinner{
+    width:34px;height:34px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.15);border-top-color:#9B8CFF;
+    animation:authSpin .7s linear infinite;
+}
+@keyframes authSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){
+    .auth-success-spinner{animation-duration:1.4s}
+}

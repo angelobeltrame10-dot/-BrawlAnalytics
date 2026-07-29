@@ -7,6 +7,7 @@
    - Persistenza sessione (getSession + onAuthStateChange)
    - UI del modal di autenticazione
    - Sincronizzazione navbar (Login/Signup vs Avatar/Email/Logout)
+   - Transizioni animate Login <-> Sign Up e success overlay
 
    NON contiene:
    - Router (js_router.js)
@@ -364,31 +365,39 @@ function injectAuthModal(){
 
             <div id="auth-message" class="auth-error" hidden></div>
 
-            <form class="auth-form" id="auth-login-panel" hidden>
-                <input type="email" class="auth-input" id="login-email" placeholder="Email" required autocomplete="email">
-                <div class="auth-password-field">
-                    <input type="password" class="auth-input" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
-                    <button type="button" class="auth-eye-toggle" data-target="login-password">👁</button>
-                </div>
-                <button type="submit" class="auth-submit-btn" id="auth-submit-btn-login">Login</button>
-            </form>
+            <div class="auth-panels">
 
-            <form class="auth-form" id="auth-signup-panel" hidden>
-                <input type="email" class="auth-input" id="signup-email" placeholder="Email" required autocomplete="email">
-                <div class="auth-password-field">
-                    <input type="password" class="auth-input" id="signup-password" placeholder="Enter your password" required autocomplete="new-password">
-                    <button type="button" class="auth-eye-toggle" data-target="signup-password">👁</button>
+                <form class="auth-form" id="auth-login-panel" hidden>
+                    <input type="email" class="auth-input" id="login-email" placeholder="Email" required autocomplete="email">
+                    <div class="auth-password-field">
+                        <input type="password" class="auth-input" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+                        <button type="button" class="auth-eye-toggle" data-target="login-password">👁</button>
+                    </div>
+                    <button type="submit" class="auth-submit-btn" id="auth-submit-btn-login">Login</button>
+                </form>
+
+                <form class="auth-form" id="auth-signup-panel" hidden>
+                    <input type="email" class="auth-input" id="signup-email" placeholder="Email" required autocomplete="email">
+                    <div class="auth-password-field">
+                        <input type="password" class="auth-input" id="signup-password" placeholder="Enter your password" required autocomplete="new-password">
+                        <button type="button" class="auth-eye-toggle" data-target="signup-password">👁</button>
+                    </div>
+                    <div class="auth-password-field">
+                        <input type="password" class="auth-input" id="signup-confirm-password" placeholder="Confirm your password" required autocomplete="new-password">
+                        <button type="button" class="auth-eye-toggle" data-target="signup-confirm-password">👁</button>
+                    </div>
+                    <label class="auth-checkbox">
+                        <input type="checkbox" id="signup-terms">
+                        <span>I agree to the <a href="../legal/terms.html" target="_blank" rel="noopener">Terms &amp; Conditions</a></span>
+                    </label>
+                    <button type="submit" class="auth-submit-btn" id="auth-submit-btn-signup">Create account</button>
+                </form>
+
+                <div class="auth-success-overlay" id="auth-success-overlay">
+                    <div class="auth-success-spinner"></div>
                 </div>
-                <div class="auth-password-field">
-                    <input type="password" class="auth-input" id="signup-confirm-password" placeholder="Confirm your password" required autocomplete="new-password">
-                    <button type="button" class="auth-eye-toggle" data-target="signup-confirm-password">👁</button>
-                </div>
-                <label class="auth-checkbox">
-                    <input type="checkbox" id="signup-terms">
-                    <span>I agree to the <a href="../legal/terms.html" target="_blank" rel="noopener">Terms &amp; Conditions</a></span>
-                </label>
-                <button type="submit" class="auth-submit-btn" id="auth-submit-btn-signup">Create account</button>
-            </form>
+
+            </div>
         </div>
     `;
 
@@ -430,18 +439,61 @@ function injectAuthModal(){
 
 }
 
+/*
+    Cambia modalità login/signup con una transizione animata
+    (fade + slide + scale). Al primo render, o se prefers-reduced-motion
+    è attivo, esegue uno swap istantaneo senza animazione.
+*/
 function setAuthMode(mode){
 
+    const previousMode = modalMode;
     modalMode = mode;
 
-    document.getElementById("auth-login-panel").hidden = mode !== "login";
-    document.getElementById("auth-signup-panel").hidden = mode !== "signup";
+    const loginPanel = document.getElementById("auth-login-panel");
+    const signupPanel = document.getElementById("auth-signup-panel");
 
     document.getElementById("auth-modal-title").textContent = mode === "login" ? "Welcome back" : "Create an account";
     document.getElementById("auth-switch-text").textContent = mode === "login" ? "Don't have an account?" : "Already have an account?";
     document.getElementById("auth-switch-link").textContent = mode === "login" ? "Sign up" : "Log in";
 
     hideAuthMessage();
+
+    if(!loginPanel || !signupPanel){
+        return;
+    }
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const outgoing = mode === "login" ? signupPanel : loginPanel;
+    const incoming = mode === "login" ? loginPanel : signupPanel;
+
+    // Primo render (nessun form ancora visibile) o reduced-motion:
+    // swap istantaneo, nessuna animazione.
+    if(previousMode === mode || outgoing.hidden || reduceMotion){
+        loginPanel.hidden = mode !== "login";
+        signupPanel.hidden = mode !== "signup";
+        return;
+    }
+
+    const goingToSignup = mode === "signup";
+    const exitClass = goingToSignup ? "auth-form-exit-left" : "auth-form-exit-right";
+    const enterClass = goingToSignup ? "auth-form-enter-from-right" : "auth-form-enter-from-left";
+
+    incoming.hidden = false;
+    incoming.classList.add(enterClass);
+    outgoing.classList.add(exitClass);
+
+    // Forza un reflow prima di rimuovere la classe di ingresso, così
+    // il browser applica davvero lo stato iniziale prima di animare.
+    void incoming.offsetHeight;
+
+    requestAnimationFrame(()=>{
+        incoming.classList.remove(enterClass);
+    });
+
+    setTimeout(()=>{
+        outgoing.hidden = true;
+        outgoing.classList.remove(exitClass);
+    }, 300);
 
 }
 
@@ -478,6 +530,29 @@ function hideAuthMessage(){
 
 }
 
+/*
+    Mostra brevemente uno spinner sopra il form (fade + scale) prima
+    di eseguire il callback (tipicamente closeAuthModal). Se l'overlay
+    non è presente in DOM per qualche motivo, esegue subito il callback.
+*/
+function playSuccessTransition(callback){
+
+    const overlay = document.getElementById("auth-success-overlay");
+
+    if(!overlay){
+        callback();
+        return;
+    }
+
+    overlay.classList.add("active");
+
+    setTimeout(()=>{
+        overlay.classList.remove("active");
+        callback();
+    }, 450);
+
+}
+
 async function handleAuthSubmit(){
 
     const submitBtn = document.getElementById(modalMode === "login" ? "auth-submit-btn-login" : "auth-submit-btn-signup");
@@ -494,7 +569,7 @@ async function handleAuthSubmit(){
 
         if(result.success){
             clearAuthForms();
-            closeAuthModal();
+            playSuccessTransition(closeAuthModal);
         }
         else{
             showAuthMessage(result.error);
@@ -525,7 +600,7 @@ async function handleAuthSubmit(){
             else{
                 showAuthMessage("Account created successfully!", "success");
                 clearAuthForms();
-                setTimeout(closeAuthModal, 900);
+                setTimeout(()=> playSuccessTransition(closeAuthModal), 500);
             }
 
         }
