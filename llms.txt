@@ -19,6 +19,7 @@ Users upload their own YouTube Studio "Contenuti" CSV export (Lifetime range). N
 
 ## Links
 - Website: https://brawl-analytics-official.vercel.app/
+- Documentation: https://brawl-analytics-official.vercel.app/documentation.html
 - Features: https://brawl-analytics-official.vercel.app/features.html
 - About: https://brawl-analytics-official.vercel.app/about.html
 - CSV upload tutorial: https://brawl-analytics-official.vercel.app/tutorials/upload-csv.html
