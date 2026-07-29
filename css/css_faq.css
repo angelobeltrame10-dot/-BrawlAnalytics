@@ -14,6 +14,36 @@
 
     padding-block:var(--space-8);
 
+    position:relative;
+
+    overflow:hidden;
+
+}
+
+.faq::before{
+
+    content:"";
+
+    position:absolute;
+
+    top:0;
+
+    left:50%;
+
+    transform:translateX(-50%);
+
+    width:600px;
+
+    height:400px;
+
+    background:radial-gradient(
+        circle,
+        rgba(61,220,255,.06),
+        transparent 70%
+    );
+
+    pointer-events:none;
+
 }
 
 
@@ -27,6 +57,10 @@
     text-align:center;
 
     margin-bottom:var(--space-6);
+
+    position:relative;
+
+    z-index:1;
 
 }
 
@@ -84,6 +118,10 @@
 
     gap:var(--space-3);
 
+    position:relative;
+
+    z-index:1;
+
 }
 
 
@@ -103,6 +141,19 @@
     padding-inline:var(--space-5);
 
     overflow:hidden;
+
+    transition:
+        border-color var(--transition),
+        background var(--transition),
+        transform var(--transition);
+
+}
+
+.faq-item:hover{
+
+    border-color:rgba(61,220,255,.25);
+
+    background:rgba(31,18,64,.8);
 
 }
 
@@ -130,6 +181,14 @@
 
     list-style:none;
 
+    transition:color var(--transition);
+
+}
+
+.faq-item summary:hover{
+
+    color:var(--color-secondary);
+
 }
 
 
@@ -155,6 +214,16 @@
     height:22px;
 
     flex-shrink:0;
+
+    transition:transform var(--transition);
+
+}
+
+
+
+.faq-item:hover .faq-icon{
+
+    transform:scale(1.1);
 
 }
 
@@ -226,6 +295,12 @@
 
 }
 
+.faq-item[open] .faq-icon{
+
+    transform:rotate(180deg);
+
+}
+
 
 
 .faq-item[open] summary{
@@ -248,13 +323,24 @@
 
     padding-bottom:var(--space-5);
 
-    animation:faqOpen .25s ease;
+    animation:faqOpen .3s ease;
+
+    line-height:1.6;
 
 }
 
-.faq-answer a:hover {
-    color: #FFD668;
-    
+.faq-answer a{
+
+    color:var(--color-secondary);
+
+    transition:color var(--transition);
+
+}
+
+.faq-answer a:hover{
+
+    color:var(--color-primary);
+
 }
 
 @keyframes faqOpen{
@@ -263,7 +349,7 @@
 
         opacity:0;
 
-        transform:translateY(-5px);
+        transform:translateY(-8px);
 
     }
 

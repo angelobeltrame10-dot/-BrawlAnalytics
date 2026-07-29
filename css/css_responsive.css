@@ -149,6 +149,8 @@
 
         font-size:.85rem;
 
+        min-height:40px;
+
     }
 
 
@@ -184,6 +186,8 @@
 
         font-size:2.2rem;
 
+        line-height:1.15;
+
     }
 
 
@@ -191,6 +195,8 @@
     .hero-description{
 
         font-size:.95rem;
+
+        line-height:1.6;
 
     }
 
@@ -202,6 +208,8 @@
 
         width:100%;
 
+        gap:var(--space-3);
+
     }
 
 
@@ -209,6 +217,8 @@
     .hero-actions .btn{
 
         width:100%;
+
+        min-height:52px;
 
     }
 
@@ -220,6 +230,8 @@
 
         width:100%;
 
+        gap:var(--space-3);
+
     }
 
 
@@ -227,6 +239,14 @@
     .stat-chip{
 
         width:100%;
+
+        min-height:72px;
+
+        display:flex;
+
+        align-items:center;
+
+        justify-content:space-between;
 
     }
 
@@ -241,7 +261,9 @@
 
     .faq-item{
 
-        padding-inline:1.5rem;
+        padding-inline:1.25rem;
+
+        min-height:64px;
 
     }
 
@@ -250,6 +272,16 @@
     .faq-item summary{
 
         font-size:.9rem;
+
+        padding-block:var(--space-3);
+
+    }
+
+    .faq-answer{
+
+        font-size:.9rem;
+
+        padding-bottom:var(--space-4);
 
     }
 
@@ -317,7 +349,7 @@
 
     .panel{
 
-        padding:var(--space-5);
+        padding:var(--space-4);
 
     }
 
@@ -442,6 +474,8 @@
     .btn-lg{
 
         padding:.8rem 1.2rem;
+
+        min-height:52px;
 
     }
 

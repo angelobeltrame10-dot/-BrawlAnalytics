@@ -44,6 +44,9 @@ import {
 }
 from "./js_auth.js";
 
+import { loadPublicStats } from "./js_public_stats.js";
+import { initScrollReveal } from "./js_scroll_reveal.js";
+
 
 
 /*
@@ -92,6 +95,9 @@ async function startApp(){
         showLanding();
 
     }
+
+    initScrollReveal();
+    loadPublicStats();
 
 
 

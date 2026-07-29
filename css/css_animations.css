@@ -261,3 +261,95 @@
     }
 
 }
+
+
+
+/* ==========================================================
+   FADE SLIDE UP
+========================================================== */
+
+@keyframes fadeSlideUp{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(20px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:translateY(0);
+
+    }
+
+}
+
+
+
+/* ==========================================================
+   SCROLL REVEAL
+========================================================== */
+
+.scroll-reveal{
+
+    opacity:0;
+
+    transform:translateY(30px);
+
+    transition:
+        opacity 0.6s ease,
+        transform 0.6s ease;
+
+}
+
+.scroll-reveal.revealed{
+
+    opacity:1;
+
+    transform:translateY(0);
+
+}
+
+.scroll-reveal-left{
+
+    opacity:0;
+
+    transform:translateX(-30px);
+
+    transition:
+        opacity 0.6s ease,
+        transform 0.6s ease;
+
+}
+
+.scroll-reveal-left.revealed{
+
+    opacity:1;
+
+    transform:translateX(0);
+
+}
+
+.scroll-reveal-right{
+
+    opacity:0;
+
+    transform:translateX(30px);
+
+    transition:
+        opacity 0.6s ease,
+        transform 0.6s ease;
+
+}
+
+.scroll-reveal-right.revealed{
+
+    opacity:1;
+
+    transform:translateX(0);
+
+}

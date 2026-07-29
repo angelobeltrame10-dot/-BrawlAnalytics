@@ -40,6 +40,40 @@ function formatStat(value){
 
 }
 
+function animateCounter(element, targetValue, duration = 1500){
+    
+    const startValue = 0;
+    const startTime = performance.now();
+    const isPercentage = targetValue.toString().includes('%');
+    const numericValue = isPercentage ? parseFloat(targetValue) : parseInt(targetValue.replace(/\D/g, ''));
+    
+    function update(currentTime){
+        
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth animation
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        const currentValue = Math.floor(easeOutQuart * numericValue);
+        
+        if(isPercentage){
+            element.textContent = `${currentValue}%`;
+        } else {
+            element.textContent = formatStat(currentValue);
+        }
+        
+        if(progress < 1){
+            requestAnimationFrame(update);
+        } else {
+            element.textContent = targetValue;
+        }
+        
+    }
+    
+    requestAnimationFrame(update);
+    
+}
+
 export async function loadPublicStats(){
 
     const el = document.getElementById("stat-creators");
@@ -57,10 +91,21 @@ export async function loadPublicStats(){
 
         if(error || !data) return;
 
-        document.getElementById("stat-creators").textContent = formatStat(data.total_creators);
-        document.getElementById("stat-videos").textContent = formatStat(data.total_videos_analyzed);
-        document.getElementById("stat-ideas").textContent = formatStat(data.total_ideas_generated);
-        document.getElementById("stat-feedback").textContent = `${data.positive_feedback_percentage}%`;
+        const creatorsEl = document.getElementById("stat-creators");
+        const videosEl = document.getElementById("stat-videos");
+        const ideasEl = document.getElementById("stat-ideas");
+        const feedbackEl = document.getElementById("stat-feedback");
+
+        const creatorsValue = formatStat(data.total_creators);
+        const videosValue = formatStat(data.total_videos_analyzed);
+        const ideasValue = formatStat(data.total_ideas_generated);
+        const feedbackValue = `${data.positive_feedback_percentage}%`;
+
+        // Animate all stats with slight delays
+        setTimeout(() => animateCounter(creatorsEl, creatorsValue, 1200), 100);
+        setTimeout(() => animateCounter(videosEl, videosValue, 1400), 200);
+        setTimeout(() => animateCounter(ideasEl, ideasValue, 1600), 300);
+        setTimeout(() => animateCounter(feedbackEl, feedbackValue, 1000), 400);
 
     }
     catch(error){
