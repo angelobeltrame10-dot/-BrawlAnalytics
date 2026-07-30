@@ -85,8 +85,16 @@ function initNavigation(){
 
 
             <a
+                href="../about.html"
+                id="nav-about"
+            >
+                about
+            </a>
+
+
+            <a
                 href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener"
-                id="nav-faq"
+                id="nav-contact"
             >
                 contact
             </a>
@@ -256,6 +264,14 @@ function switchToAppMode(){
         "hidden"
     );
 
+    document
+    .getElementById(
+        "nav-about"
+    )
+    ?.classList.add(
+        "hidden"
+    );
+
 }
 
 function switchToHomeMode(){
@@ -271,6 +287,14 @@ function switchToHomeMode(){
     document
     .getElementById(
         "nav-faq"
+    )
+    ?.classList.remove(
+        "hidden"
+    );
+
+    document
+    .getElementById(
+        "nav-about"
     )
     ?.classList.remove(
         "hidden"

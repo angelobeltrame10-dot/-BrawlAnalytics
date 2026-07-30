@@ -72,7 +72,6 @@ function renderInput(){
 
     flow.innerHTML = `
         <div class="va-card">
-            <h3 style="margin-bottom: 1rem;">Personal AI Coach</h3>
             <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">Your dedicated YouTube strategist. The AI will analyze your entire channel history to provide personalized recommendations.</p>
             <button class="va-primary" id="coach-analyze-btn" type="button">Generate Insights <span>→</span></button>
         </div>`;

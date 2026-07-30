@@ -38,7 +38,6 @@ function renderInput(){
 
     flow.innerHTML = `
         <div class="va-card">
-            <h3 style="margin-bottom: 1rem;">Hook & Concept Analyzer</h3>
             <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">Describe the first seconds of your Short. The AI will evaluate how strong your opening concept is.</p>
             <textarea id="hook-input" class="hook-textarea" placeholder='Describe the first seconds of your Short.
 

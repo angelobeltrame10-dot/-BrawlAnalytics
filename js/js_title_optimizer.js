@@ -39,7 +39,6 @@ function renderInput(){
 
     flow.innerHTML = `
         <div class="va-card">
-            <h3 style="margin-bottom: 1rem;">Title Optimizer</h3>
             <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">Enter your YouTube Short title. The AI will analyze it and generate optimized alternatives based on your channel's historical performance.</p>
             <input id="title-input" class="hook-textarea" type="text" placeholder="Enter your title..." style="width: 100%; min-height: 60px; padding: 1rem; border: var(--border); border-radius: var(--radius-md); background: var(--color-background); color: var(--color-text); font-size: 1rem; resize: none;">
             <button class="va-primary" id="title-analyze-btn" type="button">Analyze Title <span>→</span></button>

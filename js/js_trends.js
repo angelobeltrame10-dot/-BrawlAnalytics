@@ -131,103 +131,22 @@ export async function ensureTrendsLoaded(){
 
 /* ==========================================================
    CREATOR TRENDS
+
+   Dati reali salvati settimanalmente nel KV del worker da uno
+   scenario Make (endpoint POST, protetto da Bearer token). La
+   dashboard legge quegli stessi dati con una richiesta GET
+   pubblica e senza credenziali (vedi worker: la rotta GET è
+   read-only e non richiede MAKE_SECRET, che non deve MAI
+   finire nel browser).
+
+   NIENTE dati fittizi/mock: se il fetch fallisce o non c'è
+   ancora nessun dato in KV, viene mostrato uno stato onesto
+   (empty/error), mai un fallback che spaccia dati vecchi o
+   inventati per trend reali.
 ========================================================== */
 
 let creatorTrendsData = null;
 let creatorTrendsLoaded = false;
-
-// Mock data for testing when worker is unavailable
-const MOCK_CREATOR_TRENDS = {
-    "date": "2026-07-30",
-    "trends": [
-        {
-            "generatedAt": "2026-07-30T00:00:00Z",
-            "videosAnalyzed": 150,
-            "freshnessScore": 85,
-            "formats": [
-                {"name": "Gameplay Tutorial", "count": 45},
-                {"name": "Rank Push Journey", "count": 32},
-                {"name": "Mythic Drop", "count": 28},
-                {"name": "Brawl Stars News", "count": 25},
-                {"name": "Challenge Guide", "count": 20}
-            ],
-            "topics": [
-                {"topic": "New Brawler Release", "count": 38},
-                {"topic": "Balance Changes", "count": 35},
-                {"topic": "Season Pass", "count": 30},
-                {"topic": "Championship Challenge", "count": 25},
-                {"topic": "Map Strategies", "count": 22}
-            ],
-            "brawlers": [
-                {"brawler": "Cordelius", "count": 42},
-                {"brawler": "Maisie", "count": 38},
-                {"brawler": "Ruffs", "count": 35},
-                {"brawler": "Chester", "count": 30},
-                {"brawler": "Gray", "count": 28}
-            ],
-            "keywords": [
-                {"keyword": "new brawler", "count": 55},
-                {"keyword": "best build", "count": 48},
-                {"keyword": "gameplay tips", "count": 45},
-                {"keyword": "rank push", "count": 42},
-                {"keyword": "tutorial", "count": 38}
-            ],
-            "trends": [
-                {
-                    "name": "New Brawler First Impressions",
-                    "category": "Content Coverage",
-                    "trendScore": 92,
-                    "confidence": 88,
-                    "viralPotential": 95,
-                    "competition": 75,
-                    "saturation": 68,
-                    "longevity": "High",
-                    "executionDifficulty": "Medium",
-                    "status": "Trending",
-                    "reason": "New brawler releases generate massive initial interest as players want to see abilities, kits, and gameplay before trying them themselves.",
-                    "whyNow": "Cordelius was just released and players are actively searching for first-impression content to understand the brawler's power level and playstyle.",
-                    "avoid": "Don't simply showcase the brawler without analysis. Pure gameplay videos without commentary are oversaturated.",
-                    "howToDifferentiate": "Focus on specific aspects: ability combos, synergies with specific teammates, counter strategies, or unique gadget/star power combinations.",
-                    "originalitySuggestion": "Create a 'Is Cordelius Worth It?' video that breaks down the brawler's value across different game modes and trophy ranges."
-                },
-                {
-                    "name": "Mythic Drop Reactions",
-                    "category": "Entertainment",
-                    "trendScore": 85,
-                    "confidence": 82,
-                    "viralPotential": 88,
-                    "competition": 82,
-                    "saturation": 75,
-                    "longevity": "Medium",
-                    "executionDifficulty": "Low",
-                    "status": "Trending",
-                    "reason": "Mythic drop reaction videos combine excitement with rarity, creating highly shareable moments that resonate with the F2P player base.",
-                    "whyNow": "The current Starr Road features desirable mythics, and many players are hoping for drops during their Starr drops.",
-                    "avoid": "Don't fake reactions or overreact excessively. Audiences can detect inauthenticity.",
-                    "howToDifferentiate": "Add educational value by explaining the mythic's viability, best game modes, and how it fits into the current meta.",
-                    "originalitySuggestion": "Create a 'Mythic Drop Tier List' where you rank recent mythic drops and explain which ones have aged well."
-                },
-                {
-                    "name": "Season Pass Value Analysis",
-                    "category": "Educational",
-                    "trendScore": 78,
-                    "confidence": 85,
-                    "viralPotential": 72,
-                    "competition": 65,
-                    "saturation": 55,
-                    "longevity": "High",
-                    "executionDifficulty": "Medium",
-                    "status": "Emerging",
-                    "reason": "Players want to know if the current Season Pass is worth their gems before committing to the purchase.",
-                    "whyNow": "The new season just launched, and players are evaluating whether to spend their saved gems on the pass or save for future content.",
-                    "avoid": "Don't just list rewards without context. Players need value analysis, not just feature lists.",
-                    "howToDifferentiate": "Break down the value per gem, compare with previous seasons, and identify which rewards are must-haves vs. skip-worthy.",
-                    "originalitySuggestion": "Create a 'Free-to-Play Path' video showing what F2P players can achieve without buying the pass, then compare the pass holder's advantages."
-                }
-            ]
-        }
-    ]
-};
 
 export function setupTrendsTabNavigation(){
     const tabs = document.querySelectorAll('.trends-tab');
@@ -259,7 +178,6 @@ export function setupTrendsTabNavigation(){
 }
 
 async function loadCreatorTrends(){
-    const container = document.getElementById('creator-trends-container');
     const loadingEl = document.getElementById('creator-trends-loading');
     const emptyEl = document.getElementById('creator-trends-empty');
     const errorEl = document.getElementById('creator-trends-error');
@@ -272,18 +190,19 @@ async function loadCreatorTrends(){
     contentEl.hidden = true;
     
     try{
-        const response = await fetch(CREATOR_TRENDS_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
+        const response = await fetch(CREATOR_TRENDS_ENDPOINT, { method: 'GET' });
+
+        // Nessun dato ancora salvato in KV (es. prima esecuzione dello
+        // scenario Make non ancora avvenuta): stato vuoto, non errore.
+        if(response.status === 404){
+            showCreatorTrendsEmpty();
+            return;
+        }
+
         if(!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
         
-        // Check for empty data
         if(!data || !data.trends || !Array.isArray(data.trends) || data.trends.length === 0){
             showCreatorTrendsEmpty();
             return;
@@ -294,24 +213,12 @@ async function loadCreatorTrends(){
         
         renderCreatorTrends(data);
         
-        // Hide loading, show content
         loadingEl.hidden = true;
         contentEl.hidden = false;
         
     } catch(error){
         console.error('Creator trends fetch failed:', error);
-        console.log('Using mock data for testing since worker requires authentication');
-        
-        // Use mock data for testing when worker is unavailable
-        // In production, you would want to configure proper authentication
-        creatorTrendsData = MOCK_CREATOR_TRENDS;
-        creatorTrendsLoaded = true;
-        
-        renderCreatorTrends(MOCK_CREATOR_TRENDS);
-        
-        // Hide loading, show content
-        loadingEl.hidden = true;
-        contentEl.hidden = false;
+        showCreatorTrendsError();
     }
 }
 
@@ -474,12 +381,18 @@ function renderSidebarPanel(containerId, items){
     }
     
     container.innerHTML = items.slice(0, 10).map(item => {
-        const name = typeof item === 'string' ? item : (item.name || item.topic || item.keyword || item.brawler || JSON.stringify(item));
+        // "word" copre le keyword ({"word":"...","count":...}) restituite
+        // dallo scenario Make: senza questo fallback il nome finiva
+        // per collassare su JSON.stringify(item) e mostrare JSON grezzo.
+        const rawName = typeof item === 'string'
+            ? item
+            : (item.name || item.topic || item.keyword || item.brawler || item.word || JSON.stringify(item));
         const count = typeof item === 'string' ? 0 : (item.count || 0);
+        const name = escapeHtml(rawName);
         
         return `
             <div class="sidebar-item">
-                <span class="sidebar-item-name">${escapeHtml(name)}</span>
+                <span class="sidebar-item-name">${name}</span>
                 ${count > 0 ? `<span class="sidebar-item-count">${count}</span>` : ''}
             </div>
         `;

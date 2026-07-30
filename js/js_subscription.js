@@ -265,7 +265,7 @@ function injectUpgradeModal(){
                 <ul class="pricing-features">
                     <li>3 ideas</li>
                     <li>1 analysis</li>
-                    <li>Basic stats</li>
+                    <li>Trend Explorer</li>
                 </ul>
                 <button class="pricing-btn pricing-btn-current" disabled>Current Plan</button>
             </div>
@@ -277,7 +277,7 @@ function injectUpgradeModal(){
                 <ul class="pricing-features">
                     <li>Unlimited ideas</li>
                     <li>Unlimited AI</li>
-                    <li>Virality Engine</li>
+                    <li>Trend Explorer</li>
                     <li>Hook Analyzer</li>
                     <li>AI Coach</li>
                     <li>Title Optimizer</li>
