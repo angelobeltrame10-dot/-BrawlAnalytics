@@ -481,11 +481,113 @@
     <section id="trends-section" class="dashboard-section" hidden>
         <section class="panel">
             <div class="panel-header">
-                <h2 class="panel-title">🔥 Brawl Stars Trends</h2>
-                <button id="refresh-trends-btn" class="btn btn-outline btn-sm">Refresh</button>
+                <h2 class="panel-title">🔥 Trend Explorer</h2>
             </div>
-            <div id="trends-list" class="trends-list">
-                <div class="trends-loading">Loading trends...</div>
+            
+            <!-- Tab Navigation -->
+            <div class="trends-tab-nav">
+                <button class="trends-tab active" data-trends-tab="trending-searches">
+                    Trending Searches
+                </button>
+                <button class="trends-tab" data-trends-tab="creator-trends">
+                    Creator Trends
+                </button>
+            </div>
+            
+            <!-- Trending Searches Tab -->
+            <div id="trending-searches-tab" class="trends-tab-content">
+                <div class="panel-header" style="margin-top: var(--space-4);">
+                    <h3 class="panel-title">Google Trends</h3>
+                    <button id="refresh-trends-btn" class="btn btn-outline btn-sm">Refresh</button>
+                </div>
+                <div id="trends-list" class="trends-list">
+                    <div class="trends-loading">Loading trends...</div>
+                </div>
+            </div>
+            
+            <!-- Creator Trends Tab -->
+            <div id="creator-trends-tab" class="trends-tab-content" hidden>
+                <div id="creator-trends-container">
+                    <div class="creator-trends-header">
+                        <h3 class="panel-title">Creator Trends</h3>
+                        <p class="panel-subtitle">Weekly analysis of what the biggest Brawl Stars creators are publishing. Use these trends as inspiration, not as templates to copy.</p>
+                        
+                        <div class="creator-trends-metrics">
+                            <div class="metric-item">
+                                <span class="metric-label">Videos analyzed</span>
+                                <span class="metric-value" id="creator-videos-analyzed">-</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Freshness Score</span>
+                                <span class="metric-value" id="creator-freshness-score">-</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Last update</span>
+                                <span class="metric-value" id="creator-last-update">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Warning Box -->
+                    <div class="creator-trends-warning">
+                        <div class="warning-icon">⚠️</div>
+                        <div class="warning-content">
+                            <h4>Don't Copy. Learn.</h4>
+                            <p>Creator Trends are designed to help you understand what successful creators are doing right now. They are NOT meant to be copied. Publishing an almost identical video usually performs worse than creating an original idea inspired by the same trend. Always combine these insights with your own style and with your Channel Profile.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div id="creator-trends-loading" class="creator-trends-loading">
+                        <div class="skeleton-loader">
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="creator-trends-empty" class="creator-trends-empty" hidden>
+                        <div class="empty-icon">📊</div>
+                        <h3>No creator trends available.</h3>
+                        <p>The weekly analysis hasn't been generated yet.</p>
+                    </div>
+                    
+                    <!-- Error State -->
+                    <div id="creator-trends-error" class="creator-trends-error" hidden>
+                        <div class="error-icon">❌</div>
+                        <h3>Unable to load creator trends.</h3>
+                        <p id="creator-trends-error-message">Please try again later.</p>
+                        <button id="retry-creator-trends-btn" class="btn btn-outline btn-sm">Retry</button>
+                    </div>
+                    
+                    <!-- Trends Content -->
+                    <div id="creator-trends-content" class="creator-trends-content" hidden>
+                        <div class="creator-trends-grid">
+                            <div class="creator-trends-main">
+                                <div id="creator-trends-cards" class="creator-trends-cards"></div>
+                            </div>
+                            <div class="creator-trends-sidebar">
+                                <div class="sidebar-panel">
+                                    <h4 class="sidebar-title">Top Formats</h4>
+                                    <div id="top-formats" class="sidebar-list"></div>
+                                </div>
+                                <div class="sidebar-panel">
+                                    <h4 class="sidebar-title">Top Topics</h4>
+                                    <div id="top-topics" class="sidebar-list"></div>
+                                </div>
+                                <div class="sidebar-panel">
+                                    <h4 class="sidebar-title">Top Brawlers</h4>
+                                    <div id="top-brawlers" class="sidebar-list"></div>
+                                </div>
+                                <div class="sidebar-panel">
+                                    <h4 class="sidebar-title">Top Keywords</h4>
+                                    <div id="top-keywords" class="sidebar-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </section>

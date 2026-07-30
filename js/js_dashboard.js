@@ -33,7 +33,7 @@ import { initFormatsManager, renderFormatCards } from "./js_formats_manager.js";
 
 import { initSubscription, consumeIdeaGeneration } from "./js_subscription.js";
 
-import { initTrends, setupTrendsRefresh } from "./js_trends.js";
+import { initTrends, setupTrendsRefresh, setupTrendsTabNavigation, setupCreatorTrendsRetry } from "./js_trends.js";
 
 import {
 
@@ -175,6 +175,8 @@ async function initDashboard(){
     setupIdeaGeneration();
     initFormatsManager();
     setupTrendsRefresh();
+    setupTrendsTabNavigation();
+    setupCreatorTrendsRetry();
     initSubscription();
 
     customFormats = await loadCustomFormats();
