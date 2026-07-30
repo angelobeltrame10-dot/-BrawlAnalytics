@@ -133,6 +133,8 @@
   .eyebrow.gold{color:var(--gold);}
   .eyebrow.green{color:var(--green);}
   .wrap{max-width:1120px;margin:0 auto;padding:0 24px;}
+  @media (max-width:480px){.wrap{padding:0 20px;}}
+  img{display:block;max-width:100%;border-radius:14px;border:1px solid var(--border)}
 
   /* NAV */
   .nav{
@@ -179,18 +181,23 @@
     background:rgba(255,255,255,0.02);
   }
 
-  .shots-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px;}
+  .shots-grid{width:100%; display:grid;grid-template-columns:1fr;gap:20px;margin-top:24px;}
   .shot-card{
     background:var(--bg-panel-alt);
     border:1px dashed var(--border-soft);
     border-radius:var(--radius-card);
     padding:20px 16px;text-align:center;
+    width:100%;display:flex;flex-direction:column;align-items:center;
   }
   .shot-frame{
-    height:84px;display:flex;align-items:center;justify-content:center;
+    height:320px;display:flex;align-items:center;justify-content:center;
     font-size:1.8rem;opacity:0.55;
     background:linear-gradient(160deg, rgba(56,225,255,0.06), rgba(255,201,60,0.05));
     border-radius:12px;margin-bottom:14px;
+    overflow:hidden;
+  }
+  .shot-frame img{
+    width:100%;height:100%;object-fit:contain;border-radius:12px;
   }
   .shot-label{font-size:0.86rem;font-weight:700;color:var(--text-primary);}
   .shot-note{font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:4px;}
@@ -330,9 +337,15 @@
     .nav-links{display:none;}
     .footer-grid{flex-direction:column;text-align:center;}
     .footer-links{justify-content:center;}
+    .card-grid{gap:12px;}
+    .metric-card{padding:16px;}
   }
   @media (max-width:480px){
     .shots-grid{grid-template-columns:1fr;}
+    .shot-frame{height:160px;}
+    .card{padding:20px 16px;}
+    .hero{padding:64px 0 40px;}
+    .cta{padding:40px 24px;}
   }
 </style>
 </head>
@@ -398,12 +411,10 @@
     <section id="preview">
       <span class="eyebrow">Product preview</span>
       <h2>What the tools look like</h2>
-      <p class="lede">Screenshots for each tool are being finalized and will be added here directly. For now, here's a placeholder for what each preview will cover.</p>
       <div class="shots-grid">
-        <div class="shot-card"><div class="shot-frame">🖼</div><div class="shot-label">Dashboard Preview</div><div class="shot-note">Coming soon</div></div>
-        <div class="shot-card"><div class="shot-frame">🖼</div><div class="shot-label">Virality Engine Preview</div><div class="shot-note">Coming soon</div></div>
-        <div class="shot-card"><div class="shot-frame">🖼</div><div class="shot-label">Video Analysis Preview</div><div class="shot-note">Coming soon</div></div>
-        <div class="shot-card"><div class="shot-frame">🖼</div><div class="shot-label">Personal AI Coach Preview</div><div class="shot-note">Coming soon</div></div>
+        <div class="shot-card"><div class="shot-frame"><img src="assets/dashboard.png" alt="Dashboard Preview"></div><div class="shot-label">Dashboard Preview</div></div>
+        <div class="shot-card"><div class="shot-frame"><img src="assets/video-analysis.png" alt="Video Analysis Preview"></div><div class="shot-label">Video Analysis Preview</div></div>
+        <div class="shot-card"><div class="shot-frame"><img src="assets/idea-generator.png" alt="Idea Generator Preview"></div><div class="shot-label">Idea Generator Preview</div></div>
       </div>
     </section>
 
