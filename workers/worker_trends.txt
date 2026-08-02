@@ -1,0 +1,174 @@
+export default {
+    async fetch(request, env) {
+        const url = new URL(request.url);
+
+        try {
+            /* ============================================
+               HEALTH CHECK
+            ============================================ */
+            if (
+                request.method === "GET" &&
+                url.pathname === "/health"
+            ) {
+                return json({
+                    success: true,
+                    service: "Brawl Analytics Trends Worker",
+                    status: "online",
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            /* ============================================
+               GET TRENDS
+            ============================================ */
+            if (
+                request.method === "GET" &&
+                url.pathname === "/trends"
+            ) {
+                const cached = await env.BRAWL_TRENDS_KV.get(
+                    "latest_trends"
+                );
+
+                if (!cached) {
+                    return json({
+                        success: false,
+                        error: "No trends available."
+                    }, 404);
+                }
+
+                return new Response(cached, {
+                    status: 200,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*"
+                    }
+                });
+            }
+
+            /* ============================================
+               UPDATE TRENDS (MAKE)
+            ============================================ */
+            if (
+                request.method === "POST" &&
+                url.pathname === "/trends"
+            ) {
+                const auth = request.headers.get("Authorization");
+
+                if (
+                    auth !== `Bearer ${env.MAKE_SECRET}`
+                ) {
+                    return json({
+                        success: false,
+                        error: "Unauthorized."
+                    }, 401);
+                }
+
+                const body = await request.json();
+
+                if (
+                    !body.date ||
+                    !Array.isArray(body.trends)
+                ) {
+                    return json({
+                        success: false,
+                        error: "Invalid payload."
+                    }, 400);
+                }
+
+                // Pulizia e formattazione dei trend prima del salvataggio
+                const cleanedTrends = sanitizeTrends(body.trends);
+
+                const payload = {
+                    version: 1,
+                    date: body.date,
+                    updatedAt: new Date().toISOString(),
+                    trends: cleanedTrends
+                };
+
+                await env.BRAWL_TRENDS_KV.put(
+                    "latest_trends",
+                    JSON.stringify(payload)
+                );
+
+                return json({
+                    success: true,
+                    message: "Daily trends updated.",
+                    count: payload.trends.length,
+                    updatedAt: payload.updatedAt
+                });
+            }
+
+            /* ============================================
+               FUTURE ENDPOINT
+            ============================================ */
+            if (
+                request.method === "POST" &&
+                url.pathname === "/virality"
+            ) {
+                return json({
+                    success: false,
+                    message: "Virality Engine not implemented yet."
+                }, 501);
+            }
+
+            return json({
+                success: false,
+                error: "Route not found."
+            }, 404);
+
+        } catch (error) {
+            return json({
+                success: false,
+                error: error.message
+            }, 500);
+        }
+    }
+};
+
+/* ============================================
+   HELPERS & DATA SANITIZER
+============================================ */
+
+function sanitizeTrends(rawTrends) {
+    let formattedTrends = [];
+
+    // Se Make invia un array con un unico blocco di testo (es. ["mensioni in crescita: query1, query2"])
+    if (rawTrends.length > 0 && typeof rawTrends[0] === 'string') {
+        let fullString = rawTrends.join(", ");
+
+        // Rimuove la frase introduttiva (es. "mensioni in crescita tra le related_queries:")
+        if (fullString.includes(":")) {
+            fullString = fullString.split(":")[1];
+        }
+
+        // Divide per virgola, rimuove spazi vuoti e mappa ogni termine nell'oggetto {"query": "..."}
+        formattedTrends = fullString
+            .split(",")
+            .map(item => item.trim())
+            .filter(item => item.length > 0)
+            .map(item => ({ query: item }));
+
+    } else if (rawTrends.length > 0 && typeof rawTrends[0] === 'object') {
+        // Se arrivano già come oggetti, assicura che abbiano la chiave "query"
+        formattedTrends = rawTrends.map(item => {
+            if (item.query) return { query: item.query };
+            if (typeof item === 'string') return { query: item };
+            return { query: String(item) };
+        });
+    }
+
+    return formattedTrends;
+}
+
+function json(data, status = 200) {
+    return new Response(
+        JSON.stringify(data, null, 2),
+        {
+            status,
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            }
+        }
+    );
+}

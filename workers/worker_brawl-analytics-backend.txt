@@ -4,6 +4,7 @@
 
    Central AI backend with dedicated handlers for each feature:
    - Hook & Concept Analyzer
+   - Title Optimizer
    - Personal AI Coach
    - Generic passthrough (idea generation, format detection,
      keyword generation — used by js_api.js)
@@ -11,42 +12,43 @@
    Robust JSON validation, repair, and field completion.
    Never returns incomplete data to frontend.
 
-   FIX (root cause of "tutte le chiamate AI vanno male"):
-   callGroq() forzava SEMPRE response_format: json_object, anche
-   sulla route generica. Groq in quella modalità richiede che
-   l'intero output sia un oggetto JSON {}: qualunque prompt che
-   chieda testo semplice (idee separate da "|") o un array JSON
-   nudo ([...]) — cioè discoverChannelFormats, expandFormatCoverage,
-   generateKeywordsForFormat, generaIdeeConAI in js_api.js — veniva
-   rotto o rifiutato dal modello. Ora json_object è opt-in: attivo
-   SOLO per hook_analysis e personal_coach (che dichiarano davvero
-   uno schema a oggetto), mai per la route generica.
 
 ========================================================== */
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
-const ALLOWED_ORIGIN = "*";
+const ALLOWED_ORIGINS = [
+    "https://brawl-analytics-official.vercel.app",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+];
 
 // ============================================================
 // CORS & RESPONSE HELPERS
 // ============================================================
 
-function corsHeaders() {
-    return {
-        "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+function corsHeaders(request) {
+    const origin = request?.headers?.get("Origin") || "";
+    const headers = {
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Vary": "Origin"
     };
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+        headers["Access-Control-Allow-Origin"] = origin;
+    }
+
+    return headers;
 }
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body, request, status = 200) {
     return new Response(
         JSON.stringify(body),
         {
             status,
             headers: {
                 "Content-Type": "application/json",
-                ...corsHeaders()
+                ...corsHeaders(request)
             }
         }
     );
@@ -116,9 +118,9 @@ function ensureEnum(value, allowed, defaultValue) {
 // ============================================================
 
 /**
- * jsonMode è ora un parametro esplicito, non più sempre true.
- * - true  → usato SOLO da handleHookAnalysis/handlePersonalCoach,
- *           che dichiarano uno schema a oggetto {} nel prompt.
+ * jsonMode è esplicito, non più sempre true.
+ * - true  → usato SOLO da handleHookAnalysis / handlePersonalCoach /
+ *           handleTitleOptimizer, che dichiarano uno schema a oggetto {}.
  * - false → route generica (js_api.js): idee separate da "|",
  *           array JSON nudi [...], testo libero. Forzare json_object
  *           qui rompeva/rifiutava sistematicamente l'output di Groq.
@@ -266,7 +268,7 @@ Analyze this opening concept following the process above. Consider how it aligns
             env,
             0.18,
             3000,
-            true // jsonMode: questo handler dichiara davvero uno schema a oggetto
+            true
         );
 
         const content = response.choices?.[0]?.message?.content || "";
@@ -415,33 +417,30 @@ async function handleTitleOptimizer(payload, env) {
         return { error: "Missing title" };
     }
 
-    // Build context from channel profile
     let context = "";
     if (channelProfile) {
         const avgViews = channelProfile.averageViews || 0;
-        const bestFormats = Array.isArray(channelProfile.bestFormats) 
-            ? channelProfile.bestFormats.slice(0, 3).join(", ") 
+        const bestFormats = Array.isArray(channelProfile.bestFormats)
+            ? channelProfile.bestFormats.slice(0, 3).join(", ")
             : "None";
         const worstFormats = Array.isArray(channelProfile.worstFormats)
             ? channelProfile.worstFormats.slice(0, 3).join(", ")
             : "None";
 
-        // Analyze historical title performance if available
         let titleStyleInsights = "";
         if (channelProfile.historicalVideos && channelProfile.historicalVideos.length > 0) {
             const titles = channelProfile.historicalVideos.map(v => v.title).filter(Boolean);
             if (titles.length > 0) {
-                // Simple heuristic: count titles with competitive vs funny keywords
                 const competitiveKeywords = ["best", "strongest", "op", "meta", "rank", "tier", "pro", "guide"];
                 const funnyKeywords = ["funny", "crazy", "insane", "lol", "hilarious", "meme", "lost mind"];
-                
-                const competitiveCount = titles.filter(t => 
+
+                const competitiveCount = titles.filter(t =>
                     competitiveKeywords.some(k => t.toLowerCase().includes(k))
                 ).length;
-                const funnyCount = titles.filter(t => 
+                const funnyCount = titles.filter(t =>
                     funnyKeywords.some(k => t.toLowerCase().includes(k))
                 ).length;
-                
+
                 if (competitiveCount > funnyCount) {
                     titleStyleInsights = "Your historical data shows that competitive-style titles tend to perform better for this channel. ";
                 } else if (funnyCount > competitiveCount) {
@@ -461,7 +460,6 @@ Use this context to personalize your analysis and recommendations. Reference his
 `;
     }
 
-    // Build trends context
     let trendsContext = "";
     if (currentTrends && Array.isArray(currentTrends) && currentTrends.length > 0) {
         trendsContext = `
@@ -489,7 +487,8 @@ Analyze this title following the process above. Consider how it aligns with the 
             ],
             env,
             0.18,
-            3500
+            3500,
+            true
         );
 
         const content = response.choices?.[0]?.message?.content || "";
@@ -499,7 +498,6 @@ Analyze this title following the process above. Consider how it aligns with the 
             return { error: "AI returned invalid JSON" };
         }
 
-        // Validate and complete all fields
         return {
             overallScore: clampValue(parsed.overallScore, 0, 100, 50),
             ctrPrediction: clampValue(parsed.ctrPrediction, 0, 100, 50),
@@ -645,7 +643,7 @@ Remember: never fabricate a percentage or trend that isn't backed by the numbers
             env,
             0.15,
             2500,
-            true // jsonMode: questo handler dichiara davvero uno schema a oggetto
+            true
         );
 
         const content = response.choices?.[0]?.message?.content || "";
@@ -696,65 +694,47 @@ Remember: never fabricate a percentage or trend that isn't backed by the numbers
 export default {
     async fetch(request, env) {
         if (request.method === "OPTIONS") {
-            return new Response(null, { headers: corsHeaders() });
+            return new Response(null, { headers: corsHeaders(request) });
         }
 
         if (request.method !== "POST") {
-            return jsonResponse({ error: "Method not allowed" }, 405);
+            return jsonResponse({ error: "Method not allowed" }, request, 405);
         }
 
         if (!env.CHIAVE_API_AI) {
-            return jsonResponse({ error: "Missing AI key" }, 500);
+            return jsonResponse({ error: "Missing AI key" }, request, 500);
         }
 
         let payload;
         try {
             payload = await request.json();
         } catch {
-            return jsonResponse({ error: "Invalid JSON" }, 400);
+            return jsonResponse({ error: "Invalid JSON" }, request, 400);
         }
 
         const { type } = payload;
 
         try {
-            // =============================
-            // ROUTE: HOOK & CONCEPT ANALYZER
-            // =============================
             if (type === "hook_analysis") {
                 const result = await handleHookAnalysis(payload, env);
-                return jsonResponse(result);
+                return jsonResponse(result, request);
             }
 
-            // =============================
-            // ROUTE: PERSONAL AI COACH
-            // =============================
             if (type === "personal_coach") {
                 const result = await handlePersonalCoach(payload, env);
-                return jsonResponse(result);
+                return jsonResponse(result, request);
             }
 
-            // =============================
-            // ROUTE: TITLE OPTIMIZER
-            // =============================
             if (type === "title_optimizer") {
                 const result = await handleTitleOptimizer(payload, env);
-                return jsonResponse(result);
+                return jsonResponse(result, request);
             }
 
-
-            // =============================
-            // ROUTE: GENERIC OPENAI COMPATIBLE (fallback)
-            // Usata da js_api.js per: generazione idee (testo con "|"),
-            // discoverChannelFormats/expandFormatCoverage (array JSON
-            // nudo), generateKeywordsForFormat (array JSON nudo).
-            // NON deve mai forzare json_object: nessuno di questi
-            // payload è un oggetto {} — forzarlo fa scartare/rompere
-            // la risposta da Groq quasi sistematicamente.
-            // =============================
+            // ROUTE: GENERIC (fallback) — usata da js_api.js
             const { messages, model, temperature, max_tokens } = payload;
 
             if (!Array.isArray(messages) || messages.length === 0) {
-                return jsonResponse({ error: "Missing messages" }, 400);
+                return jsonResponse({ error: "Missing messages" }, request, 400);
             }
 
             const data = await callGroq(
@@ -762,13 +742,13 @@ export default {
                 env,
                 temperature ?? 0.7,
                 max_tokens ?? 2000,
-                false // jsonMode disattivato: vedi nota sopra
+                false
             );
 
-            return jsonResponse(data);
+            return jsonResponse(data, request);
 
         } catch (error) {
-            return jsonResponse({ error: error.message }, 500);
+            return jsonResponse({ error: error.message }, request, 500);
         }
     }
 };

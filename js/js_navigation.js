@@ -61,7 +61,7 @@ function initNavigation(){
                 <img src="assets/favicon.ico" alt="Brawl Analytics logo" width="32" height="32">
 
             <span class="logo__text">
-                Brawl<strong>Analytics</strong> - BETA
+                Brawl<strong>Analytics</strong>
             </span>
 
         </a>
@@ -269,6 +269,15 @@ function switchToAppMode(){
         "nav-about"
     )
     ?.classList.add(
+        "hidden"
+    );
+
+    // Keep Contact visible in both modes
+    document
+    .getElementById(
+        "nav-contact"
+    )
+    ?.classList.remove(
         "hidden"
     );
 

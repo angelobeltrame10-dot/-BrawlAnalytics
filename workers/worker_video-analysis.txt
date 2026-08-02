@@ -1,0 +1,957 @@
+// Video Insights Worker - Single File Version
+
+const ALLOWED_ORIGINS = [
+  "https://brawl-analystic-official.vercel.app",
+  "https://www.brawl-analystic-official.vercel.app",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://localhost:3000",
+  "https://brawl-stars-analystic.vercel.app",
+  "https://brawl-analystic.vercel.app"
+];
+
+export default {
+  async fetch(request, env) {
+    const origin = request.headers.get('Origin');
+    const headers = corsHeaders(origin);
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers });
+    }
+
+    if (request.method !== 'POST') {
+      return jsonResponse(
+        { error: 'Method not allowed. Use POST.' },
+        405,
+        headers
+      );
+    }
+
+    const url = new URL(request.url);
+
+    if (url.pathname === '/analyze-video') {
+      return await handleAnalyzeVideo(request, env, origin);
+    }
+
+    return jsonResponse(
+      { error: 'Not found' },
+      404,
+      headers
+    );
+  }
+};
+
+// ==================== MAIN HANDLER ====================
+
+async function handleAnalyzeVideo(request, env, origin) {
+  const startTime = Date.now();
+  const headers = corsHeaders(origin);
+
+  if (!env.GEMINI_API_KEY) {
+    return jsonResponse(
+      { error: 'Server configuration error: Missing GEMINI_API_KEY' },
+      500,
+      headers
+    );
+  }
+
+  // FIX: il modello configurato ("gemini-3.5-Flash-Lite" nelle env vars)
+  // aveva maiuscole. Gli ID modello Gemini sono case-sensitive e SEMPRE
+  // minuscoli — un ID con maiuscole viene rifiutato da generateContent
+  // con 400 INVALID_ARGUMENT ("Invalid model name format"). Normalizzare
+  // qui protegge da futuri typo di questo tipo direttamente nelle env
+  // vars, senza dover ogni volta ricordare la regola a mano.
+  const resolvedModel = String(env.GEMINI_MODEL || 'gemini-2.5-flash').trim().toLowerCase();
+  console.log('[Worker] GEMINI_MODEL (resolved) =', resolvedModel);
+
+  try {
+    // Step 1: Handle video upload
+    const { file, error: uploadError } = await handleVideoUpload(request, env);
+
+    if (uploadError) {
+      console.error('[Upload Error]', uploadError);
+      return jsonResponse(
+        buildErrorResponse(uploadError),
+        400,
+        headers
+      );
+    }
+
+    // Step 2: Upload video to Gemini
+    const { uri, error: geminiUploadError } = await uploadVideoToGemini(file, env.GEMINI_API_KEY);
+
+    if (geminiUploadError) {
+      console.error('[Gemini Upload Error]', geminiUploadError);
+      return jsonResponse(
+        buildErrorResponse(geminiUploadError),
+        502,
+        headers
+      );
+    }
+
+    // Step 3: Wait for file processing
+    // NOTA: l'endpoint di polling /files/{name} vuole il solo nome file (senza host/prefisso),
+    // mentre generateContent vuole l'URI COMPLETO restituito dall'upload.
+    const fileName = extractFileUri(uri);
+    const { success: processingSuccess, error: processingError } = await waitForFileProcessing(
+      fileName,
+      env.GEMINI_API_KEY
+    );
+
+    if (!processingSuccess || processingError) {
+      console.error('[Processing Error]', processingError);
+      return jsonResponse(
+        buildErrorResponse(processingError || { type: 'gemini', message: 'File processing failed', failedFields: ['processing'] }),
+        502,
+        headers
+      );
+    }
+
+    // Step 4: Generate analysis (usa l'URI completo, non il fileName)
+    const prompt = buildAnalysisPrompt();
+    const { response: analysisText, error: generationError } = await generateVideoAnalysis(
+      uri,
+      prompt,
+      resolvedModel,
+      env
+    );
+
+    if (generationError) {
+      console.error('[Generation Error]', generationError);
+      const status = generationError.type === 'invalid_model' ? 500 : 502;
+      return jsonResponse(
+        buildErrorResponse(generationError),
+        status,
+        headers
+      );
+    }
+
+    // Step 5: Parse and validate response
+    const parsedData = parseAndValidateResponse(analysisText);
+
+    if (!parsedData) {
+      const parseError = {
+        type: 'parsing',
+        message: 'Failed to parse Gemini response as valid JSON',
+        failedFields: ['parsing']
+      };
+      console.error('[Parse Error]', parseError);
+      return jsonResponse(
+        buildErrorResponse(parseError),
+        502,
+        headers
+      );
+    }
+
+    // Step 6: Build success response
+    const processingTime = Date.now() - startTime;
+    const metadata = {
+      processingTime,
+      model: resolvedModel,
+      videoDuration: parsedData.energyCurve.length
+    };
+
+    return jsonResponse(
+      buildSuccessResponse(parsedData, metadata),
+      200,
+      headers
+    );
+
+  } catch (error) {
+    const errorInfo = categorizeError(error);
+    console.error('[Unexpected Error]', errorInfo);
+    return jsonResponse(
+      buildErrorResponse(errorInfo),
+      500,
+      headers
+    );
+  }
+}
+
+// ==================== UPLOAD HANDLER ====================
+
+async function handleVideoUpload(request, env) {
+  const contentType = request.headers.get('Content-Type') || '';
+
+  try {
+    if (contentType.includes('multipart/form-data')) {
+      return await handleMultipartUpload(request, env);
+    } else if (contentType.includes('application/octet-stream')) {
+      return await handleBinaryUpload(request, env);
+    } else {
+      return {
+        file: {},
+        error: {
+          type: 'upload',
+          message: `Unsupported Content-Type: ${contentType}. Use multipart/form-data or application/octet-stream`,
+          failedFields: ['contentType']
+        }
+      };
+    }
+  } catch (error) {
+    return {
+      file: {},
+      error: {
+        type: 'upload',
+        message: error.message || 'Upload failed',
+        failedFields: ['upload']
+      }
+    };
+  }
+}
+
+async function handleMultipartUpload(request, env) {
+  const formData = await request.formData();
+  const fileEntry = formData.get('video');
+
+  if (!fileEntry || !(fileEntry instanceof File)) {
+    return {
+      file: {},
+      error: {
+        type: 'upload',
+        message: 'No video file found in form data. Expected field name: video',
+        failedFields: ['video']
+      }
+    };
+  }
+
+  const maxSize = getMaxVideoSize(env.MAX_VIDEO_SIZE_MB);
+  const videoFile = {
+    name: fileEntry.name,
+    type: fileEntry.type,
+    size: fileEntry.size,
+    data: await fileEntry.arrayBuffer()
+  };
+
+  const validationError = validateVideoFile(videoFile, maxSize / (1024 * 1024));
+  if (validationError) {
+    return { file: videoFile, error: validationError };
+  }
+
+  return { file: videoFile };
+}
+
+async function handleBinaryUpload(request, env) {
+  const contentLength = request.headers.get('Content-Length');
+  const contentType = request.headers.get('Content-Type') || 'video/mp4';
+  const fileName = request.headers.get('X-File-Name') || 'video.mp4';
+
+  if (!contentLength) {
+    return {
+      file: {},
+      error: {
+        type: 'upload',
+        message: 'Missing Content-Length header',
+        failedFields: ['contentLength']
+      }
+    };
+  }
+
+  const size = parseInt(contentLength, 10);
+  const maxSize = getMaxVideoSize(env.MAX_VIDEO_SIZE_MB);
+
+  if (size > maxSize) {
+    return {
+      file: {},
+      error: {
+        type: 'upload',
+        message: `File size ${formatFileSize(size)} exceeds maximum ${maxSize / (1024 * 1024)}MB`,
+        failedFields: ['fileSize']
+      }
+    };
+  }
+
+  const data = await request.arrayBuffer();
+  const videoFile = {
+    name: fileName,
+    type: contentType,
+    size: data.byteLength,
+    data
+  };
+
+  const validationError = validateVideoFile(videoFile, maxSize / (1024 * 1024));
+  if (validationError) {
+    return { file: videoFile, error: validationError };
+  }
+
+  return { file: videoFile };
+}
+
+// ==================== VALIDATION ====================
+
+const ALLOWED_MIME_TYPES = [
+  'video/mp4',
+  'video/quicktime',
+  'video/x-matroska',
+  'video/webm'
+];
+
+function validateVideoFile(file, maxSizeMB) {
+  const maxSizeBytes = maxSizeMB * 1024 * 1024;
+
+  if (file.size > maxSizeBytes) {
+    return {
+      type: 'validation',
+      message: `File size ${formatFileSize(file.size)} exceeds maximum ${maxSizeMB}MB`,
+      failedFields: ['fileSize']
+    };
+  }
+
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    return {
+      type: 'validation',
+      message: `Unsupported file type: ${file.type}. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`,
+      failedFields: ['fileType']
+    };
+  }
+
+  if (file.size === 0) {
+    return {
+      type: 'validation',
+      message: 'File is empty',
+      failedFields: ['fileSize']
+    };
+  }
+
+  return null;
+}
+
+function getMaxVideoSize(envMaxSize) {
+  if (!envMaxSize) return 100 * 1024 * 1024;
+
+  const parsed = parseInt(envMaxSize, 10);
+  if (isNaN(parsed) || parsed <= 0) return 100 * 1024 * 1024;
+
+  return parsed * 1024 * 1024;
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// ==================== GEMINI CLIENT ====================
+
+// Endpoint per le chiamate "normali" (polling file, generateContent).
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+// Endpoint corretto per l'upload dei BYTES del file (diverso da /v1beta/files,
+// che è solo "metadata-only" e non contiene mai il campo "file" atteso).
+const GEMINI_UPLOAD_BASE = 'https://generativelanguage.googleapis.com/upload/v1beta';
+
+const DEFAULT_TIMEOUT = 60000;
+const MAX_RETRIES = 3;
+
+/**
+ * Errori "strutturali" (400 di validazione, modello inesistente/nome
+ * sbagliato, risposta priva del campo atteso) non sono transitori:
+ * ritentare 3 volte produce sempre lo stesso esito e spreca solo
+ * chiamate reali verso Gemini. Solo errori di rete, timeout e 429/5xx
+ * hanno senso da ritentare.
+ */
+function isRetryableStatus(status) {
+  return status === 429 || status >= 500;
+}
+
+async function uploadVideoToGemini(file, apiKey) {
+  const formData = new FormData();
+  formData.append('file', new Blob([file.data], { type: file.type }), file.name);
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    let response;
+    try {
+      response = await fetch(
+        `${GEMINI_UPLOAD_BASE}/files?key=${apiKey}`,
+        { method: 'POST', body: formData, signal: AbortSignal.timeout(DEFAULT_TIMEOUT) }
+      );
+    } catch (error) {
+      // Errore di rete/timeout: questo sì ha senso ritentare.
+      if (attempt === MAX_RETRIES) {
+        return {
+          uri: '',
+          error: { type: 'network_error', message: error.message || 'Video upload to Gemini failed', failedFields: ['videoUpload'] }
+        };
+      }
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      continue;
+    }
+
+    const respText = await response.text();
+
+    if (!response.ok) {
+      console.error('[Gemini Upload] HTTP error:', response.status, respText);
+
+      if (isRetryableStatus(response.status) && attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        continue;
+      }
+
+      // Errore non transitorio (es. 400) o ultimo tentativo: esci subito.
+      return {
+        uri: '',
+        error: {
+          type: 'gemini',
+          message: `Gemini upload failed: ${response.status} - ${respText}`,
+          failedFields: ['videoUpload']
+        }
+      };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(respText);
+    } catch (e) {
+      console.error('[Gemini Upload] Failed to parse JSON response:', respText);
+      return {
+        uri: '',
+        error: { type: 'gemini', message: 'Gemini upload returned non-JSON response', failedFields: ['videoUpload'] }
+      };
+    }
+
+    if (data?.file?.uri) {
+      return { uri: data.file.uri };
+    }
+
+    if (data?.file?.name) {
+      return { uri: `files/${data.file.name}` };
+    }
+
+    if (data?.name) {
+      return { uri: `files/${data.name}` };
+    }
+
+    // Risposta 200 ma senza il campo atteso: è un errore strutturale,
+    // non ha senso ritentare, esce subito senza consumare altre chiamate.
+    console.error('[Gemini Upload] Unexpected upload response shape:', data);
+    return {
+      uri: '',
+      error: {
+        type: 'gemini',
+        message: `Gemini upload response missing file.uri: ${JSON.stringify(data)}`,
+        failedFields: ['videoUpload']
+      }
+    };
+  }
+
+  return {
+    uri: '',
+    error: { type: 'gemini', message: 'Max retries exceeded for video upload', failedFields: ['videoUpload'] }
+  };
+}
+
+// fileName qui è il solo nome/ID breve (es. "abc123"), NON l'URI completo.
+async function waitForFileProcessing(fileName, apiKey) {
+  const maxAttempts = 30;
+  const interval = 1000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(
+        `${GEMINI_API_BASE}/files/${fileName}?key=${apiKey}`,
+        {
+          method: 'GET',
+          signal: AbortSignal.timeout(DEFAULT_TIMEOUT)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`File status check failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data || !data.file) {
+        console.error('[File Status] Missing data.file in response:', data);
+
+        if (data && data.state) {
+          if (data.state === 'PROCESSING') {
+            await new Promise(resolve => setTimeout(resolve, interval));
+            continue;
+          }
+          if (data.state === 'ACTIVE') return { success: true };
+          if (data.state === 'FAILED') {
+            return {
+              success: false,
+              error: { type: 'gemini', message: 'Gemini file processing failed', failedFields: ['fileProcessing'] }
+            };
+          }
+        }
+
+        return {
+          success: false,
+          error: {
+            type: 'gemini',
+            message: `Missing file metadata in status response: ${JSON.stringify(data)}`,
+            failedFields: ['fileProcessing']
+          }
+        };
+      }
+
+      if (data.file.state === 'PROCESSING') {
+        await new Promise(resolve => setTimeout(resolve, interval));
+        continue;
+      }
+
+      if (data.file.state === 'FAILED') {
+        return {
+          success: false,
+          error: { type: 'gemini', message: 'Gemini file processing failed', failedFields: ['fileProcessing'] }
+        };
+      }
+
+      if (data.file.state === 'ACTIVE') {
+        return { success: true };
+      }
+
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        return {
+          success: false,
+          error: { type: 'gemini', message: error.message || 'File status check failed', failedFields: ['fileProcessing'] }
+        };
+      }
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+  }
+
+  return {
+    success: false,
+    error: { type: 'timeout', message: 'File processing timeout', failedFields: ['fileProcessing'] }
+  };
+}
+
+// fileUri qui deve essere l'URI COMPLETO restituito dall'upload, non il solo nome.
+// `model` viene passato già risolto/normalizzato (minuscolo) dal chiamante.
+async function generateVideoAnalysis(fileUri, prompt, model, env) {
+  const apiKey = env.GEMINI_API_KEY;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    let response;
+    try {
+      response = await fetch(
+        `${GEMINI_API_BASE}/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                file_data: {
+                  file_uri: fileUri,
+                  mime_type: 'video/mp4'
+                }
+              }, {
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 8192,
+              responseMimeType: 'application/json'
+            }
+          }),
+          signal: AbortSignal.timeout(DEFAULT_TIMEOUT)
+        }
+      );
+    } catch (error) {
+      console.error('[generateVideoAnalysis] attempt', attempt, 'network error:', error);
+      if (attempt === MAX_RETRIES) {
+        return {
+          response: '',
+          error: { type: 'network_error', message: error.message || 'Video analysis generation failed', failedFields: ['generation'] }
+        };
+      }
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      continue;
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Gemini generation] HTTP ${response.status} - ${errorText}`);
+
+      if (response.status === 429 && attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 2000));
+        continue;
+      }
+
+      if (isRetryableStatus(response.status) && attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        continue;
+      }
+
+      // 400/404 (es. nome modello inesistente o malformato) non sono
+      // transitori: niente retry, esce subito con un messaggio chiaro
+      // invece di sprecare altre 2 chiamate identiche.
+      const isModelError = response.status === 400 && /model/i.test(errorText);
+      return {
+        response: '',
+        error: {
+          type: isModelError ? 'invalid_model' : 'gemini',
+          message: isModelError
+            ? `Invalid GEMINI_MODEL "${model}" — check the exact, lowercase model id in Cloudflare env vars. Gemini said: ${errorText}`
+            : `Gemini generation failed: ${response.status} - ${errorText}`,
+          failedFields: ['generation']
+        }
+      };
+    }
+
+    const data = await response.json();
+    if (!data || !data.candidates) {
+      console.error('[generateVideoAnalysis] Unexpected response shape:', data);
+    }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    if (!text) {
+      return {
+        response: '',
+        error: { type: 'gemini', message: 'Empty response from Gemini', failedFields: ['generation'] }
+      };
+    }
+
+    return { response: text };
+  }
+
+  return {
+    response: '',
+    error: { type: 'gemini', message: 'Max retries exceeded for generation', failedFields: ['generation'] }
+  };
+}
+
+// ==================== PROMPT BUILDER ====================
+
+function buildAnalysisPrompt() {
+  return `You are an objective video analysis system. Your task is to extract structured features from video content only.
+
+RULES:
+- NEVER calculate scores, predictions, or virality estimates
+- NEVER provide subjective judgments like "good", "bad", "should"
+- NEVER give recommendations or advice
+- ONLY describe what is objectively observable in the video
+- All numeric scores must be derived from visual/audio analysis
+- Avoid marketing language or opinions
+- Return ONLY valid JSON, no markdown, no explanations
+
+Analyze the video and extract the following features:
+
+HOOK ANALYSIS (First 3 seconds):
+- hookStrength (0-100): How strongly does the video capture attention immediately?
+- hookType: question|challenge|action|surprise|humor|story|other
+- clarityOfObjective (0-100): How clear is "what's happening" in the first seconds?
+
+VISUAL ANALYSIS:
+- visualClarity (0-100): Cleanliness, readability, zoom appropriateness, lack of clutter
+- visualOriginality (0-100): Visual presentation uniqueness (not idea originality)
+- editingPace: slow|medium|fast
+- sceneChanges: Total count of scene transitions
+- averageShotDuration: Average shot length in seconds
+- deadMoments: Count of low-action periods
+- energyCurve: Array of energy levels (0-100) for each second of video
+
+CONTENT ANALYSIS:
+- category: Gameplay|Challenge|Funny|Guide|Ranked|Story|Tier List|News|Other
+- contentComplexity: low|medium|high
+- estimatedDifficulty: easy|medium|hard (to replicate)
+
+AUDIO ANALYSIS:
+- audioQuality (0-100): Clarity, production value, levels
+- musicPresence: none|background|dominant
+- voicePresence: none|ai|human
+
+TEXT ANALYSIS:
+- hasSubtitles: true/false
+- subtitleQuality (0-100): Readability, timing, positioning
+- textDensity: low|medium|high
+- hasCTA: true/false (call to action present?)
+
+ENGAGEMENT ANALYSIS:
+- emotionLevel (0-100): Emotional transmission strength
+- surpriseMoments: Count of surprise elements
+- replayValue (0-100): Rewatch incentive
+- retentionRisk: low|medium|high
+
+ENDING ANALYSIS:
+- endingStrength (0-100): Ending impact and resolution
+- loopPotential (0-100): Natural transition to rewatch
+
+OVERALL:
+- overallQuality (0-100): Overall production quality
+- thumbnailTimestamp: Best frame time for thumbnail (seconds)
+
+OBJECTIVE OBSERVATIONS:
+- technicalIssues: Array of up to 10 technical problems (e.g., "low brightness", "camera shake")
+- strengths: Array of up to 10 objectively observable strengths
+- weaknesses: Array of up to 10 objectively observable weaknesses
+
+IMPORTANT: strengths and weaknesses must be factual observations, not opinions.
+
+Return ONLY a valid JSON object with this exact schema:
+{
+  "hookStrength": 0-100,
+  "hookType": "question|challenge|action|surprise|humor|story|other",
+  "visualClarity": 0-100,
+  "editingPace": "slow|medium|fast",
+  "sceneChanges": number,
+  "averageShotDuration": number,
+  "deadMoments": number,
+  "retentionRisk": "low|medium|high",
+  "energyCurve": [0-100, ...],
+  "hasSubtitles": true/false,
+  "subtitleQuality": 0-100,
+  "textDensity": "low|medium|high",
+  "audioQuality": 0-100,
+  "musicPresence": "none|background|dominant",
+  "voicePresence": "none|ai|human",
+  "emotionLevel": 0-100,
+  "surpriseMoments": number,
+  "replayValue": 0-100,
+  "visualOriginality": 0-100,
+  "clarityOfObjective": 0-100,
+  "hasCTA": true/false,
+  "endingStrength": 0-100,
+  "loopPotential": 0-100,
+  "thumbnailTimestamp": number,
+  "category": "Gameplay|Challenge|Funny|Guide|Ranked|Story|Tier List|News|Other",
+  "estimatedDifficulty": "easy|medium|hard",
+  "contentComplexity": "low|medium|high",
+  "overallQuality": 0-100,
+  "technicalIssues": ["string", ...],
+  "strengths": ["string", ...],
+  "weaknesses": ["string", ...]
+}`;
+}
+
+// ==================== RESPONSE PARSER ====================
+
+const HOOK_TYPES = ['question', 'challenge', 'action', 'surprise', 'humor', 'story', 'other'];
+const EDITING_PACES = ['slow', 'medium', 'fast'];
+const RETENTION_RISKS = ['low', 'medium', 'high'];
+const MUSIC_PRESENCE = ['none', 'background', 'dominant'];
+const VOICE_PRESENCE = ['none', 'ai', 'human'];
+const TEXT_DENSITY = ['low', 'medium', 'high'];
+const CATEGORIES = ['Gameplay', 'Challenge', 'Funny', 'Guide', 'Ranked', 'Story', 'Tier List', 'News', 'Other'];
+const DIFFICULTY = ['easy', 'medium', 'hard'];
+const COMPLEXITY = ['low', 'medium', 'high'];
+
+function parseAndValidateResponse(text) {
+  const json = extractJSON(text);
+  if (!json) return null;
+
+  try {
+    return {
+      hookStrength: clampScore(json.hookStrength),
+      hookType: validateEnum(json.hookType, HOOK_TYPES) || 'other',
+      visualClarity: clampScore(json.visualClarity),
+      editingPace: validateEnum(json.editingPace, EDITING_PACES) || 'medium',
+      sceneChanges: validateCount(json.sceneChanges),
+      averageShotDuration: validatePositiveNumber(json.averageShotDuration),
+      deadMoments: validateCount(json.deadMoments),
+      retentionRisk: validateEnum(json.retentionRisk, RETENTION_RISKS) || 'medium',
+      energyCurve: validateNumberArray(json.energyCurve),
+      hasSubtitles: validateBoolean(json.hasSubtitles),
+      subtitleQuality: clampScore(json.subtitleQuality),
+      textDensity: validateEnum(json.textDensity, TEXT_DENSITY) || 'medium',
+      audioQuality: clampScore(json.audioQuality),
+      musicPresence: validateEnum(json.musicPresence, MUSIC_PRESENCE) || 'none',
+      voicePresence: validateEnum(json.voicePresence, VOICE_PRESENCE) || 'none',
+      emotionLevel: clampScore(json.emotionLevel),
+      surpriseMoments: validateCount(json.surpriseMoments),
+      replayValue: clampScore(json.replayValue),
+      visualOriginality: clampScore(json.visualOriginality),
+      clarityOfObjective: clampScore(json.clarityOfObjective),
+      hasCTA: validateBoolean(json.hasCTA),
+      endingStrength: clampScore(json.endingStrength),
+      loopPotential: clampScore(json.loopPotential),
+      thumbnailTimestamp: validatePositiveNumber(json.thumbnailTimestamp),
+      category: validateEnum(json.category, CATEGORIES) || 'Other',
+      estimatedDifficulty: validateEnum(json.estimatedDifficulty, DIFFICULTY) || 'medium',
+      contentComplexity: validateEnum(json.contentComplexity, COMPLEXITY) || 'medium',
+      overallQuality: clampScore(json.overallQuality),
+      technicalIssues: validateStringArray(json.technicalIssues, 10),
+      strengths: validateStringArray(json.strengths, 10),
+      weaknesses: validateStringArray(json.weaknesses, 10)
+    };
+  } catch (error) {
+    console.error('Response validation error:', error);
+    return null;
+  }
+}
+
+function extractJSON(text) {
+  if (!text) return null;
+
+  const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  const objectStart = cleaned.indexOf('{');
+  const objectEnd = cleaned.lastIndexOf('}');
+
+  if (objectStart !== -1 && objectEnd !== -1 && objectEnd > objectStart) {
+    try {
+      return JSON.parse(cleaned.slice(objectStart, objectEnd + 1));
+    } catch (e) {
+      // Try array instead
+    }
+  }
+
+  const arrayStart = cleaned.indexOf('[');
+  const arrayEnd = cleaned.lastIndexOf(']');
+
+  if (arrayStart !== -1 && arrayEnd !== -1 && arrayEnd > arrayStart) {
+    try {
+      return JSON.parse(cleaned.slice(arrayStart, arrayEnd + 1));
+    } catch (e) {
+      console.error('Failed to parse JSON from response:', e);
+      return null;
+    }
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error('Failed to parse JSON from response:', e);
+    return null;
+  }
+}
+
+function clampScore(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 50;
+  return Math.max(0, Math.min(100, Math.round(num)));
+}
+
+function validateEnum(value, allowed) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.toLowerCase();
+  for (const candidate of allowed) {
+    if (String(candidate).toLowerCase() === normalized) return candidate;
+  }
+  return null;
+}
+
+function validateCount(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.round(num);
+}
+
+function validatePositiveNumber(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.round(num * 100) / 100;
+}
+
+function validateNumberArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(v => {
+      const num = Number(v);
+      return Number.isFinite(num) ? Math.max(0, Math.min(100, Math.round(num))) : 50;
+    })
+    .slice(0, 300);
+}
+
+function validateBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true';
+  }
+  return false;
+}
+
+function validateStringArray(value, maxLength) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(item => typeof item === 'string')
+    .map(item => item.trim())
+    .filter(item => item.length > 0)
+    .slice(0, maxLength);
+}
+
+// ==================== ERROR HANDLER ====================
+
+function buildErrorResponse(error, partialData) {
+  const response = {
+    success: false,
+    errors: {
+      partialSuccess: !!partialData,
+      failedFields: error.failedFields || [],
+      message: error.message
+    }
+  };
+
+  if (partialData) {
+    response.data = partialData;
+  }
+
+  return response;
+}
+
+function buildSuccessResponse(data, metadata) {
+  return {
+    success: true,
+    data,
+    metadata
+  };
+}
+
+function categorizeError(error) {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes('timeout') || message.includes('abort')) {
+      return { type: 'timeout', message: error.message, failedFields: ['processing'] };
+    }
+
+    if (message.includes('upload') || message.includes('form')) {
+      return { type: 'upload', message: error.message, failedFields: ['upload'] };
+    }
+
+    if (message.includes('validation') || message.includes('invalid')) {
+      return { type: 'validation', message: error.message, failedFields: ['validation'] };
+    }
+
+    if (message.includes('parse') || message.includes('json')) {
+      return { type: 'parsing', message: error.message, failedFields: ['parsing'] };
+    }
+  }
+
+  return {
+    type: 'gemini',
+    message: error instanceof Error ? error.message : 'Unknown error occurred',
+    failedFields: ['unknown']
+  };
+}
+
+// ==================== UTILITIES ====================
+
+function corsHeaders(origin) {
+  const headers = {
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-File-Name',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
+  };
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+
+  return headers;
+}
+
+function jsonResponse(body, status, headers) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers
+    }
+  });
+}
+
+function extractFileUri(geminiUri) {
+  const match = geminiUri.match(/files\/(.+)/);
+  return match ? match[1] : geminiUri;
+}

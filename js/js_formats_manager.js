@@ -272,74 +272,88 @@ async function viewFormat(index, options = {}) {
 }
 
 function createModal() {
+    console.log("createModal called");
+    
     // Remove existing modal if any
     const existing = document.getElementById('format-modal-overlay');
-    if (existing) existing.remove();
+    if (existing) {
+        console.log("Removing existing modal overlay");
+        existing.remove();
+    }
 
     const allVideos = getDashboardData();
     const allTitles = Array.from(new Set(allVideos.map(video => getVideoTitle(video)).filter(Boolean)));
+
+    console.log(`Available videos for format: ${allTitles.length}`);
 
     // Selezione tenuta in memoria (non ancora salvata) finché non si
     // preme "Create format".
     const selectedVideos = new Set();
 
     const videoPickerHtml = allTitles.length > 0 ? `
-        <div class="search-box">
+        <div class="search-box improved-search">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-            <input type="text" class="search-input" id="format-video-search" placeholder="Search videos...">
+            <input type="text" class="search-input improved-input" id="format-video-search" placeholder="Search videos...">
         </div>
-        <div class="video-picker-list video-picker-list-compact" id="format-videos-picker">
+        <div class="video-picker-list video-picker-list-compact improved-list" id="format-videos-picker">
             ${allTitles.map(title => `
-                <div class="video-picker-row" data-video-title="${title}">
-                    <span class="video-picker-check"></span>
-                    <span class="video-picker-title">${title}</span>
+                <div class="video-picker-row improved-row" data-video-title="${title}">
+                    <span class="video-picker-check improved-check"></span>
+                    <span class="video-picker-title improved-title">${title}</span>
                 </div>
             `).join('')}
         </div>
-    ` : `<p class="modal-hint">Upload a CSV to associate videos with this format.</p>`;
+    ` : `<p class="modal-hint improved-hint">Upload a CSV to associate videos with this format.</p>`;
 
     const overlay = document.createElement('div');
     overlay.id = 'format-modal-overlay';
-    overlay.className = 'modal-overlay';
+    overlay.className = 'modal-overlay improved-overlay';
     overlay.innerHTML = `
-        <div class="modal">
-            <div class="modal-header">
-                <div class="format-detail-heading">
-                    <span class="format-detail-icon">✨</span>
-                    <div>
-                        <h3 class="modal-title">New Format</h3>
-                        <p class="modal-subtitle">Create a custom format — the AI will generate matching keywords automatically.</p>
+        <div class="modal improved-modal">
+            <div class="modal-header improved-header">
+                <div class="format-detail-heading improved-heading">
+                    <span class="format-detail-icon improved-icon">✨</span>
+                    <div class="heading-content">
+                        <h3 class="modal-title improved-title">New Format</h3>
+                        <p class="modal-subtitle improved-subtitle">Create a custom format — the AI will generate matching keywords automatically.</p>
                     </div>
                 </div>
             </div>
-            <div class="modal-body">
-                <div class="modal-field">
-                    <label class="modal-label">Name</label>
-                    <input type="text" class="modal-input" id="format-name-input" placeholder="e.g., Funny Moments">
+            <div class="modal-body improved-body">
+                <div class="modal-field improved-field">
+                    <label class="modal-label improved-label">Name</label>
+                    <input type="text" class="modal-input improved-input" id="format-name-input" placeholder="e.g., Funny Moments">
                 </div>
-                <div class="modal-field">
-                    <label class="modal-label">Description</label>
-                    <textarea class="modal-textarea" id="format-description-input" placeholder="Briefly describe this format..."></textarea>
+                <div class="modal-field improved-field">
+                    <label class="modal-label improved-label">Description</label>
+                    <textarea class="modal-textarea improved-textarea" id="format-description-input" placeholder="Briefly describe this format..."></textarea>
                 </div>
-                <div class="video-picker">
-                    <div class="section-header">
-                        <label class="modal-label" style="margin:0;">Videos <span class="modal-hint" style="display:inline;margin:0;">(optional, helps the AI)</span></label>
-                        <span class="section-count" id="format-videos-selected-count">0 selected</span>
+                <div class="video-picker improved-picker">
+                    <div class="section-header improved-section-header">
+                        <label class="modal-label improved-label" style="margin:0;">Videos <span class="modal-hint improved-hint" style="display:inline;margin:0;">(optional, helps the AI)</span></label>
+                        <span class="section-count improved-count" id="format-videos-selected-count">0 selected</span>
                     </div>
                     ${videoPickerHtml}
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
-                <button class="modal-btn modal-btn-confirm" id="modal-create">Create format</button>
+            <div class="modal-footer improved-footer">
+                <button class="modal-btn modal-btn-cancel improved-btn-cancel" id="modal-cancel">Cancel</button>
+                <button class="modal-btn modal-btn-confirm improved-btn-confirm" id="modal-create">Create format</button>
             </div>
         </div>
     `;
 
     document.body.appendChild(overlay);
+    console.log("Modal overlay appended to body");
+
+    // Show modal with a small delay to ensure DOM is ready
+    setTimeout(() => {
+        overlay.classList.add('active');
+        console.log("Modal active class added");
+    }, 10);
 
     // Event listeners
     document.getElementById('modal-cancel').addEventListener('click', hideModal);
@@ -595,4 +609,4 @@ async function toggleAssociatedVideo(formatIndex, videoTitle, searchQuery) {
     await renderFormatCards();
 }
 
-export { initFormatsManager, renderFormatCards };
+export { initFormatsManager, renderFormatCards, createModal };

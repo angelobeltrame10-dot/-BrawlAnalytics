@@ -66,7 +66,10 @@ export async function buildChannelProfile(videos, customFormats = []) {
             views: getVideoViews(video),
             retention: getVideoRetention(video),
             duration: video["Durata"] || video.duration || 0,
-            format: video.format || "Unknown"
+            format: video.format || "Unknown",
+            publishedAt: video["Data pubblicazione"] instanceof Date
+                ? video["Data pubblicazione"].toISOString()
+                : null 
         }))
     };
 }

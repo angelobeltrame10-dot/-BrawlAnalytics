@@ -55,7 +55,8 @@ import {
     classifyVideos,
     detectFormat,
     getFormatRanking,
-    getTopFormat
+    getTopFormat,
+    getTopFormats
 
 }
 from "./js_fomats.js";
@@ -80,6 +81,7 @@ import {
 }
 from "./js_video_analysis.js";
 
+import { reconcilePredictions } from "./js_learning_engine.js";
 
 
 import {
@@ -454,11 +456,11 @@ function renderIdeaHtml(ideas, topFormat) {
     return ideas.map((idea, index) => `
         <article class="idea-card fade-up" style="animation-delay: ${index * 0.1}s">
             <div class="idea-header">
-                <span class="idea-tag">${topFormat || "Format"}</span>
+                <span class="idea-tag">${idea.format || topFormat || "Format"}</span>
                 <span class="idea-score">${90 - index * 3}</span>
             </div>
             <div class="idea-body">
-                ${idea}
+                ${idea.text || idea}
             </div>
         </article>
     `).join("");
@@ -493,7 +495,8 @@ async function generateIdeasWithAI() {
  
     const videos = getDashboardData();
     const classified = classifyVideos(videos, customFormats);
-    const topFormat = getTopFormat(classified, customFormats) || "Gameplay";
+    const topFormats = getTopFormats(classified, customFormats, 3);
+    const topFormat = topFormats[0] || "Gameplay";
  
     const topVideos = videos
         .slice()
@@ -501,8 +504,8 @@ async function generateIdeasWithAI() {
         .slice(0, 5);
  
     let ideeGenerate = [];
-    if (videos.length > 0) {
-        ideeGenerate = await generaIdeeConAI(topVideos, topFormat);
+    if (videos.length > 0 && topFormats.length > 0) {
+        ideeGenerate = await generaIdeeConAI(topVideos, topFormats);
     }
  
     if (ideeGenerate && ideeGenerate.length > 0) {
@@ -521,9 +524,9 @@ async function generateIdeasWithAI() {
         console.warn("generaIdeeConAI ha restituito 0 idee: uso fallback statico (verrà comunque salvato).");
  
         const fallback = [
-            "Try a double wall-bounce trickshot using Rico on the new Brawl Ball map.",
-            "Can you win a Solo Showdown match without picking up a single Power Cube?",
-            "Compile 3 clips where players accidentally super into the poison gas."
+            { text: "Try a double wall-bounce trickshot using Rico on the new Brawl Ball map.", format: "Trickshot" },
+            { text: "Can you win a Solo Showdown match without picking up a single Power Cube?", format: "Challenge" },
+            { text: "Compile 3 clips where players accidentally super into the poison gas.", format: "Funny Moments" }
         ];
  
         await saveGeneratedIdeas(fallback, topFormat || "Mixed");
@@ -827,6 +830,7 @@ async function handleCSVUpload(file){
         await cleanupVideoAssociations(dashboardData);
         const channelProfile = await buildChannelProfile(dashboardData, customFormats);
         await saveChannelProfile(channelProfile);
+        await reconcilePredictions(dashboardData);
 
         /*
             Aggiorna interfaccia dopo analysis
@@ -1070,7 +1074,9 @@ async function refreshDashboard(){
     let growthRate = 0;
     const videosWithDate = dashboardData.filter(v => v["Data pubblicazione"] instanceof Date);
     
-    if (videosWithDate.length >= 4) {
+    console.log(`Growth Rate Calculation: Total videos=${dashboardData.length}, Videos with valid dates=${videosWithDate.length}`);
+    
+    if (videosWithDate.length >= 2) {
 
         const sortedByDate = [...videosWithDate].sort((a, b) => {
 
@@ -1081,15 +1087,40 @@ async function refreshDashboard(){
 
         });
 
+        // Log sample dates for debugging
+        console.log(`Growth Rate Calculation: Sample dates - First: ${sortedByDate[0]["Data pubblicazione"].toISOString()}, Last: ${sortedByDate[sortedByDate.length-1]["Data pubblicazione"].toISOString()}`);
+
         const midPoint = Math.floor(sortedByDate.length / 2);
         const firstHalfViews = sortedByDate.slice(0, midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
         const secondHalfViews = sortedByDate.slice(midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
 
+        console.log(`Growth Rate Calculation: First half views=${firstHalfViews}, Second half views=${secondHalfViews}`);
+
         if (firstHalfViews > 0) {
             growthRate = ((secondHalfViews - firstHalfViews) / firstHalfViews) * 100;
+            console.log(`Growth Rate Calculation: Calculated growth rate=${growthRate.toFixed(1)}%`);
+        } else {
+            console.log(`Growth Rate Calculation: First half views is 0, cannot calculate growth rate`);
         }
 
+    } else {
+        console.log(`Growth Rate Calculation: Not enough videos with valid dates (${videosWithDate.length} < 2), trying fallback calculation`);
+        
+        // Fallback: use video order if dates are not available
+        if (dashboardData.length >= 2) {
+            const midPoint = Math.floor(dashboardData.length / 2);
+            const firstHalfViews = dashboardData.slice(0, midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
+            const secondHalfViews = dashboardData.slice(midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
+            
+            console.log(`Growth Rate Fallback: First half views=${firstHalfViews}, Second half views=${secondHalfViews}`);
+            
+            if (firstHalfViews > 0) {
+                growthRate = ((secondHalfViews - firstHalfViews) / firstHalfViews) * 100;
+                console.log(`Growth Rate Fallback: Calculated growth rate=${growthRate.toFixed(1)}%`);
+            }
+        }
     }
+    
     const growthRateElement = document.querySelector(".growth-rate");
     if (growthRateElement) {
         const sign = growthRate >= 0 ? "+" : "";

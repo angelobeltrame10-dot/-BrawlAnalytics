@@ -173,6 +173,9 @@ function parseDurataToSeconds(value){
 
     Restituisce un vero oggetto Date, oppure
     null se la data manca o non è valida.
+    
+    Improved to handle more YouTube Studio CSV date formats
+    and add debugging for troubleshooting.
 */
 function parsePublishDate(value){
 
@@ -182,17 +185,78 @@ function parsePublishDate(value){
 
     }
 
-    const parsed = new Date(value);
-
-    return isNaN(
-
-        parsed.getTime()
-
-    )
-
-        ? null
-
-        : parsed;
+    const trimmedValue = String(value).trim();
+    
+    // Try standard Date parsing first
+    let parsed = new Date(trimmedValue);
+    
+    // If standard parsing fails, try common YouTube Studio formats
+    if (isNaN(parsed.getTime())) {
+        // Try formats like "22 Jun 2026", "Jun 22, 2026", "2026-06-22", etc.
+        const datePatterns = [
+            /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/, // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+            /^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/, // YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD
+            /^(\w{3})\s+(\d{1,2}),?\s+(\d{4})$/, // Jun 22, 2026 or Jun 22 2026
+            /^(\d{1,2})\s+(\w{3})\s+(\d{4})$/ // 22 Jun 2026
+        ];
+        
+        for (const pattern of datePatterns) {
+            const match = trimmedValue.match(pattern);
+            if (match) {
+                try {
+                    if (pattern === datePatterns[0] || pattern === datePatterns[1]) {
+                        // Numeric formats
+                        const [, part1, part2, year] = match;
+                        let month, day;
+                        
+                        // Try to determine if DD/MM or MM/DD based on values
+                        if (pattern === datePatterns[0]) {
+                            // DD/MM/YYYY format (European/YouTube Studio default)
+                            day = parseInt(part1, 10);
+                            month = parseInt(part2, 10);
+                        } else {
+                            // YYYY/MM/DD format
+                            year = parseInt(part1, 10);
+                            month = parseInt(part2, 10);
+                            day = parseInt(part3, 10);
+                        }
+                        
+                        parsed = new Date(year, month - 1, day);
+                        if (!isNaN(parsed.getTime())) {
+                            console.log(`CSV Parser: Parsed date "${trimmedValue}" as ${parsed.toISOString()}`);
+                            return parsed;
+                        }
+                    } else if (pattern === datePatterns[2]) {
+                        // "Jun 22, 2026" format
+                        const [, monthStr, day, year] = match;
+                        const month = new Date(`${monthStr} 1, 2000`).getMonth();
+                        parsed = new Date(parseInt(year, 10), month, parseInt(day, 10));
+                        if (!isNaN(parsed.getTime())) {
+                            console.log(`CSV Parser: Parsed date "${trimmedValue}" as ${parsed.toISOString()}`);
+                            return parsed;
+                        }
+                    } else if (pattern === datePatterns[3]) {
+                        // "22 Jun 2026" format
+                        const [, day, monthStr, year] = match;
+                        const month = new Date(`${monthStr} 1, 2000`).getMonth();
+                        parsed = new Date(parseInt(year, 10), month, parseInt(day, 10));
+                        if (!isNaN(parsed.getTime())) {
+                            console.log(`CSV Parser: Parsed date "${trimmedValue}" as ${parsed.toISOString()}`);
+                            return parsed;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`CSV Parser: Failed to parse date "${trimmedValue}" with pattern`, pattern);
+                }
+            }
+        }
+        
+        console.warn(`CSV Parser: Unable to parse date "${trimmedValue}"`);
+        return null;
+    }
+    
+    console.log(`CSV Parser: Parsed date "${trimmedValue}" as ${parsed.toISOString()}`);
+    return parsed;
 
 }
 

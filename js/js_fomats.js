@@ -176,6 +176,9 @@ function getTopFormat(videos, customFormats = []) {
     let max = 0;
 
     Object.keys(ranking).forEach(format => {
+        // Skip "Other" format when determining top format
+        if (format === "Other") return;
+        
         if (ranking[format] > max) {
             max = ranking[format];
             best = format;
@@ -185,11 +188,33 @@ function getTopFormat(videos, customFormats = []) {
     return best;
 }
 
+function getTopFormats(videos, customFormats = [], count = 3) {
+    if (!Array.isArray(videos) || videos.length === 0) {
+        return [];
+    }
+
+    const classified = videos.every(video => video.format)
+        ? videos
+        : classifyVideos(videos, customFormats);
+
+    const ranking = getFormatRanking(classified, customFormats);
+    
+    // Convert to array and sort by count (descending), excluding "Other"
+    const sortedFormats = Object.entries(ranking)
+        .filter(([format]) => format !== "Other")
+        .sort(([, countA], [, countB]) => countB - countA)
+        .slice(0, count)
+        .map(([format]) => format);
+
+    return sortedFormats;
+}
+
 export {
     DEFAULT_FORMAT_RULES,
     detectFormat,
     classifyVideos,
     getTopFormat,
+    getTopFormats,
     getFormatRanking,
     buildFormatRules,
     normalizeKeywords

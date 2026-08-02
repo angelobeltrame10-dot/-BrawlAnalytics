@@ -134,7 +134,7 @@ footer a:hover{color:var(--primary)}
         <span class="eyebrow">Legal</span>
         <h1>Privacy Policy</h1>
         <p>How Brawl Analytics collects, uses and protects the information tied to your account and your uploaded YouTube Studio data.</p>
-        <span class="updated-badge">🕓 Last updated: July 2026</span>
+        <span class="updated-badge">🕓 Last updated: August 2026</span>
     </div>
 </section>
 
@@ -153,9 +153,10 @@ footer a:hover{color:var(--primary)}
         <a href="#rights">9. Your rights</a>
         <a href="#retention">10. Data retention</a>
         <a href="#children">11. Children's privacy</a>
-        <a href="#changes">12. Changes to this policy</a>
-        <a href="#deletion">13. Data deletion</a>
-        <a href="#contact">14. Contact</a>
+        <a href="#automated">12. Automated Analysis</a> 
+        <a href="#changes">13. Changes to this policy</a>
+        <a href="#deletion">14. Data deletion</a>
+        <a href="#contact">15. Contact</a>
     </nav>
 
     <div class="content">
@@ -168,6 +169,7 @@ footer a:hover{color:var(--primary)}
                 <li><strong>Uploaded channel data</strong> — the YouTube Studio CSV export you upload, including video titles, view counts, retention percentages, watch time and publish dates.</li>
                 <li><strong>Content you create in the app</strong> — custom formats, generated video ideas, and the answers you give in the Video Analysis questionnaire (originality, format, description).</li>
                 <li><strong>Basic usage data</strong> — your current plan (Free or Pro) and how many AI actions (video analyses, idea generations) you've used today, needed to enforce daily limits.</li>
+                <li><strong>Uploaded videos</strong> — when you use the Video Analysis feature, you may upload a video for AI analysis. The uploaded video is processed only to extract analytical features and is not used to train AI models or shared with other users.</li>
             </ul>
         </section>
 
@@ -185,9 +187,28 @@ footer a:hover{color:var(--primary)}
 
         <section class="card" id="ai">
             <h2><span class="num">04</span>AI processing</h2>
-            <p>Some features — automatic format detection and personalized idea generation — send a limited amount of text (video titles and short descriptions, never raw video files) to a Cloudflare Worker we operate, which forwards the request to our AI provider, <strong>Groq</strong>.</p>
-            <p>The Worker keeps our AI provider credentials server-side; your browser never talks to Groq directly. Only the text needed for the specific analysis is sent — never your email, password, or full account data.</p>
-        </section>
+            <p>Some features of Brawl Analytics use artificial intelligence to provide personalized insights.
+
+                Depending on the feature being used, limited data may be securely processed through Cloudflare Workers and forwarded to trusted AI providers.
+
+                Examples include:
+
+                <ul>
+
+                <li>Video Analysis — uploaded videos may be temporarily processed by Google's Gemini models to extract objective characteristics such as editing pace, subtitle presence, hook strength, visual clarity and other production-related features. The AI does not determine the final Virality Score.</li>
+
+                <li>Format Detection, Idea Generator, Personal AI Coach, Hook Analyzer and Title Optimizer — may process limited text such as video titles, descriptions or questionnaire answers using Groq language models.</li>
+                
+                </ul>
+                <p>
+                Only the minimum information required for each feature is transmitted to the AI provider, and it is not stored or used for any other purpose.
+                AI providers do not receive your account password or complete database records.
+
+                The extracted analytical features are used exclusively to generate your personalized reports inside Brawl Analytics.
+                
+                Uploaded videos are processed exclusively to generate analytical insights for your account and are not used by Brawl Analytics to train artificial intelligence models.
+            </p>
+            </section>
 
         <section class="card" id="storage">
             <h2><span class="num">05</span>Where data is stored</h2>
@@ -205,6 +226,7 @@ footer a:hover{color:var(--primary)}
                 <li><strong>Supabase</strong> — authentication and database hosting.</li>
                 <li><strong>Cloudflare Workers</strong> — hosts the API endpoints that relay AI requests and fetch trend data.</li>
                 <li><strong>Groq</strong> — processes video titles/descriptions to power AI features.</li>
+                <li><strong>Google Gemini</strong> — video understanding and extraction of objective production features from uploaded videos.</li>
             </ul>
             <p>We only share the minimum amount of information required for these services to operate.</p>
         </section>
@@ -226,7 +248,7 @@ footer a:hover{color:var(--primary)}
 
         <section class="card" id="retention">
             <h2><span class="num">10</span>Data retention</h2>
-            <p>We keep your account and channel data for as long as your account is active. Generated ideas are cached per day and naturally replaced the next time you generate new ones. If you delete your account, associated data is removed from our database.</p>
+            <p>We keep your account and channel data for as long as your account is active. Generated ideas are cached per day and naturally replaced the next time you generate new ones. If you delete your account, associated data is removed from our database. Uploaded videos used for Video Analysis are processed only for the duration necessary to complete the analysis and are not permanently stored by Brawl Analytics unless explicitly stated in future features.</p>
         </section>
 
         <section class="card" id="children">
@@ -234,14 +256,24 @@ footer a:hover{color:var(--primary)}
             <p>Brawl Analytics is not directed at children under 13, in line with our <a href="terms.html" style="color:var(--secondary)">Terms & Conditions</a>. We do not knowingly collect data from users under this age.</p>
         </section>
 
+        
+        <section class="card" id="automated">
+            <h2><span class="num">12</span>Automated Analysis</h2>
+            <p>Some results shown by Brawl Analytics are generated automatically using machine learning models and statistical algorithms.
+
+                These analyses are intended to assist content creators in evaluating video ideas and production quality.
+
+                Virality predictions, AI suggestions and estimated performance are informational only and should not be interpreted as guarantees of future YouTube performance.</p>
+        </section>
+
         <section class="card" id="changes">
-            <h2><span class="num">12</span>Changes to this policy</h2>
+            <h2><span class="num">13</span>Changes to this policy</h2>
             <p>We may update this Privacy Policy as the Service evolves. Continued use of Brawl Analytics after an update means you accept the revised policy.</p>
         </section>
 
         <section class="card" id="deletion">
 
-            <h2><span class="num">13</span>Data deletion</h2>
+            <h2><span class="num">14</span>Data deletion</h2>
 
             <p>
                 You may request the permanent deletion of your account and all associated personal
@@ -257,7 +289,7 @@ footer a:hover{color:var(--primary)}
         </section>
 
         <section class="card" id="contact">
-            <h2><span class="num">14</span>Contact</h2>
+            <h2><span class="num">15</span>Contact</h2>
             <p>Questions about this Privacy Policy or your data? Reach out any time.</p>
             <a class="mail-btn" href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener">✉ angeskicollab10@gmail.com</a>
         </section>

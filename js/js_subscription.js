@@ -264,7 +264,7 @@ function injectUpgradeModal(){
                 <div class="pricing-price">€0</div>
                 <ul class="pricing-features">
                     <li>3 ideas</li>
-                    <li>1 analysis</li>
+                    <li>1 video analysis</li>
                     <li>Trend Explorer</li>
                 </ul>
                 <button class="pricing-btn pricing-btn-current" disabled>Current Plan</button>
@@ -276,7 +276,7 @@ function injectUpgradeModal(){
                 <div class="pricing-price">€6.99<small>/ month</small></div>
                 <ul class="pricing-features">
                     <li>Unlimited ideas</li>
-                    <li>Unlimited AI</li>
+                    <li>Unlimited video analyses</li>
                     <li>Trend Explorer</li>
                     <li>Hook Analyzer</li>
                     <li>AI Coach</li>

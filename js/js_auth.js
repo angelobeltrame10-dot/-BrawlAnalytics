@@ -22,6 +22,8 @@
 import { getSupabaseClient } from "./js_supabase_client.js";
 
 import { resetStorageCache } from "./js_storage.js";
+import { switchToAppMode, switchToHomeMode } from "./js_navigation.js";
+import { showApp } from "./js_router.js";
 
 
 let currentUser = null;
@@ -313,6 +315,40 @@ function setupNavAuthButtons(){
 
     });
 
+    // Setup context-aware dashboard button on homepage
+    document.getElementById("dashboard-or-login-btn")?.addEventListener("click", async ()=>{
+        if(isLoggedIn()){
+            // User is logged in, navigate to dashboard
+            try {
+                const { showApp } = await import("./js_router.js");
+                showApp();
+                switchToAppMode(); // Update navbar to show Home instead of FAQ/About
+            } catch (error) {
+                console.error("Failed to load router:", error);
+            }
+        } else {
+            // User is not logged in, show login modal
+            openAuthModal("login");
+        }
+    });
+
+    // Setup signup/logout button on homepage
+    document.getElementById("signup-or-logout-btn")?.addEventListener("click", async ()=>{
+        if(isLoggedIn()){
+            // User is logged in, handle logout
+            const result = await logout();
+            if(!result.success){
+                console.error("Logout error:", result.error);
+            } else {
+                // Update navbar to show FAQ/About instead of Home after logout
+                switchToHomeMode();
+            }
+        } else {
+            // User is not logged in, show signup modal
+            openAuthModal("signup");
+        }
+    });
+
 }
 
 function updateAuthUI(){
@@ -322,6 +358,34 @@ function updateAuthUI(){
     document.getElementById("nav-login")?.classList.toggle("hidden", loggedIn);
     document.getElementById("nav-signup")?.classList.toggle("hidden", loggedIn);
     document.getElementById("nav-user-menu")?.classList.toggle("hidden", !loggedIn);
+
+    // Update context-aware dashboard button on homepage
+    const dashboardBtn = document.getElementById("dashboard-or-login-btn");
+    if(dashboardBtn){
+        if(loggedIn){
+            dashboardBtn.textContent = "Dashboard";
+            dashboardBtn.classList.remove("btn-primary");
+            dashboardBtn.classList.add("btn-outline");
+        } else {
+            dashboardBtn.textContent = "Login";
+            dashboardBtn.classList.remove("btn-outline");
+            dashboardBtn.classList.add("btn-primary");
+        }
+    }
+
+    // Update signup/logout button on homepage
+    const signupLogoutBtn = document.getElementById("signup-or-logout-btn");
+    if(signupLogoutBtn){
+        if(loggedIn){
+            signupLogoutBtn.textContent = "Logout";
+            signupLogoutBtn.classList.remove("btn-outline");
+            signupLogoutBtn.classList.add("btn-primary");
+        } else {
+            signupLogoutBtn.textContent = "Sign up";
+            signupLogoutBtn.classList.remove("btn-primary");
+            signupLogoutBtn.classList.add("btn-outline");
+        }
+    }
 
     if(loggedIn && currentUser){
 
@@ -569,7 +633,22 @@ async function handleAuthSubmit(){
 
         if(result.success){
             clearAuthForms();
-            playSuccessTransition(closeAuthModal);
+            // Check if user was trying to access dashboard
+            const dashboardBtn = document.getElementById("dashboard-or-login-btn");
+            const wasDashboardIntent = dashboardBtn && dashboardBtn.textContent === "Dashboard";
+            
+            playSuccessTransition(async () => {
+                closeAuthModal();
+                // If user was trying to access dashboard, redirect there after login
+                if(wasDashboardIntent){
+                    try {
+                        const { showApp } = await import("./js_router.js");
+                        showApp();
+                    } catch (error) {
+                        console.error("Failed to navigate to dashboard after login:", error);
+                    }
+                }
+            });
         }
         else{
             showAuthMessage(result.error);

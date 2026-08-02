@@ -3,6 +3,8 @@ import { getAvailableFormats } from "./js_channel_profile.js";
 import { analyzeVirality } from "./js_virality_engine.js";
 import { consumeVideoAnalysis } from "./js_subscription.js";
 import { ensureTrendsLoaded } from "./js_trends.js";
+import { createModal as createFormatModal } from "./js_formats_manager.js";
+import { loadCustomFormats, saveCustomFormats } from "./js_storage.js";
 
 let initialized = false;
 let cachedChannelProfile = null;
@@ -21,6 +23,21 @@ let userAnswers = {
     format: null,
     description: null
 };
+
+// Store uploaded video file for insights analysis
+let uploadedVideoFile = null;
+
+// Track video analysis error state.
+// FIX: this used to stay null forever because extractVideoInsights()
+// swallowed every failure internally and just returned null, so
+// nothing ever assigned to this variable. That made `geminiFailed`
+// in renderResults() always falsy, so the app silently fell back to
+// generic virality-engine text instead of showing the Gemini-specific
+// insights (or an honest error banner) whenever the worker failed.
+let analysisError = null;
+
+// Video insights worker endpoint (must include the analyze path)
+const VIDEO_INSIGHTS_WORKER_URL = "https://video-analysis.angeskicollab10.workers.dev/analyze-video";
 
 async function getDynamicQuestions() {
     if (!cachedChannelProfile) {
@@ -136,6 +153,9 @@ function startUpload(file, flow){
         return;
     }
 
+    // Store the uploaded video file for insights analysis
+    uploadedVideoFile = file;
+
     if (activeUploadTimer) {
         clearInterval(activeUploadTimer);
         activeUploadTimer = null;
@@ -190,6 +210,8 @@ function resetVideoAnalysisState(){
 
     initialized = false;
     cachedChannelProfile = null;
+    analysisError = null;
+    uploadedVideoFile = null;
 
     userAnswers = {
         videoOriginality: null,
@@ -200,15 +222,69 @@ function resetVideoAnalysisState(){
 
 }
 
+/**
+ * Handle "Other" format selection by showing format creation modal
+ */
+async function handleOtherFormatSelection(flow, currentIndex) {
+    console.log("Other format selected, attempting to show format creation modal");
+    
+    // Store the current wizard state to resume after format creation
+    const savedIndex = currentIndex;
+    const formatsBefore = await loadCustomFormats();
+    const formatCountBefore = formatsBefore.length;
+    
+    console.log(`Formats before modal: ${formatCountBefore}`);
+    
+    // Show format creation modal
+    try {
+        createFormatModal();
+        console.log("Format modal function called successfully");
+        
+        // Verify modal was created
+        setTimeout(() => {
+            const modalOverlay = document.getElementById('format-modal-overlay');
+            console.log(`Modal overlay exists: ${!!modalOverlay}, has active class: ${modalOverlay?.classList.contains('active')}`);
+        }, 100);
+    } catch (error) {
+        console.error("Error calling createFormatModal:", error);
+    }
+    
+    // Listen for format creation completion
+    const checkForFormatCreation = setInterval(async () => {
+        const formatsAfter = await loadCustomFormats();
+        const modalOverlay = document.getElementById('format-modal-overlay');
+        
+        // If modal is closed, check if a new format was created
+        if (!modalOverlay || !modalOverlay.classList.contains('active')) {
+            clearInterval(checkForFormatCreation);
+            
+            // Check if a new format was actually created
+            if (formatsAfter.length > formatCountBefore) {
+                // A new format was created, use it
+                const newFormat = formatsAfter[formatsAfter.length - 1];
+                userAnswers.format = newFormat.name;
+                console.log(`Format created: ${newFormat.name}, continuing to next step`);
+                
+                // Refresh the wizard with updated formats and move to next step
+                cachedChannelProfile = null; // Force reload of channel profile
+                await renderWizard(flow, savedIndex + 1);
+            } else {
+                // No format was created (user cancelled), return to format selection
+                console.log(`Format creation cancelled, returning to format selection`);
+                cachedChannelProfile = null;
+                await renderWizard(flow, savedIndex);
+            }
+        }
+    }, 500);
+}
+
 async function renderWizard(flow, index){
 
-    console.log("renderWizard chiamata", index);
     let questions;
     try {
         questions = await getDynamicQuestions();
-        console.log("questions caricate", questions);
     } catch (error) {
-        console.error("Errore:", error);
+        console.error("Video analysis: failed to load dynamic questions.", error);
         questions = baseQuestions;
     }
 
@@ -239,6 +315,13 @@ async function renderWizard(flow, index){
         button.addEventListener("click", ()=>{
             button.classList.add("selected");
             const selectedText = button.textContent.trim().replace("→", "").trim();
+            
+            // Handle "Other" format selection
+            if (index === 2 && selectedText === "Other") {
+                handleOtherFormatSelection(flow, index);
+                return;
+            }
+            
             if (index === 0) userAnswers.videoOriginality = selectedText;
             else if (index === 1) userAnswers.ideaOriginality = selectedText;
             else if (index === 2) userAnswers.format = selectedText;
@@ -262,14 +345,156 @@ async function renderWizard(flow, index){
             return;
         }
 
-        renderAnalysis(flow);
+        renderAnalysis(flow, uploadedVideoFile);
     });
 
 }
 
-function renderAnalysis(flow){
+/**
+ * Extract video insights using the video insights worker.
+ *
+ * FIX: this now THROWS a structured { type, message } error on any
+ * failure (network error, non-2xx response, malformed JSON, or a
+ * success:false payload) instead of quietly logging and returning
+ * null. Swallowing the error here was the root cause of the bug:
+ * the caller (renderAnalysis) had no way to know an error happened,
+ * so `analysisError` was never set and the UI never showed the
+ * Gemini-specific failure state — it just silently fell back to
+ * generic data with no explanation.
+ */
+async function extractVideoInsights(videoFile) {
+    if (!videoFile) {
+        throw { type: "upload", message: "No video file was found for analysis." };
+    }
 
-    const steps = ["Reading video", "Detecting hook", "Detecting on-screen text", "Comparing with previous Shorts", "Reading current trends", "Estimating virality"];
+    const formData = new FormData();
+    formData.append('video', videoFile);
+
+    let response;
+    try {
+        response = await fetch(VIDEO_INSIGHTS_WORKER_URL, {
+            method: 'POST',
+            body: formData
+        });
+    } catch (error) {
+        throw { type: "network_error", message: error?.message || "Unable to reach the video analysis service." };
+    }
+
+    let payload = null;
+    try {
+        payload = await response.json();
+    } catch (error) {
+        throw {
+            type: response.status >= 500 ? "server_error" : "invalid_response",
+            message: `The analysis service returned an unreadable response (HTTP ${response.status}).`
+        };
+    }
+
+    if (!response.ok) {
+        const errInfo = payload?.errors || payload?.error || {};
+        console.error("Video insights worker error:", payload);
+        throw {
+            type: errInfo.type || (response.status === 429 ? "rate_limit" : response.status >= 500 ? "server_error" : "api_error"),
+            message: errInfo.message || `The analysis service returned HTTP ${response.status}.`
+        };
+    }
+
+    if (payload?.success && payload?.data) {
+        return payload.data;
+    }
+
+    console.error("Video insights extraction failed:", payload?.errors);
+    throw {
+        type: payload?.errors?.type || "unknown_error",
+        message: payload?.errors?.message || "Video insights extraction failed."
+    };
+}
+
+/**
+ * Get user-friendly error message based on error type
+ */
+function getErrorMessage(error) {
+    if (!error) return 'An unknown error occurred during video analysis.';
+    
+    const messages = {
+        'missing_api_key': 'The AI video analysis service is not configured. Please contact the administrator to set up the Gemini API key.',
+        'rate_limit': 'The AI service is currently busy. Please try again in a few minutes.',
+        'server_error': 'The analysis service is temporarily unavailable (server error). Please try again later.',
+        'network_error': 'Unable to connect to the analysis service. Please check your internet connection.',
+        'timeout': 'The analysis request timed out. Please try again.',
+        'api_error': `Analysis service error: ${error.message}`,
+        'invalid_response': `Invalid response from analysis service: ${error.message}`,
+        'unknown_error': `An unexpected error occurred: ${error.message}`,
+        'upload': error.message || 'There was a problem with the uploaded video file.'
+    };
+    
+    return messages[error.type] || messages['unknown_error'];
+}
+
+/**
+ * Render error state with banner and basic user data
+ */
+function renderErrorState(flow, error) {
+    const errorMessage = getErrorMessage(error);
+    
+    flow.innerHTML = `
+        <div class="va-results">
+            <div class="va-error-banner">
+                <div class="va-error-icon">⚠️</div>
+                <div class="va-error-content">
+                    <h4>Video analysis unavailable</h4>
+                    <p>${errorMessage}</p>
+                </div>
+            </div>
+            
+            <div class="va-results-hero">
+                <div>
+                    <span class="va-eyebrow">VIRALITY ANALYSIS · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}</span>
+                    <h3>Limited analysis</h3>
+                    <p>AI video analysis is unavailable, but you can still see results based on the context you provided.</p>
+                </div>
+                <button class="va-outline" id="va-restart" type="button">Analyze another video →</button>
+            </div>
+            
+            <div class="va-basic-data">
+                <div class="va-section-title">
+                    <div>
+                        <span class="va-step">PROVIDED CONTEXT</span>
+                        <h3>Basic information</h3>
+                    </div>
+                    <p>Data based on your questionnaire responses.</p>
+                </div>
+                <div class="va-basic-data-grid">
+                    <div class="va-basic-item">
+                        <span>Video originality</span>
+                        <strong>${userAnswers.videoOriginality || 'Not specified'}</strong>
+                    </div>
+                    <div class="va-basic-item">
+                        <span>Idea originality</span>
+                        <strong>${userAnswers.ideaOriginality || 'Not specified'}</strong>
+                    </div>
+                    <div class="va-basic-item">
+                        <span>Format</span>
+                        <strong>${userAnswers.format || 'Not specified'}</strong>
+                    </div>
+                    <div class="va-basic-item">
+                        <span>Description</span>
+                        <strong>${userAnswers.description || 'No description'}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById("va-restart").addEventListener("click", () => {
+        analysisError = null;
+        renderUpload(flow);
+    });
+}
+
+function renderAnalysis(flow, videoFile = null){
+
+    const steps = ["Reading video", "Extracting visual features", "Detecting hook", "Detecting on-screen text", "Comparing with previous Shorts", "Reading current trends", "Estimating virality"];
 
     flow.innerHTML = `
         <div class="va-analysis">
@@ -277,33 +502,146 @@ function renderAnalysis(flow){
             <span class="va-eyebrow">BRAWL ANALYTICS ENGINE</span>
             <h3>Building your report<span class="va-loading">...</span></h3>
             <p>We're mapping the signals that shape a great Brawl Stars Short.</p>
-            <div class="va-analysis-list">${steps.map(step=> `<div>${step}</div>`).join("")}</div>
+            <div class="va-analysis-list">${steps.map((step, i) => `<div data-step="${i}">${step}</div>`).join("")}</div>
             <div class="va-progress"><i id="va-analysis-bar"></i></div>
             <small id="va-analysis-copy">Initializing workspace</small>
         </div>`;
 
-    let index = 0;
+    let stepIndex = 0;
+    let videoInsights = null;
+    let geminiCompleted = false;
 
-    const timer = setInterval(()=>{
+    // Reset error state for this run before kicking off extraction.
+    analysisError = null;
 
+    // Start video insights extraction in background if video file exists.
+    let insightsPromise;
+    if (videoFile) {
+        insightsPromise = extractVideoInsights(videoFile)
+            .then(result => {
+                videoInsights = result;
+                analysisError = null;
+                geminiCompleted = true;
+                console.log("Gemini API: Analysis completed successfully");
+                
+                // Mark remaining steps as done when Gemini completes
+                const rows = flow.querySelectorAll(".va-analysis-list div");
+                for (let i = stepIndex; i < rows.length; i++) {
+                    rows[i].classList.add("done");
+                }
+                document.getElementById("va-analysis-bar").style.width = "100%";
+                document.getElementById("va-analysis-copy").textContent = "Report completed";
+            })
+            .catch(error => {
+                console.error("Video insights extraction failed:", error);
+                videoInsights = null;
+                analysisError = (error && error.type)
+                    ? error
+                    : { type: "unknown_error", message: error?.message || String(error) };
+                geminiCompleted = true;
+                console.log("Gemini API: Analysis failed");
+                
+                // Mark remaining steps as done even on failure
+                const rows = flow.querySelectorAll(".va-analysis-list div");
+                for (let i = stepIndex; i < rows.length; i++) {
+                    rows[i].classList.add("done");
+                }
+                document.getElementById("va-analysis-bar").style.width = "100%";
+                document.getElementById("va-analysis-copy").textContent = "Analysis completed";
+            });
+    } else {
+        analysisError = { type: "upload", message: "No video file was found for analysis." };
+        insightsPromise = Promise.resolve();
+        geminiCompleted = true;
+        
+        // No video file, mark all steps as done immediately
         const rows = flow.querySelectorAll(".va-analysis-list div");
-        rows[index].classList.add("done");
-        index++;
-        document.getElementById("va-analysis-bar").style.width = `${index / steps.length * 100}%`;
-        document.getElementById("va-analysis-copy").textContent = index < steps.length ? steps[index] : "Report complete";
+        rows.forEach(row => row.classList.add("done"));
+        document.getElementById("va-analysis-bar").style.width = "100%";
+        document.getElementById("va-analysis-copy").textContent = "Report completed";
+    }
 
-        if(index === steps.length){
-
-            clearInterval(timer);
-            setTimeout(()=> renderResults(flow), 500);
-
+    // Simulate realistic progress: mark steps one by one at intervals
+    // This simulates the actual processing that Gemini would do
+    const progressTimer = setInterval(() => {
+        if (geminiCompleted) {
+            clearInterval(progressTimer);
+            setTimeout(() => renderResults(flow, videoInsights), 500);
+            return;
         }
 
-    }, 560);
+        const rows = flow.querySelectorAll(".va-analysis-list div");
+        if (stepIndex < rows.length && !rows[stepIndex].classList.contains("done")) {
+            rows[stepIndex].classList.add("done");
+            document.getElementById("va-analysis-bar").style.width = `${((stepIndex + 1) / steps.length) * 100}%`;
+            document.getElementById("va-analysis-copy").textContent = steps[stepIndex];
+            stepIndex++;
+        }
+    }, 1500); // Complete one step every 1.5 seconds to simulate real processing
 
 }
 
-async function renderResults(flow){
+function toPercentScore(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.max(0, Math.min(100, numericValue > 1 ? numericValue : numericValue * 100));
+}
+
+function mergeInsightItems(primaryItems = [], secondaryItems = [], fallbackItems = []) {
+    const seen = new Set();
+    const merged = [];
+
+    [primaryItems, secondaryItems, fallbackItems]
+        .flat()
+        .filter(Boolean)
+        .forEach(item => {
+            const cleanedItem = String(item).trim();
+            if (!cleanedItem) return;
+            const lookupKey = cleanedItem.toLowerCase();
+            if (seen.has(lookupKey)) return;
+            seen.add(lookupKey);
+            merged.push(cleanedItem);
+        });
+
+    return merged;
+}
+
+function buildBreakdown(result, videoInsights = null, useRealData = false) {
+    if (useRealData && result?.scoreBreakdown) {
+        const breakdown = [
+            ["Originality", Math.round(result.scoreBreakdown.originality.score)],
+            ["Trend", Math.round(result.scoreBreakdown.trend.score)],
+            ["Format", Math.round(result.scoreBreakdown.format.score)],
+            ["Channel", Math.round(result.scoreBreakdown.channel.score)],
+            ["Competition", Math.round(result.scoreBreakdown.competition.score)],
+            ["Retention", Math.round(result.scoreBreakdown.retention.score)],
+            ["Trends", Math.round(result.scoreBreakdown.trendsOverlap.score)]
+        ];
+
+        if (videoInsights?.hookStrength != null) {
+            breakdown.splice(2, 0, ["Hook", Math.round(toPercentScore(videoInsights.hookStrength))]);
+        }
+
+        return breakdown;
+    }
+
+    return [
+        ["Hook", 94],
+        ["Originality", 86],
+        ["Trend", 91],
+        ["Retention", 83],
+        ["Format", 89],
+        ["Channel", 87],
+        ["Competition", 76]
+    ];
+}
+
+async function renderResults(flow, videoInsights = null){
+    
+    // Don't return early - always show full dashboard, just add error banner if Gemini failed.
+    // FIX: analysisError is now actually populated on failure (see
+    // extractVideoInsights/renderAnalysis above), so this check works.
+    const geminiFailed = !videoInsights && !!analysisError;
 
     // Recupera i trend reali (dalla cache se già caricati in questa
     // sessione, altrimenti li scarica ora): prima questo valore era
@@ -314,11 +652,13 @@ async function renderResults(flow){
 
     const result = await analyzeVirality(
         userAnswers,
-        trendsAnalysis
+        trendsAnalysis,
+        videoInsights
     );
     
     // Use real results or fallback to placeholders if analysis failed
     const useRealData = result.success;
+    const usedVideoInsights = !!videoInsights;
     
     const score = useRealData ? result.viralityScore : 72;
     const confidence = useRealData ? result.confidence : 75;
@@ -326,28 +666,55 @@ async function renderResults(flow){
     const scoreCategory = useRealData ? result.scoreCategory.label : "Strong potential";
     const scoreIcon = useRealData ? result.scoreCategory.icon : "↑";
     
-    const breakdown = useRealData && result.scoreBreakdown ? [
-        ["Originality", result.scoreBreakdown.originality.score],
-        ["Trend", result.scoreBreakdown.trend.score],
-        ["Format", result.scoreBreakdown.format.score],
-        ["Channel", result.scoreBreakdown.channel.score],
-        ["Competition", result.scoreBreakdown.competition.score]
-    ] : [["Hook",96],["Trend",91],["Originality",87],["Format",93],["Duration",84],["Editing",89],["Text",78]];
+    const breakdown = buildBreakdown(result, videoInsights, useRealData);
     
-    const strengths = useRealData && result.strengths ? result.strengths : ["Excellent hook", "Trending topic detected", "Strong format for your channel", "Good pacing"];
-    const weaknesses = useRealData && result.weaknesses ? result.weaknesses : ["Ending is slightly too long", "Few text overlays", "Audio could be more dynamic"];
-    const criticalIssues = useRealData && result.criticalIssues ? result.criticalIssues : [];
+    const strengths = mergeInsightItems(
+        videoInsights?.strengths || [],
+        useRealData && result.strengths ? result.strengths : [],
+        ["Excellent hook", "Trending topic detected", "Strong format for your channel", "Good pacing"]
+    );
     
-    const summary = useRealData && result.summary ? result.summary : "This video shows strong viral potential based on its format alignment and trend relevance.";
+    const weaknesses = mergeInsightItems(
+        videoInsights?.weaknesses || [],
+        useRealData && result.weaknesses ? result.weaknesses : [],
+        ["Ending is slightly too long", "Few text overlays", "Audio could be more dynamic"]
+    );
+    
+    const technicalIssues = mergeInsightItems(
+        videoInsights?.technicalIssues || [],
+        [],
+        []
+    );
+    
+    const criticalIssues = mergeInsightItems(
+        [],
+        useRealData && result.criticalIssues ? result.criticalIssues : [],
+        []
+    );
+    
+    const summary = useRealData && result.summary ? result.summary : 
+        (usedVideoInsights ? "This video shows strong viral potential based on visual analysis, format alignment and trend relevance." : "This video shows strong viral potential based on its format alignment and trend relevance.");
     const actionPlan = useRealData && result.actionPlan ? result.actionPlan : ["Move the first text overlay earlier.", "Reduce the ending by 8 seconds.", "Add subtitles during the middle section.", "Strengthen the first 2 seconds."];
+
+    // Generate error banner HTML if Gemini failed
+    const errorBannerHtml = geminiFailed ? `
+        <div class="va-error-banner">
+            <div class="va-error-icon">⚠️</div>
+            <div class="va-error-content">
+                <h4>Video analysis unavailable</h4>
+                <p>${getErrorMessage(analysisError)}</p>
+            </div>
+        </div>
+    ` : '';
 
     flow.innerHTML = `
         <div class="va-results">
+            ${errorBannerHtml}
             <div class="va-results-hero"><div><span class="va-eyebrow">${useRealData ? "VIRALITY ANALYSIS" : "SIMULATED REPORT"} · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}</span><h3>Your Short has <em>${scoreCategory.toLowerCase()}</em> viral potential.</h3><p>${useRealData ? summary : "All values below are demonstrative placeholders, ready to be connected to a real analysis engine later."}</p></div><button class="va-outline" id="va-restart" type="button">Analyse another video →</button></div>
             <div class="va-score-grid"><article class="va-metric va-score"><span>VIRALITY SCORE</span><strong><b id="va-score-value">0</b><small>/ 100</small></strong><i>${scoreIcon} ${scoreCategory}</i><p>${useRealData ? "Based on originality, trend alignment, format performance, and channel history." : "Strong early signals, format fit and audience relevance."}</p></article><article class="va-metric"><span>CONFIDENCE</span><strong>${confidence}%</strong><i>${useRealData ? (confidence >= 70 ? "High confidence" : confidence >= 40 ? "Moderate confidence" : "Low confidence") : "High confidence"}</i><div class="va-progress"><i style="width:${confidence}%"></i></div><p>${useRealData ? "Based on historical data volume and channel consistency." : "Based on available simulated signals."}</p></article><article class="va-metric va-views"><span>ESTIMATED VIEWS</span><strong>${viewRange}</strong><p>This range is an estimate, not a guarantee.</p><div class="va-spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article></div>
             <div class="va-section-title"><div><span class="va-step">SIGNAL MAP</span><h3>Score breakdown</h3></div><p>${useRealData ? "How each factor contributed to your score." : "Where the simulated score comes from."}</p></div>
             <div class="va-breakdown">${breakdown.map(([name,value])=> `<div><p><span>${name}</span><strong>${value}</strong></p><div class="va-progress"><i style="width:${value}%"></i></div></div>`).join("")}</div>
-            <div class="va-insights"><article class="va-insight good"><span>✦</span><h4>Strengths</h4><ul>${strengths.map(s => `<li>${s}</li>`).join("")}</ul></article><article class="va-insight weak"><span>↗</span><h4>Weaknesses</h4><ul>${weaknesses.map(w => `<li>${w}</li>`).join("")}</ul></article><article class="va-insight critical"><span>!</span><h4>Critical issues</h4>${criticalIssues.length > 0 ? `<ul>${criticalIssues.map(c => `<li>${c}</li>`).join("")}</ul>` : "<p>No critical issues detected.</p>"}</article></div>
+            <div class="va-insights"><article class="va-insight good"><span>✦</span><h4>Strengths</h4><ul>${strengths.map(s => `<li>${s}</li>`).join("")}</ul></article><article class="va-insight weak"><span>↗</span><h4>Weaknesses</h4><ul>${weaknesses.map(w => `<li>${w}</li>`).join("")}</ul></article>${technicalIssues.length > 0 ? `<article class="va-insight critical"><span>⚙️</span><h4>Technical issues</h4><ul>${technicalIssues.map(t => `<li>${t}</li>`).join("")}</ul></article>` : ''}${criticalIssues.length > 0 ? `<article class="va-insight critical"><span>!</span><h4>Critical issues</h4><ul>${criticalIssues.map(c => `<li>${c}</li>`).join("")}</ul></article>` : ''}</div>
             <section class="va-suggestions"><div><span class="va-step">ACTION PLAN</span><h3>Recommendations</h3><p>${useRealData ? "Based on your analysis results." : "A future engine can make these recommendations unique to every upload."}</p></div><ol>${actionPlan.map((item, index) => `<li><b>0${index + 1}</b> ${item}</li>`).join("")}</ol></section>
             <section class="va-channel"><span class="va-channel-mark">B</span><div><span>CHANNEL INSIGHTS</span><h3>Built for your audience.</h3><p>${useRealData && result.predictionContext ? `This video is predicted to perform ${result.predictionContext.comparison.toLowerCase()} compared to your historical content.` : "This video is better than <strong>82%</strong> of your previous Shorts. It is very similar to your best-performing content and uses a strong format for your audience."}</p></div><strong>${useRealData && result.predictionContext ? `P${result.predictionContext.percentile}` : "+18%"}<small>${useRealData ? "percentile vs<br>your history" : "above your average<br>demo score"}</small></strong></section>
             <div class="va-end-grid"><aside><span>EDUCATIONAL TIP</span><h4 id="va-tip">Trending topics usually perform best within 48 hours.</h4><button id="va-next-tip" type="button">Show another tip →</button></aside><section class="va-faq"><span class="va-step">FAQ</span><h3>A few good questions</h3><details open><summary>Why is this only a prediction? <b>+</b></summary><p>Performance depends on timing, audience behaviour and distribution. A score is a decision aid, not a promise.</p></details><details><summary>How accurate is the score? <b>+</b></summary><p>${useRealData ? "Accuracy depends on your channel's historical data volume and consistency. More data = higher confidence." : "This demo uses placeholder data. The production score can be calibrated against your data."}</p></details><details><summary>How is the Virality Score calculated? <b>+</b></summary><p>${useRealData ? "The score combines originality, trend alignment, format performance, channel history, and competition factors using dynamic weighting." : "A future version can combine video, content, trend and channel signals transparently."}</p></details><details><summary>Can the prediction be wrong? <b>+</b></summary><p>Yes. Use it to spot opportunities and refine your creative process.</p></details></section></div>

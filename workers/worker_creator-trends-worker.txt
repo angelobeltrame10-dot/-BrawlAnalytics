@@ -1,0 +1,81 @@
+const ALLOWED_ORIGIN = "*";
+
+function corsHeaders() {
+    return {
+        "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Max-Age": "86400"
+    };
+}
+
+function jsonResponse(body, status = 200) {
+    return Response.json(body, { status, headers: corsHeaders() });
+}
+
+export default {
+    async fetch(request, env) {
+
+        if (request.method === "OPTIONS") {
+            return new Response(null, { status: 204, headers: corsHeaders() });
+        }
+
+        // ============================================================
+        // GET — lettura pubblica usata dalla dashboard.
+        // Nessun Authorization richiesto: sono trend aggregati, non
+        // dati sensibili, e il MAKE_SECRET non deve mai finire nel
+        // browser dell'utente.
+        // ============================================================
+        if (request.method === "GET") {
+
+            try {
+                const stored = await env.BRAWL_KV.get("latest_creator_trends");
+
+                if (!stored) {
+                    return jsonResponse({ success: false, error: "No creator trends available yet" }, 404);
+                }
+
+                return new Response(stored, {
+                    status: 200,
+                    headers: { "Content-Type": "application/json", ...corsHeaders() }
+                });
+
+            } catch (err) {
+                return jsonResponse({ success: false, error: err.message }, 500);
+            }
+
+        }
+
+        // ============================================================
+        // POST — scrittura riservata a Make (Bearer token richiesto)
+        // ============================================================
+        if (request.method !== "POST") {
+            return jsonResponse({ success: false, error: "Method Not Allowed" }, 405);
+        }
+
+        const authHeader = request.headers.get("Authorization");
+
+        if (!authHeader || authHeader !== `Bearer ${env.MAKE_SECRET}`) {
+            return jsonResponse({ success: false, error: "Unauthorized" }, 401);
+        }
+
+        try {
+
+            const data = await request.json();
+
+            if (!data || typeof data !== "object" || Array.isArray(data)) {
+                return jsonResponse({ success: false, error: "Invalid JSON payload" }, 400);
+            }
+
+            data.receivedAt = new Date().toISOString();
+
+            await env.BRAWL_KV.put("latest_creator_trends", JSON.stringify(data));
+
+            return jsonResponse({ success: true, message: "Creator trends updated." });
+
+        } catch (err) {
+            return jsonResponse({ success: false, error: err.message }, 500);
+        }
+
+    }
+};

@@ -390,12 +390,13 @@
       <li><a href="#virality-engine">3. Virality Engine</a></li>
       <li><a href="#format-detector">4. Format Detector</a></li>
       <li><a href="#video-analysis">5. Video Analysis</a></li>
-      <li><a href="#hook-analyzer">6. Hook Analyzer</a></li>
-      <li><a href="#title-optimizer">7. Title Optimizer</a></li>
-      <li><a href="#idea-generator">8. Idea Generator</a></li>
-      <li><a href="#ai-coach">9. Personal AI Coach</a></li>
-      <li><a href="#privacy">10. Privacy</a></li>
-      <li><a href="#roadmap">11. Future Features</a></li>
+      <li><a href="#ai-analysis">6. AI Analysis Engine</a></li>
+      <li><a href="#hook-analyzer">7. Hook Analyzer</a></li>
+      <li><a href="#title-optimizer">8. Title Optimizer</a></li>
+      <li><a href="#idea-generator">9. Idea Generator</a></li>
+      <li><a href="#ai-coach">10. Personal AI Coach</a></li>
+      <li><a href="#privacy">11. Privacy</a></li>
+      <li><a href="#roadmap">12. Future Features</a></li>
       <li><a href="#faq">FAQ</a></li>
     </ul>
   </aside>
@@ -471,8 +472,11 @@
     <section id="virality-engine">
       <span class="eyebrow">Tool</span>
       <h2>Virality Engine</h2>
-      <p class="lede">The Virality Engine is not a view predictor that outputs a random-looking number. It's a comparison between a new idea and everything the platform already knows about your channel.</p>
-      <p>Before publishing, you describe the video idea you're considering. The AI combines several inputs to evaluate it:</p>
+      <p class="lede">
+      The Virality Engine evaluates your video idea before you invest time recording or editing it.</p>
+      <p>
+          Unlike Video Analysis, which reviews a finished draft, the Virality Engine focuses on the concept itself. It compares your idea with your Channel Profile, current Brawl Stars trends and historical performance patterns to estimate how well the concept fits your audience before you publish.
+      </p>
       <div class="flow">
         <div class="flow-step"><span class="num">→</span><p>Current Brawl Stars trends circulating on Shorts</p></div>
         <div class="flow-step"><span class="num">→</span><p>Your Channel Profile and historical performance</p></div>
@@ -523,40 +527,128 @@
     <div class="divider"></div>
 
     <section id="video-analysis">
-      <span class="eyebrow">Tool</span>
-      <h2>Video Analysis</h2>
-      <p class="lede">Where the Virality Engine works from a written idea, Video Analysis works from the project itself — before it goes live.</p>
-      <p>You upload a Short you're preparing to publish, and the AI reviews the video directly rather than waiting for YouTube's own statistics to accumulate after release. The analysis focuses on:</p>
+    <span class="eyebrow">Tool</span>
+    <h2>Video Analysis</h2>
+
+      <p class="lede">
+        While the Virality Engine evaluates your idea before production, Video Analysis reviews the actual video you've created before you publish it.
+      </p>
+
+      <p>
+        Simply upload your Short and Google's Gemini multimodal AI analyzes the video itself rather than relying only on written descriptions or metadata. The AI reviews the visual content frame by frame to identify strengths, weaknesses and opportunities for improvement before your audience ever sees it.
+      </p>
+
+      <p>
+        Depending on the content of the video, the analysis may evaluate:
+      </p>
+
       <div class="card-grid cols-2">
-        <div class="metric-card"><div class="m-title">Hook quality</div><p>How effectively the opening moments earn attention.</p></div>
-        <div class="metric-card"><div class="m-title">Pacing</div><p>Whether the rhythm of cuts and beats holds interest.</p></div>
-        <div class="metric-card"><div class="m-title">Clarity</div><p>Whether the point of the video is easy to follow.</p></div>
-        <div class="metric-card"><div class="m-title">Editing rhythm</div><p>How transitions and timing shape the viewing experience.</p></div>
-        <div class="metric-card"><div class="m-title">Retention potential</div><p>Where in the video attention is most likely to drop.</p></div>
-        <div class="metric-card"><div class="m-title">Engagement potential</div><p>Elements likely to drive comments, likes or shares.</p></div>
+          <div class="metric-card">
+              <div class="m-title">Hook quality</div>
+              <p>Whether the opening captures attention quickly enough to stop viewers from scrolling.</p>
+          </div>
+
+          <div class="metric-card">
+              <div class="m-title">Pacing</div>
+              <p>How the rhythm of the edit keeps viewers engaged throughout the Short.</p>
+          </div>
+
+          <div class="metric-card">
+              <div class="m-title">Storytelling</div>
+              <p>Whether the sequence of events is easy to follow and builds interest.</p>
+          </div>
+
+          <div class="metric-card">
+              <div class="m-title">Visual clarity</div>
+              <p>How clearly gameplay, text and key moments are presented.</p>
+          </div>
+
+          <div class="metric-card">
+              <div class="m-title">Retention potential</div>
+              <p>Sections where viewer attention is likely to increase or drop.</p>
+          </div>
+
+          <div class="metric-card">
+              <div class="m-title">Overall engagement</div>
+              <p>The overall likelihood that viewers remain interested until the end.</p>
+          </div>
       </div>
-      <p style="margin-top:20px;">The goal is straightforward: surface weak points while there's still time to re-edit, rather than learning about them from a retention graph after the video is already public.</p>
-      <p>Video Analysis is deliberately scoped to the video itself rather than to the idea behind it — it complements the Virality Engine instead of replacing it. A strong idea can still be undercut by a slow edit or a buried hook, and this is the step designed to catch that before it happens.</p>
-    </section>
+
+      <p style="margin-top:20px;">
+        The goal isn't simply to judge the finished video, but to provide practical suggestions while there's still time to improve it. Small changes before publishing can often have a much greater impact than trying to understand the results afterward.
+      </p>
+
+      <div class="quote-callout">
+        Video Analysis provides AI-generated recommendations based on the uploaded video. Suggestions are intended to support your creative decisions and should not be interpreted as guarantees of future performance.
+      </div>
+
+  </section>
+
+    <div class="divider"></div>
+
+    <section id="ai-analysis">
+    <span class="eyebrow">Tool</span>
+    <h2>AI Analysis Engine</h2>
+
+      <div class="divider"></div>
+
+  <section id="ai-analysis">
+    <span class="eyebrow green">AI Technology</span>
+    <h2>AI Analysis Engine</h2>
+
+      <p class="lede">
+          Every AI-powered feature inside Brawl Analytics is built around modern multimodal artificial intelligence capable of understanding both text and video.
+      </p>
+
+      <p>
+          Depending on the tool you're using, the AI can analyze uploaded videos, evaluate written ideas, study your Channel Profile, compare your content with current Brawl Stars trends, and generate personalized recommendations based on your own upload history.
+      </p>
+
+      <p>
+          Unlike traditional analytics dashboards, feedback is generated dynamically for every request. This means every analysis is tailored to your specific channel instead of relying on fixed templates or generic advice.
+      </p>
+
+      <div class="info-note">
+          <span class="dot">ⓘ</span>
+          <p>
+              AI-generated analyses are designed to assist creators in making better publishing decisions. They should be considered recommendations rather than guarantees of future performance.
+          </p>
+      </div>
+
+  </section>
 
     <div class="divider"></div>
 
     <section id="hook-analyzer">
-      <span class="eyebrow gold">Flagship feature</span>
-      <h2>Hook Analyzer <span class="pro-badge">PRO</span></h2>
-      <p class="lede">The Hook Analyzer looks at exactly one thing: the first few seconds of your Short, since that's what decides whether a viewer keeps watching or scrolls past.</p>
-      <p>You describe how the video opens — no title, no description, no extra fields required. The AI evaluates that opening across several dimensions:</p>
+    <span class="eyebrow gold">Flagship feature</span>
+    <h2>Hook Analyzer <span class="pro-badge">PRO</span></h2>
+
+      <p class="lede">
+        The Hook Analyzer focuses on the most important part of any Short: the opening seconds that determine whether viewers keep watching or immediately scroll away.
+      </p>
+
+      <p>
+        Using AI vision, the tool analyzes the beginning of your uploaded video and evaluates how effectively it captures attention. Instead of looking at the entire Short equally, it concentrates on the first impression your content makes.
+      </p>
+
+      <p>
+        The analysis considers factors such as:
+      </p>
+
       <div class="tag-row">
-        <span class="tag">Hook Strength</span>
-        <span class="tag">Scroll Stop Potential</span>
-        <span class="tag">Curiosity</span>
-        <span class="tag">Clarity</span>
-        <span class="tag">Viewer Retention Potential</span>
-        <span class="tag">Emotional Impact</span>
+          <span class="tag">Hook Strength</span>
+          <span class="tag">Scroll Stop Potential</span>
+          <span class="tag">Curiosity</span>
+          <span class="tag">Clarity</span>
+          <span class="tag">Viewer Retention Potential</span>
+          <span class="tag">Emotional Impact</span>
       </div>
-      <p style="margin-top:20px;">It then generates several alternative hooks that aim to open the video more strongly, so you can compare your original opening against a handful of concrete rewrites. The purpose is narrow and specific: sharpen the first seconds, which on Shorts is usually the single biggest lever a creator has over performance.</p>
-      <p>The tool is intentionally limited to just the hook rather than the whole video, because the decision to keep scrolling or keep watching is made in that opening window, before a title, a description, or the rest of the edit ever comes into play. Testing a few hook variants against each other is often faster than re-filming an entire Short.</p>
-    </section>
+
+      <p style="margin-top:20px;">
+        Alongside its evaluation, the AI can suggest alternative openings and practical improvements designed to make the first seconds more engaging without changing the overall idea of your video.
+      </p>
+
+  </section>
 
     <div class="divider"></div>
 
@@ -637,14 +729,38 @@
     <section id="privacy">
       <span class="eyebrow green">Privacy</span>
       <h2>How your data is handled</h2>
-      <p class="lede">Brawl Analytics is built around your channel's data, so it's worth being explicit about how that data is treated.</p>
-      <p>Your videos are never shared publicly through the platform. CSV files you upload are used strictly to power your own analytics and predictions — not for any other purpose. Personal data is never sold to third parties. Data processing exists for one reason: to generate the analytics, scores and recommendations described throughout this page, for you alone.</p>
-      <p>Your Channel Profile, uploaded CSV data and generated ideas are tied to your account and are not visible to other users of the platform. If you use both the free and Pro tiers over time, this same data carries forward rather than resetting — your history is what makes the platform useful, so it's treated as something to preserve, not discard.</p>
+      <section id="privacy">
+      <span class="eyebrow green">Privacy</span>
+      <h2>How your data is handled</h2>
+
+      <p class="lede">
+        Brawl Analytics is built around your channel's data, so it's important to be transparent about how that information is processed.
+      </p>
+
+      <p>
+        Your uploaded CSV files are used exclusively to build your Channel Profile and generate personalized analytics. Uploaded videos are processed only to perform the AI analysis you request and are never made publicly available.
+      </p>
+
+      <p>
+        Your data is never sold to third parties and is not shared with other users. AI analyses are generated solely to provide the features described throughout this documentation.
+      </p>
+
+      <p>
+        Your Channel Profile, uploaded CSV files, uploaded videos and generated ideas remain associated only with your account. As your channel grows and you upload new data, your analyses become more personalized over time.
+      </p>
+
       <div class="info-note">
-        <span class="dot">ⓘ</span>
-        <p>This section is a summary. The full <a href="legal/privacy.html">Privacy Policy</a> and <a href="legal/terms.html">Terms &amp; Conditions</a> cover data retention, your rights, and account-level details in full.</p>
+          <span class="dot">ⓘ</span>
+          <p>
+              This section is only a summary. Please refer to the full
+              <a href="legal/privacy.html">Privacy Policy</a>
+              and
+              <a href="legal/terms.html">Terms &amp; Conditions</a>
+              for complete details about data processing and your rights.
+          </p>
       </div>
-    </section>
+
+  </section>
 
     <div class="divider"></div>
 
@@ -739,6 +855,18 @@
         <div class="metric-card">
           <div class="m-title">Is the Personal AI Coach available on the free plan?</div>
           <p>The Personal AI Coach is a Pro feature. Other tools on this page are available on the free plan, with daily usage limits.</p>
+        </div>
+        <div class="metric-card">
+        <div class="m-title">Does the AI actually watch my uploaded video?</div>
+        <p>Yes. Video Analysis uses Google's Gemini multimodal AI to analyze the visual content of your uploaded video, allowing it to provide feedback based on what actually appears on screen.</p>
+        </div>
+        <div class="metric-card">
+            <div class="m-title">Are my uploaded videos stored permanently?</div>
+            <p>Uploaded videos are processed only to generate the requested analysis. They are not shared publicly or used to train AI models.</p>
+        </div>
+        <div class="metric-card">
+            <div class="m-title">Why can the Virality Engine and Video Analysis give different feedback?</div>
+            <p>The Virality Engine evaluates your idea before production, while Video Analysis reviews the finished video itself. They analyze different stages of the creative process and complement each other.</p>
         </div>
       </div>
     </section>

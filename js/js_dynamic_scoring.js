@@ -1,295 +1,107 @@
 /* ==========================================================
    BRAWL ANALYTICS
-   DYNAMIC SCORING ENGINE
+   ADAPTIVE SCORING ENGINE — v3 (Livello 4)
 
-   Calculates Virality Score using multipliers and rule-based logic.
-   NOT a weighted average - uses sequential multipliers with critical failures.
+   Sostituisce i moltiplicatori sequenziali fissi con una media
+   pesata dei sotto-punteggi, dove i pesi arrivano da
+   js_dynamic_weights.js (contestuali) e il sotto-punteggio
+   "format" viene corretto dal fattore di calibrazione appreso
+   (js_calibration.js), quando disponibile e affidabile.
+
+   Nessuna black-box: ogni sotto-punteggio e ogni peso sono
+   ispezionabili in calculateScoreBreakdown().
 ========================================================== */
 
-/**
- * Calculates the Virality Score (0-100) from extracted features.
- * Uses multiplier-based approach with critical failure caps.
- */
-export function calculateViralityScore(features) {
-    // Step 1: Check for critical failures first
-    const criticalFailure = checkCriticalFailures(features);
-    if (criticalFailure) {
-        return criticalFailure.maxScore;
-    }
-    
-    // Step 2: Start with base score
-    let score = 50; // Base score starting point
-    
-    // Step 3: Apply multipliers sequentially
-    score = applyOriginalityMultiplier(score, features);
-    score = applyTrendMultiplier(score, features);
-    score = applyFormatMultiplier(score, features);
-    score = applyChannelMultiplier(score, features);
-    score = applyCompetitionMultiplier(score, features);
-    score = applyInnovationMultiplier(score, features);
-    
-    // Step 4: Apply final scaling
-    score = applyFinalScaling(score, features);
-    
-    // Step 5: Clamp to 0-100
-    return Math.max(0, Math.min(100, Math.round(score)));
+import { getDynamicWeights } from "./js_dynamic_weights.js";
+import { getCorrectionFactor } from "./js_calibration.js";
+
+function toScore100(value01) {
+    return Math.max(0, Math.min(100, value01 * 100));
 }
 
 /**
- * Checks for critical failures that cap the maximum score.
- * These conditions prevent high scores regardless of other factors.
+ * Individua condizioni di fallimento critico che impongono un tetto
+ * massimo al punteggio, indipendentemente dalla media pesata.
  */
 function checkCriticalFailures(features) {
-    // Critical failure: Completely copied video
-    if (features.videoOriginality <= 0.2 && features.ideaOriginality <= 0.2) {
-        return { hasFailure: true, reason: "Completely copied content", maxScore: 15 };
+    if (features.videoOriginality <= 0.15 && features.ideaOriginality <= 0.15) {
+        return { reason: "Extremely low originality", maxScore: 15 };
     }
-    
-    // Critical failure: Completely copied video with poor format
-    if (features.videoOriginality <= 0.2 && features.historicalPerformance <= 0.3) {
-        return { hasFailure: true, reason: "Copied content with poor format", maxScore: 10 };
+
+    // "Format terribile" è affidabile solo se historicalPerformance
+    // riflette dati reali (non il default neutro 0.5): qui è basso
+    // per davvero solo se il canale ha già video in quel formato.
+    if (features.historicalPerformance <= 0.25 && features.videoOriginality < 0.6) {
+        return { reason: "Weak format track record combined with low originality", maxScore: 30 };
     }
-    
-    // Critical failure: Format with terrible historical performance
-    if (features.historicalPerformance <= 0.2) {
-        return { hasFailure: true, reason: "Format with terrible historical performance", maxScore: 25 };
+
+    if (features.trendAlignment <= 0.2 && features.competition <= 0.25) {
+        return { reason: "No trend alignment in a saturated market", maxScore: 25 };
     }
-    
-    // Critical failure: No trend alignment AND high competition
-    if (features.trendAlignment <= 0.2 && features.competition <= 0.3) {
-        return { hasFailure: true, reason: "No trend alignment in saturated market", maxScore: 20 };
-    }
-    
-    // Critical failure: Very low originality
-    if (features.videoOriginality <= 0.1) {
-        return { hasFailure: true, reason: "Extremely low originality", maxScore: 20 };
-    }
-    
+
     return null;
 }
 
 /**
- * Applies originality multiplier.
- * Low originality severely limits the score.
+ * Breakdown per sotto-categoria: ogni voce ha uno score 0-100 e,
+ * quando applicabile, il dettaglio della correzione di calibrazione
+ * usata (per la UI "spiega la predizione").
  */
-function applyOriginalityMultiplier(score, features) {
-    const avgOriginality = (features.videoOriginality + features.ideaOriginality) / 2;
-    
-    if (avgOriginality <= 0.3) {
-        // Severe penalty for low originality
-        return score * 0.4;
-    } else if (avgOriginality <= 0.5) {
-        // Moderate penalty
-        return score * 0.7;
-    } else if (avgOriginality >= 0.9) {
-        // Bonus for high originality
-        return score * 1.2;
-    }
-    
-    return score;
-}
+export function calculateScoreBreakdown(features, format, calibrationStats = null) {
 
-/**
- * Applies trend multiplier.
- * Effect depends on format strength (dynamic weighting).
- */
-function applyTrendMultiplier(score, features) {
-    const trendScore = (features.trendAlignment + features.semanticTrendSimilarity) / 2;
-    
-    // If format is strong, trend matters less
-    if (features.formatStrength >= 0.8) {
-        if (trendScore >= 0.7) return score * 1.1;
-        if (trendScore <= 0.3) return score * 0.9;
-    }
-    // If format is weak, trend matters more
-    else if (features.formatStrength <= 0.4) {
-        if (trendScore >= 0.7) return score * 1.3;
-        if (trendScore <= 0.3) return score * 0.7;
-    }
-    // Normal format strength
-    else {
-        if (trendScore >= 0.7) return score * 1.2;
-        if (trendScore <= 0.3) return score * 0.8;
-    }
-    
-    return score;
-}
+    let formatScore01 = Math.max(0, Math.min(1, features.historicalPerformance / 1.5));
 
-/**
- * Applies format multiplier.
- * Historical performance is a strong signal.
- */
-function applyFormatMultiplier(score, features) {
-    // Format strength is the primary factor
-    if (features.historicalPerformance >= 1.5) {
-        return score * 1.4;
-    } else if (features.historicalPerformance >= 1.2) {
-        return score * 1.25;
-    } else if (features.historicalPerformance >= 0.8) {
-        return score * 1.1;
-    } else if (features.historicalPerformance <= 0.3) {
-        return score * 0.5;
-    } else if (features.historicalPerformance <= 0.5) {
-        return score * 0.7;
-    }
-    
-    return score;
-}
-
-/**
- * Applies channel multiplier.
- * Consistency affects reliability of predictions.
- */
-function applyChannelMultiplier(score, features) {
-    if (features.channelConsistency >= 0.8) {
-        return score * 1.1;
-    } else if (features.channelConsistency <= 0.3) {
-        return score * 0.9;
-    }
-    
-    return score;
-}
-
-/**
- * Applies competition multiplier.
- * High competition reduces potential.
- */
-function applyCompetitionMultiplier(score, features) {
-    if (features.competition <= 0.2) {
-        // High competition - severe penalty
-        return score * 0.7;
-    } else if (features.competition <= 0.4) {
-        // Moderate competition
-        return score * 0.85;
-    } else if (features.competition >= 0.8) {
-        // Low competition - bonus
-        return score * 1.15;
-    }
-    
-    return score;
-}
-
-/**
- * Applies innovation multiplier.
- */
-function applyInnovationMultiplier(score, features) {
-    if (features.innovation >= 0.8) {
-        return score * 1.1;
-    } else if (features.innovation <= 0.2) {
-        return score * 0.9;
-    }
-    
-    return score;
-}
-
-/**
- * Applies final scaling to ensure realistic distribution.
- */
-function applyFinalScaling(score, features) {
-    // Apply slight compression to prevent extreme values
-    // This makes it harder to reach 100 or 0
-    const compressed = 50 + (score - 50) * 0.9;
-    
-    return compressed;
-}
-
-/**
- * Calculates a detailed score breakdown for explainability.
- */
-export function calculateScoreBreakdown(features) {
-    const criticalFailure = checkCriticalFailures(features);
-
-    // I punteggi per singolo fattore vengono SEMPRE calcolati dai dati
-    // reali, anche quando un critical failure limita il punteggio totale:
-    // il critical failure impone solo un tetto massimo al risultato
-    // finale (vedi calculateViralityScore), non annulla il significato
-    // dei singoli fattori mostrati in dashboard.
-    return {
-        criticalFailure: criticalFailure ? {
-            reason: criticalFailure.reason,
-            maxScore: criticalFailure.maxScore
-        } : null,
-        originality: {
-            score: Math.round(((features.videoOriginality + features.ideaOriginality) / 2) * 100),
-            multiplier: getOriginalityMultiplier(features)
-        },
-        trend: {
-            score: Math.round(((features.trendAlignment + features.semanticTrendSimilarity) / 2) * 100),
-            multiplier: getTrendMultiplier(features)
-        },
-        format: {
-            score: Math.round(features.historicalPerformance * 100),
-            multiplier: getFormatMultiplier(features)
-        },
-        channel: {
-            score: Math.round(features.channelConsistency * 100),
-            multiplier: getChannelMultiplier(features)
-        },
-        competition: {
-            score: Math.round(features.competition * 100),
-            multiplier: getCompetitionMultiplier(features)
-        },
-        innovation: {
-            score: Math.round(features.innovation * 100),
-            multiplier: getInnovationMultiplier(features)
+    let calibrationInfo = null;
+    if (calibrationStats?.ready) {
+        const correction = getCorrectionFactor(calibrationStats, format);
+        if (correction.trust > 0) {
+            // Nudge proporzionale alla fiducia: più campioni abbiamo per
+            // questo formato, più il punteggio si sposta verso ciò che
+            // il canale ha realmente mostrato in passato.
+            const nudge = Math.max(-0.3, Math.min(0.3, (correction.factor - 1) * correction.trust));
+            formatScore01 = Math.max(0, Math.min(1, formatScore01 + nudge));
+            calibrationInfo = { source: correction.source, sampleCount: correction.sampleCount, appliedNudge: nudge };
         }
+    }
+
+    return {
+        originality: { score: toScore100((features.videoOriginality + features.ideaOriginality) / 2) },
+        trend: { score: toScore100((features.trendAlignment + features.semanticTrendSimilarity) / 2) },
+        format: { score: toScore100(formatScore01), calibration: calibrationInfo },
+        channel: { score: toScore100(features.channelConsistency) },
+        competition: { score: toScore100(features.competition) },
+        retention: { score: toScore100(features.retentionSignal) },
+        trendsOverlap: { score: toScore100((features.creatorTrendsOverlap + features.googleTrendsOverlap) / 2) }
     };
 }
 
-function getOriginalityMultiplier(features) {
-    const avgOriginality = (features.videoOriginality + features.ideaOriginality) / 2;
-    if (avgOriginality <= 0.3) return 0.4;
-    if (avgOriginality <= 0.5) return 0.7;
-    if (avgOriginality >= 0.9) return 1.2;
-    return 1.0;
-}
-
-function getTrendMultiplier(features) {
-    const trendScore = (features.trendAlignment + features.semanticTrendSimilarity) / 2;
-    if (features.formatStrength >= 0.8) {
-        if (trendScore >= 0.7) return 1.1;
-        if (trendScore <= 0.3) return 0.9;
-    } else if (features.formatStrength <= 0.4) {
-        if (trendScore >= 0.7) return 1.3;
-        if (trendScore <= 0.3) return 0.7;
-    } else {
-        if (trendScore >= 0.7) return 1.2;
-        if (trendScore <= 0.3) return 0.8;
-    }
-    return 1.0;
-}
-
-function getFormatMultiplier(features) {
-    if (features.historicalPerformance >= 1.5) return 1.4;
-    if (features.historicalPerformance >= 1.2) return 1.25;
-    if (features.historicalPerformance >= 0.8) return 1.1;
-    if (features.historicalPerformance <= 0.3) return 0.5;
-    if (features.historicalPerformance <= 0.5) return 0.7;
-    return 1.0;
-}
-
-function getChannelMultiplier(features) {
-    if (features.channelConsistency >= 0.8) return 1.1;
-    if (features.channelConsistency <= 0.3) return 0.9;
-    return 1.0;
-}
-
-function getCompetitionMultiplier(features) {
-    if (features.competition <= 0.2) return 0.7;
-    if (features.competition <= 0.4) return 0.85;
-    if (features.competition >= 0.8) return 1.15;
-    return 1.0;
-}
-
-function getInnovationMultiplier(features) {
-    if (features.innovation >= 0.8) return 1.1;
-    if (features.innovation <= 0.2) return 0.9;
-    return 1.0;
-}
-
 /**
- * Gets a qualitative assessment of the score.
+ * Punteggio finale 0-100: media pesata (pesi dinamici contestuali) dei
+ * sotto-punteggi, poi vincolata da eventuali critical failure.
  */
+export function calculateViralityScore(features, format = "", calibrationStats = null) {
+    const breakdown = calculateScoreBreakdown(features, format, calibrationStats);
+    const weights = getDynamicWeights(features, format);
+
+    let score =
+        breakdown.originality.score * weights.originality +
+        breakdown.trend.score * weights.trend +
+        breakdown.format.score * weights.format +
+        breakdown.channel.score * weights.channel +
+        breakdown.competition.score * weights.competition +
+        breakdown.retention.score * weights.retention +
+        breakdown.trendsOverlap.score * weights.trendsOverlap;
+
+    score = Math.round(Math.max(0, Math.min(100, score)));
+
+    const criticalFailure = checkCriticalFailures(features);
+    if (criticalFailure) {
+        return Math.min(score, criticalFailure.maxScore);
+    }
+
+    return score;
+}
+
 export function getScoreQualitative(score) {
     if (score >= 85) return "Excellent";
     if (score >= 70) return "Strong";
@@ -299,9 +111,6 @@ export function getScoreQualitative(score) {
     return "Poor";
 }
 
-/**
- * Gets a score category for UI display.
- */
 export function getScoreCategory(score) {
     if (score >= 85) return { label: "High potential", icon: "↗" };
     if (score >= 70) return { label: "Strong potential", icon: "↑" };

@@ -1,257 +1,286 @@
 /* ==========================================================
    BRAWL ANALYTICS
-   FEATURE EXTRACTION MODULE
+   FEATURE EXTRACTION MODULE — v3 (Livello 2)
 
-   Transforms raw data into structured features for the scoring engine.
-   This intermediate layer is mandatory before any score calculation.
+   Trasforma proposal + AI analysis + channel profile in feature
+   numeriche 0-1 (o 0-1.5 per historicalPerformance, che può
+   superare la media canale). Nessun calcolo di score qui: solo
+   estrazione/normalizzazione.
+
+   Novità v3 rispetto alla versione precedente:
+   - retentionSignal e durationFit: dati già presenti nel Channel
+     Profile ma mai collegati allo score, ora feature vere.
+   - creatorTrendsOverlap: sovrapposizione deterministica tra la
+     descrizione proposta e i format/keyword storici del canale.
+   - googleTrendsOverlap: sovrapposizione testuale (parole in
+     comune) tra descrizione e trend correnti — deterministico,
+     nessun embedding.
+   - formatStability: quanto il formato scelto ha una varianza di
+     views bassa nel tempo (più stabile = più prevedibile).
 ========================================================== */
 
 import { calculateChannelConsistency, getFormatStatistics } from "./js_channel_profile.js";
 
+const STOP_WORDS = new Set([
+    "the", "a", "an", "is", "are", "was", "were", "of", "in", "for", "on",
+    "with", "at", "by", "from", "to", "and", "but", "or", "this", "that",
+    "i", "you", "he", "she", "it", "we", "they", "my", "your"
+]);
+
 /**
- * Extracts all features from the complete analysis pipeline.
- * Combines: Channel Profile, Questionnaire, LLM Analysis, Trends
- * NO keyword matching - uses AI semantic similarity
+ * Tokenizza una stringa in parole significative (>2 caratteri, senza
+ * stop word), usata per tutte le sovrapposizioni testuali deterministiche.
  */
-export function extractFeatures(proposal, aiAnalysis, channelProfile, currentTrends = []) {
-    return {
-        // Originality features (from questionnaire)
+function tokenize(text) {
+    return String(text || "")
+        .toLowerCase()
+        .replace(/[^\w\s]/g, " ")
+        .split(/\s+/)
+        .filter(word => word.length > 2 && !STOP_WORDS.has(word));
+}
+
+/**
+ * Jaccard overlap tra due insiemi di token: |intersezione| / |unione|.
+ * Deterministico, zero costo, nessuna chiamata esterna.
+ */
+function jaccardOverlap(tokensA, tokensB) {
+    const setA = new Set(tokensA);
+    const setB = new Set(tokensB);
+    if (setA.size === 0 || setB.size === 0) return 0;
+
+    let intersection = 0;
+    setA.forEach(token => { if (setB.has(token)) intersection++; });
+
+    const union = new Set([...setA, ...setB]).size;
+    return union > 0 ? intersection / union : 0;
+}
+
+export function extractFeatures(proposal, aiAnalysis, channelProfile, currentTrends = [], videoInsights = null) {
+    const baseFeatures = {
         videoOriginality: normalizeOriginality(proposal.videoOriginality),
         ideaOriginality: normalizeOriginality(proposal.ideaOriginality),
-        
-        // Trend features (from AI analysis - semantic comparison only)
+
         trendAlignment: normalizeTrendAlignment(aiAnalysis.trendAlignment),
-        semanticTrendSimilarity: aiAnalysis.semanticTrendSimilarity || 0.5,
-        
-        // Format features (from channel profile + AI)
+        semanticTrendSimilarity: aiAnalysis.semanticTrendSimilarity ?? 0.5,
+
         formatStrength: calculateFormatStrength(proposal.format, channelProfile),
         formatSuitability: normalizeSuitability(aiAnalysis.formatSuitability),
         formatNovelty: normalizeLevel(aiAnalysis.formatNovelty),
-        
-        // Channel features (from channel profile)
+
         channelConsistency: calculateChannelConsistency(channelProfile),
         historicalPerformance: calculateHistoricalPerformance(proposal.format, channelProfile),
         historicalFit: normalizeHistoricalFit(aiAnalysis.historicalFit),
-        
-        // Innovation features (from AI)
+
         innovation: normalizeLevel(aiAnalysis.innovation),
         competition: normalizeCompetition(aiAnalysis.competition),
         topicFreshness: normalizeLevel(aiAnalysis.topicFreshness),
-        
-        // Multimedia features (reserved for future use)
-        multimediaFeatures: null // Future: hook, editing, OCR, etc.
+
+        // ---- Nuove feature deterministiche v3 ----
+        retentionSignal: calculateRetentionSignal(proposal.format, channelProfile),
+        durationFit: calculateDurationFit(channelProfile),
+        creatorTrendsOverlap: calculateCreatorTrendsOverlap(proposal, channelProfile),
+        googleTrendsOverlap: calculateGoogleTrendsOverlap(proposal, currentTrends),
+        formatStability: calculateFormatStability(proposal.format, channelProfile),
+
+        multimediaFeatures: null
     };
+
+    // Integrate video insights if available
+    if (videoInsights) {
+        baseFeatures.multimediaFeatures = {
+            hookStrength: normalizeScore(videoInsights.hookStrength),
+            visualClarity: normalizeScore(videoInsights.visualClarity),
+            editingPace: normalizeEditingPace(videoInsights.editingPace),
+            sceneChanges: normalizeCount(videoInsights.sceneChanges),
+            averageShotDuration: normalizeDuration(videoInsights.averageShotDuration),
+            deadMoments: normalizeCount(videoInsights.deadMoments),
+            retentionRisk: normalizeRetentionRisk(videoInsights.retentionRisk),
+            energyCurve: videoInsights.energyCurve || [],
+            hasSubtitles: videoInsights.hasSubtitles || false,
+            subtitleQuality: normalizeScore(videoInsights.subtitleQuality),
+            textDensity: normalizeLevel(videoInsights.textDensity),
+            audioQuality: normalizeScore(videoInsights.audioQuality),
+            musicPresence: normalizePresence(videoInsights.musicPresence),
+            voicePresence: normalizePresence(videoInsights.voicePresence),
+            emotionLevel: normalizeScore(videoInsights.emotionLevel),
+            surpriseMoments: normalizeCount(videoInsights.surpriseMoments),
+            replayValue: normalizeScore(videoInsights.replayValue),
+            visualOriginality: normalizeScore(videoInsights.visualOriginality),
+            clarityOfObjective: normalizeScore(videoInsights.clarityOfObjective),
+            hasCTA: videoInsights.hasCTA || false,
+            endingStrength: normalizeScore(videoInsights.endingStrength),
+            loopPotential: normalizeScore(videoInsights.loopPotential),
+            thumbnailTimestamp: videoInsights.thumbnailTimestamp || 0,
+            category: videoInsights.category || 'Other',
+            estimatedDifficulty: normalizeLevel(videoInsights.estimatedDifficulty),
+            contentComplexity: normalizeLevel(videoInsights.contentComplexity),
+            overallQuality: normalizeScore(videoInsights.overallQuality),
+            technicalIssues: videoInsights.technicalIssues || [],
+            strengths: videoInsights.strengths || [],
+            weaknesses: videoInsights.weaknesses || []
+        };
+    }
+
+    return baseFeatures;
 }
 
-/**
- * Normalizes originality from questionnaire to 0-1 scale.
- */
 function normalizeOriginality(value) {
     const mapping = {
-        "Completely original": 1.0,
-        "Mostly original": 0.7,
-        "Mostly reused": 0.3,
-        "Inspired by another creator": 0.5,
+        "Completely original": 1.0, "Mostly original": 0.7,
+        "Mostly reused": 0.3, "Inspired by another creator": 0.5,
         "Copy of another creator": 0.1
     };
-    return mapping[value] || 0.5;
+    return mapping[value] ?? 0.5;
 }
 
-/**
- * Normalizes trend alignment from AI to 0-1 scale.
- */
 function normalizeTrendAlignment(alignment) {
-    const mapping = {
-        "strong": 1.0,
-        "moderate": 0.6,
-        "weak": 0.3,
-        "none": 0.0
-    };
-    return mapping[alignment] || 0.5;
+    return { strong: 1.0, moderate: 0.6, weak: 0.3, none: 0.0 }[alignment] ?? 0.5;
 }
 
-/**
- * Normalizes historical fit from AI to 0-1 scale.
- */
 function normalizeHistoricalFit(fit) {
-    const mapping = {
-        "strong": 1.0,
-        "moderate": 0.6,
-        "weak": 0.3
-    };
-    return mapping[fit] || 0.5;
+    return { strong: 1.0, moderate: 0.6, weak: 0.3 }[fit] ?? 0.5;
 }
 
-/**
- * Calculates format strength based on historical performance.
- */
 function calculateFormatStrength(format, channelProfile) {
     const stats = getFormatStatistics(channelProfile, format);
-    
-    if (!stats || stats.videoCount === 0) {
-        return 0.5; // Neutral for unknown formats
-    }
-    
-    // Strength based on both view performance and consistency
+    if (!stats || stats.videoCount === 0) return 0.5;
+
     const viewScore = Math.min(1.0, stats.averageViews / Math.max(1, channelProfile.averageViews));
     const countScore = Math.min(1.0, stats.videoCount / Math.max(1, channelProfile.totalVideos));
-    
-    // Weighted average (views more important than count)
     return (viewScore * 0.7) + (countScore * 0.3);
 }
 
-/**
- * Normalizes format suitability from AI to 0-1 scale.
- */
 function normalizeSuitability(suitability) {
-    const mapping = {
-        "excellent": 1.0,
-        "good": 0.8,
-        "fair": 0.5,
-        "poor": 0.2
-    };
-    return mapping[suitability] || 0.5;
+    return { excellent: 1.0, good: 0.8, fair: 0.5, poor: 0.2 }[suitability] ?? 0.5;
 }
 
-/**
- * Calculates historical performance for the selected format.
- */
 function calculateHistoricalPerformance(format, channelProfile) {
     const stats = getFormatStatistics(channelProfile, format);
-    
-    if (!stats || stats.videoCount === 0) {
-        return 0.5; // Neutral for unknown formats
-    }
-    
-    // Compare format average to channel average
+    if (!stats || stats.videoCount === 0) return 0.5;
     if (channelProfile.averageViews > 0) {
-        return Math.min(1.0, stats.averageViews / channelProfile.averageViews);
+        return Math.min(1.5, stats.averageViews / channelProfile.averageViews);
     }
-    
     return 0.5;
 }
 
-/**
- * Normalizes level-based values (high/medium/low) to 0-1 scale.
- */
 function normalizeLevel(level) {
-    const mapping = {
-        "high": 1.0,
-        "medium": 0.5,
-        "low": 0.0
-    };
-    return mapping[level] || 0.5;
+    return { high: 1.0, medium: 0.5, low: 0.0 }[level] ?? 0.5;
 }
 
-/**
- * Normalizes competition (reversed: low competition = high score).
- */
 function normalizeCompetition(competition) {
-    const mapping = {
-        "low": 1.0,    // Low competition is good
-        "medium": 0.5,
-        "high": 0.0    // High competition is bad
-    };
-    return mapping[competition] || 0.5;
+    return { low: 1.0, medium: 0.5, high: 0.0 }[competition] ?? 0.5;
 }
 
 /**
- * Calculates a composite originality score from multiple signals.
+ * Confronta la retention media del formato scelto con la retention
+ * media del canale. >0.5 = il formato trattiene meglio della media.
  */
-export function calculateCompositeOriginality(features) {
-    const weights = {
-        videoOriginality: 0.4,
-        ideaOriginality: 0.4,
-        innovation: 0.2
-    };
-    
-    return (
-        features.videoOriginality * weights.videoOriginality +
-        features.ideaOriginality * weights.ideaOriginality +
-        features.innovation * weights.innovation
-    );
+function calculateRetentionSignal(format, channelProfile) {
+    const stats = getFormatStatistics(channelProfile, format);
+    if (!stats?.averageRetention || !channelProfile?.averageRetention) return 0.5;
+
+    const ratio = stats.averageRetention / channelProfile.averageRetention;
+    return Math.max(0, Math.min(1, 0.5 + (ratio - 1) * 0.8));
 }
 
 /**
- * Calculates a composite trend score from multiple signals.
+ * Vicinanza tra durata media del canale e durata ideale calcolata
+ * (channelProfile.idealDuration, già esistente ma prima inutilizzata).
  */
-export function calculateCompositeTrendScore(features) {
-    const weights = {
-        trendAlignment: 0.6,
-        trendSimilarity: 0.4
-    };
-    
-    return (
-        features.trendAlignment * weights.trendAlignment +
-        features.trendSimilarity * weights.trendSimilarity
-    );
+function calculateDurationFit(channelProfile) {
+    if (!channelProfile?.averageDuration || !channelProfile?.idealDuration) return 0.5;
+    const diff = Math.abs(channelProfile.averageDuration - channelProfile.idealDuration);
+    return Math.max(0, 1 - diff / 30);
 }
 
 /**
- * Calculates a composite format score from multiple signals.
+ * Sovrapposizione deterministica tra la descrizione del video proposto
+ * e i titoli storici del formato scelto: quanto il video "suona" come
+ * ciò che il creator ha già fatto in quel formato (parole in comune).
  */
-export function calculateCompositeFormatScore(features) {
-    const weights = {
-        formatStrength: 0.5,
-        formatSuitability: 0.3,
-        historicalPerformance: 0.2
-    };
-    
-    return (
-        features.formatStrength * weights.formatStrength +
-        features.formatSuitability * weights.formatSuitability +
-        features.historicalPerformance * weights.historicalPerformance
-    );
+function calculateCreatorTrendsOverlap(proposal, channelProfile) {
+    if (!channelProfile?.historicalVideos?.length) return 0.5;
+
+    const proposalTokens = tokenize(proposal.description);
+    const sameFormatVideos = channelProfile.historicalVideos.filter(v => v.format === proposal.format);
+    if (sameFormatVideos.length === 0 || proposalTokens.length === 0) return 0.5;
+
+    const historicalTokens = sameFormatVideos.flatMap(v => tokenize(v.title));
+    return jaccardOverlap(proposalTokens, historicalTokens);
 }
 
 /**
- * Gets feature importance weights based on context.
- * Weights change dynamically based on the proposal characteristics.
+ * Sovrapposizione testuale tra descrizione proposta e trend correnti
+ * (parole in comune) — sostituisce l'approccio "chiedi all'AI un
+ * numero a caso" con un conteggio verificabile.
  */
-export function getDynamicWeights(features) {
-    const baseWeights = {
-        originality: 0.25,
-        trend: 0.25,
-        format: 0.25,
-        channel: 0.15,
-        competition: 0.10
-    };
-    
-    // If video is mostly copied, originality becomes critical
-    if (features.videoOriginality < 0.3) {
-        baseWeights.originality = 0.40;
-        baseWeights.format = 0.20;
-        baseWeights.trend = 0.20;
-        baseWeights.channel = 0.10;
-        baseWeights.competition = 0.10;
-    }
-    
-    // If format has poor historical performance, reduce its weight
-    if (features.historicalPerformance < 0.5) {
-        baseWeights.format = 0.15;
-        baseWeights.originality = 0.35;
-        baseWeights.trend = 0.30;
-        baseWeights.channel = 0.10;
-        baseWeights.competition = 0.10;
-    }
-    
-    // If channel has low consistency, reduce channel weight
-    if (features.channelConsistency < 0.3) {
-        baseWeights.channel = 0.05;
-        baseWeights.originality = 0.30;
-        baseWeights.trend = 0.30;
-        baseWeights.format = 0.25;
-        baseWeights.competition = 0.10;
-    }
-    
-    // If competition is high, increase trend and originality weight
-    if (features.competition > 0.7) {
-        baseWeights.originality = 0.35;
-        baseWeights.trend = 0.30;
-        baseWeights.format = 0.20;
-        baseWeights.channel = 0.10;
-        baseWeights.competition = 0.05;
-    }
-    
-    return baseWeights;
+function calculateGoogleTrendsOverlap(proposal, currentTrends) {
+    if (!Array.isArray(currentTrends) || currentTrends.length === 0) return 0.3; // neutro-basso: nessun dato
+
+    const proposalTokens = tokenize(proposal.description);
+    const trendTokens = currentTrends.flatMap(t => tokenize(t));
+    if (proposalTokens.length === 0 || trendTokens.length === 0) return 0.3;
+
+    return Math.min(1, jaccardOverlap(proposalTokens, trendTokens) * 3); // scala l'overlap (tipicamente basso)
+}
+
+/**
+ * Stabilità del formato: coefficiente di variazione delle views dei
+ * video di quel formato (basso CV = alta stabilità = predizioni più
+ * affidabili). 1 = perfettamente stabile, 0 = altamente volatile.
+ */
+function calculateFormatStability(format, channelProfile) {
+    if (!channelProfile?.historicalVideos?.length) return 0.5;
+
+    const views = channelProfile.historicalVideos
+        .filter(v => v.format === format)
+        .map(v => v.views)
+        .filter(v => v > 0);
+
+    if (views.length < 3) return 0.5;
+
+    const mean = views.reduce((a, b) => a + b, 0) / views.length;
+    const variance = views.reduce((sum, v) => sum + (v - mean) ** 2, 0) / views.length;
+    const cv = mean > 0 ? Math.sqrt(variance) / mean : 1;
+
+    return Math.max(0, Math.min(1, 1 - cv * 0.5));
+}
+
+// ---- Helper functions for video insights normalization ----
+
+function normalizeScore(score) {
+    const num = Number(score);
+    if (!Number.isFinite(num)) return 0.5;
+    return Math.max(0, Math.min(1, num / 100));
+}
+
+function normalizeEditingPace(pace) {
+    const mapping = { 'slow': 0.3, 'medium': 0.5, 'fast': 0.8 };
+    return mapping[pace] || 0.5;
+}
+
+function normalizeCount(count) {
+    const num = Number(count);
+    if (!Number.isFinite(num) || num < 0) return 0;
+    // Normalize counts (assuming reasonable max of 20 for most counts)
+    return Math.min(1, num / 20);
+}
+
+function normalizeDuration(duration) {
+    const num = Number(duration);
+    if (!Number.isFinite(num) || num < 0) return 0.5;
+    // Normalize duration (assuming optimal range 2-10 seconds)
+    if (num >= 2 && num <= 10) return 1.0;
+    if (num < 2) return num / 2;
+    return Math.max(0, 1 - (num - 10) / 20);
+}
+
+function normalizeRetentionRisk(risk) {
+    const mapping = { 'low': 0.8, 'medium': 0.5, 'high': 0.2 };
+    return mapping[risk] || 0.5;
+}
+
+function normalizePresence(presence) {
+    const mapping = { 'none': 0.0, 'background': 0.5, 'dominant': 1.0 };
+    return mapping[presence] || 0.5;
 }

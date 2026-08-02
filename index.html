@@ -114,8 +114,8 @@
                     <p class="hero-description">Upload your YouTube Studio CSV export, discover what makes your Shorts perform, and predict which videos have the highest viral potential.</p>
 
                     <div class="hero-actions">
-                        <button class="btn btn-primary btn-lg" data-action="login">Login</button>
-                        <button class="btn btn-outline btn-lg" data-action="signup">Sign up</button>
+                        <button class="btn btn-primary btn-lg" id="dashboard-or-login-btn">Login</button>
+                        <button class="btn btn-outline btn-lg" id="signup-or-logout-btn">Sign up</button>
                     </div>
 
                     <div class="hero-stats">
@@ -142,7 +142,7 @@
                 </div>
                 <div class="ba-arrow">→</div>
                 <div class="ba-col ba-with">
-                    <span class="ba-label">With Brawl Analytics</span>
+                   <span class="ba-label">With Brawl Analytics</span>
                     <ul><li>✅ AI predicts virality</li><li>✅ AI analyzes the hook</li><li>✅ Personalized coach</li><li>✅ Current trends</li><li>✅ Channel-specific advice</li></ul>
                 </div>
             </section>
@@ -173,7 +173,16 @@
 
                     <details class="faq-item scroll-reveal">
                         <summary><span>How does the prediction work?</span><span class="faq-icon"></span></summary>
-                        <p class="faq-answer">The system analyses previous performance, retention signals and content patterns to estimate viral potential.</p>
+                        <p class="faq-answer">
+                            Before you publish, our AI compares your video idea with your Channel Profile, historical performance, detected content formats and current Brawl Stars trends to estimate its viral potential. Once you upload a draft video, Gemini AI can also analyze the video itself and provide personalized feedback before publication. Predictions and analyses are estimates, not guarantees.
+                        </p>
+                    </details>
+
+                    <details class="faq-item scroll-reveal">
+                        <summary><span>Can Brawl Analytics guarantee that my video will go viral?</span><span class="faq-icon"></span></summary>
+                        <p class="faq-answer">
+                            No. Brawl Analytics provides AI-powered predictions and recommendations based on your channel history, current trends and video analysis. These insights are designed to help you make better publishing decisions, but no AI can guarantee future views or viral success.
+                        </p>
                     </details>
 
                     <details class="faq-item scroll-reveal">
@@ -181,7 +190,7 @@
                         <p class="faq-answer">Yes. The data you upload is securely stored and used only to provide the features of Brawl Analytics, such as channel analytics, AI-powered predictions, and personalized recommendations. <strong>Your data is never sold or shared with third parties for marketing purposes.</strong> For more information, please read our <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
                     </details>
                 </div>
-            </section>
+            </section> 
 
             <footer class="site-footer">
                 <div class="site-footer__brand">

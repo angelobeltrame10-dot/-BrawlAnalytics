@@ -194,11 +194,16 @@ function safeParseJsonArray(rawText, context) {
 }
 
 /**
- * Genera 3 idee personalizzate basate sui video migliori e sul format dominante.
+ * Genera 3 idee personalizzate basate sui video migliori e sui formati dominanti.
+ * Distribuisce le idee su più formati (primo, secondo, terzo migliore).
  */
-export async function generaIdeeConAI(videoTop, migliorFormat) {
+export async function generaIdeeConAI(videoTop, topFormats) {
 
     if (!Array.isArray(videoTop) || videoTop.length === 0) {
+        return [];
+    }
+
+    if (!Array.isArray(topFormats) || topFormats.length === 0) {
         return [];
     }
 
@@ -207,31 +212,64 @@ export async function generaIdeeConAI(videoTop, migliorFormat) {
         .map(v => `- Titolo: "${getVideoTitle(v)}", Views: ${getVideoViews(v)}`)
         .join("\n");
 
+    const formatsDescription = topFormats
+        .map((format, index) => `${index + 1}. "${format}"`)
+        .join("\n");
+
     const promptText = `
 You are an expert YouTube Shorts strategist specializing in Brawl Stars.
-The creator has this dominant and highly successful format: "${migliorFormat}".
+The creator has these top-performing formats (ranked by success):
+${formatsDescription}
 
 Their recent top-performing Shorts are:
 ${contestoVideo}
 
-Generate 3 practical, highly viral ideas for upcoming Shorts, strictly adhering to the "${migliorFormat}" format.
-The ideas must be concise (single-line), catchy, and actionable.
-Return ONLY the 3 ideas separated by the "|" (pipe) character, without bullet points, numbers, or introductory/additional text.
+Generate 3 practical, highly viral ideas for upcoming Shorts. Distribute the ideas across the top formats:
+- 1 idea for the #1 format
+- 1 idea for the #2 format  
+- 1 idea for the #3 format
+
+Each idea must be concise (single-line), catchy, and actionable, strictly adhering to its assigned format.
+Return the response as a JSON array with this exact structure:
+[
+  {"text": "idea text here", "format": "format name"},
+  {"text": "idea text here", "format": "format name"},
+  {"text": "idea text here", "format": "format name"}
+]
+
+Do not include any introductory or additional text.
     `;
 
     try {
 
         const rispostaTesto = await callWorker([
-            { role: "system", content: "You are an expert YouTube Shorts strategist specializing in Brawl Stars." },
+            { role: "system", content: "You are an expert YouTube Shorts strategist specializing in Brawl Stars. Always respond with valid JSON arrays." },
             { role: "user", content: promptText }
         ]);
 
         if (!rispostaTesto) return [];
 
-        return rispostaTesto
-            .split("|")
-            .map(idea => idea.trim())
-            .filter(idea => idea.length > 0);
+        const parsed = safeParseJsonArray(rispostaTesto, "generaIdeeConAI");
+        
+        if (!parsed || !Array.isArray(parsed)) {
+            console.warn("generaIdeeConAI: AI response could not be parsed as array, trying fallback split");
+            // Fallback: try old format if JSON parsing fails
+            return rispostaTesto
+                .split("|")
+                .map((idea, index) => ({
+                    text: idea.trim(),
+                    format: topFormats[index % topFormats.length]
+                }))
+                .filter(idea => idea.text.length > 0);
+        }
+
+        // Validate and format the response
+        return parsed
+            .filter(item => item && item.text && item.text.trim().length > 0)
+            .map(item => ({
+                text: item.text.trim(),
+                format: item.format || topFormats[0]
+            }));
 
     } catch (error) {
         console.error("Errore durante la chiamata API di generazione idee:", error);

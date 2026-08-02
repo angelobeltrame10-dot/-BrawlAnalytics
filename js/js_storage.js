@@ -208,7 +208,16 @@ export async function loadGeneratedIdeas() {
 
         if (error || !data) return null;
 
-        return { ideas: data.ideas || [], topFormat: data.top_format || null };
+        // Handle both old format (array of strings) and new format (array of objects with text/format)
+        const ideas = data.ideas || [];
+        const normalizedIdeas = ideas.map(idea => {
+            if (typeof idea === 'string') {
+                return { text: idea, format: data.top_format || null };
+            }
+            return idea;
+        });
+
+        return { ideas: normalizedIdeas, topFormat: data.top_format || null };
 
     } catch (error) {
         console.error("Storage: loadGeneratedIdeas failed.", error);
