@@ -5,7 +5,7 @@
 
 import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
 import { loadChannelProfile, loadDashboardData } from "./js_storage.js";
-
+import { getVideoViews } from "./js_csv_fields.js";
 
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
 
@@ -96,7 +96,6 @@ async function handleAnalyzeClick(){
     renderLoading();
 
     try{
-        // Get channel profile for personalized analysis
         const channelProfile = await getChannelProfile();
 
         if (!channelProfile) {
@@ -104,13 +103,8 @@ async function handleAnalyzeClick(){
             return;
         }
 
-        // Prepare historical data
         const videos = await loadDashboardData();
-        
-        const historicalData = {
-            videos: videos.slice(-20), // Last 20 videos for recent performance
-            uploadFrequency: calculateUploadFrequency(videos)
-        };
+        const historicalData = buildHistoricalData(videos);
 
         const response = await fetch(AI_ENDPOINT, {
             method: "POST",
@@ -119,7 +113,7 @@ async function handleAnalyzeClick(){
                 type: "personal_coach",
                 channelProfile: channelProfile,
                 historicalData: historicalData,
-                recentAnalyses: [] // Can be expanded to track previous analyses
+                recentAnalyses: []
             })
         });
 
@@ -141,14 +135,39 @@ async function handleAnalyzeClick(){
 
 }
 
-function calculateUploadFrequency(videos) {
-    if (!Array.isArray(videos) || videos.length < 2) {
-        return "Unknown";
+const RECENT_VIDEO_WINDOW = 10;
+const MIN_VIDEOS_FOR_RECENT_TREND = 5;
+
+function buildHistoricalData(videos) {
+    if (!Array.isArray(videos) || videos.length === 0) {
+        return { hasSufficientRecentData: false, recentVideoCount: 0, averageRecentViews: null, uploadFrequency: "Unknown" };
     }
 
-    // Simple calculation: average days between uploads
-    // This is a placeholder - actual implementation would need date parsing
-    return "Regular";
+    const withDates = videos.filter(v => v["Data pubblicazione"] instanceof Date);
+    const sorted = withDates.length >= 2
+        ? [...withDates].sort((a, b) => a["Data pubblicazione"].getTime() - b["Data pubblicazione"].getTime())
+        : videos;
+
+    const recent = sorted.slice(-RECENT_VIDEO_WINDOW);
+    const recentViews = recent.map(v => getVideoViews(v)).filter(v => v > 0);
+
+    const hasSufficientRecentData = recent.length >= MIN_VIDEOS_FOR_RECENT_TREND && recentViews.length >= MIN_VIDEOS_FOR_RECENT_TREND;
+    const averageRecentViews = recentViews.length > 0
+        ? Math.round(recentViews.reduce((sum, v) => sum + v, 0) / recentViews.length)
+        : null;
+
+    let uploadFrequency = "Unknown";
+    if (withDates.length >= 2) {
+        const first = sorted[0]["Data pubblicazione"].getTime();
+        const last = sorted[sorted.length - 1]["Data pubblicazione"].getTime();
+        const daySpan = Math.max(1, (last - first) / (1000 * 60 * 60 * 24));
+        const perWeek = (withDates.length / daySpan) * 7;
+        uploadFrequency = perWeek >= 1
+            ? `~${perWeek.toFixed(1)} uploads/week`
+            : `~${(perWeek * 4.345).toFixed(1)} uploads/month`;
+    }
+
+    return { hasSufficientRecentData, recentVideoCount: recent.length, averageRecentViews, uploadFrequency };
 }
 
 function renderLoading(){

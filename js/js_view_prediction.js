@@ -242,38 +242,32 @@ export function getComparableVideos(proposal, channelProfile) {
 
 export function calculatePredictionPercentile(range, channelProfile) {
     if (!channelProfile?.historicalVideos?.length) {
-        console.log("Percentile Calculation: No historical videos available, returning 50");
         return 50;
     }
 
     const views = channelProfile.historicalVideos.map(v => v.views).filter(v => v > 0).sort((a, b) => a - b);
-    const baseline = range.baseline;
-    
-    console.log(`Percentile Calculation: Baseline=${baseline}, Views array=${views.slice(0, 5).join(', ')}... (total ${views.length})`);
+    if (views.length === 0) return 50;
 
-    // Fixed comparison logic: if baseline is >= view at index i, it means we're at that percentile
-    // Edge case: if baseline is higher than all videos, return 100
+    const baseline = range.baseline;
+
     if (baseline >= views[views.length - 1]) {
-        console.log(`Percentile Calculation: Baseline (${baseline}) >= max views (${views[views.length - 1]}), returning 100`);
         return 100;
     }
-    
-    // Edge case: if baseline is lower than all videos, return 0
+
     if (baseline <= views[0]) {
-        console.log(`Percentile Calculation: Baseline (${baseline}) <= min views (${views[0]}), returning 0`);
         return 0;
     }
 
+    let countBelow = 0;
     for (let i = 0; i < views.length; i++) {
-        if (baseline >= views[i]) {
-            const percentile = Math.round((i / views.length) * 100);
-            console.log(`Percentile Calculation: Baseline >= views[${i}]=${views[i]}, returning ${percentile}`);
-            return percentile;
+        if (views[i] <= baseline) {
+            countBelow = i + 1;
+        } else {
+            break;
         }
     }
-    
-    console.log("Percentile Calculation: No match found, returning 50");
-    return 50;
+
+    return Math.round((countBelow / views.length) * 100);
 }
 
 export function getPredictionContext(range, channelProfile, proposal) {

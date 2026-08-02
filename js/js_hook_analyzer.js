@@ -1,12 +1,16 @@
 /* ==========================================================
    BRAWL ANALYTICS
-   HOOK & CONCEPT ANALYZER — Pro only, riusa gating/popup/stile esistenti
+   HOOK & CONCEPT ANALYZER — Pro only
+   Due modalità, stesso schema di risposta:
+   - "Write it"     → testo, Groq (Worker AI generico)
+   - "Upload video" → video reale, Gemini (Worker video-analysis)
 ========================================================== */
 
 import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
 import { loadChannelProfile } from "./js_storage.js";
 
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
+const HOOK_VIDEO_ENDPOINT = "https://video-analysis.angeskicollab10.workers.dev/analyze-hook-video";
 
 const LOADING_MESSAGES = [
     "Analyzing your opening concept...",
@@ -19,40 +23,144 @@ const LOADING_MESSAGES = [
 let initialized = false;
 let loadingTimer = null;
 let channelProfileCache = null;
+let activeMode = "video";
+let uploadedHookVideoFile = null;
+let activeUploadTimer = null;
 
 export function initHookAnalyzer(){
-
+    activeMode = "video";
     if(initialized){
+        renderInput();
         return;
     }
-
     initialized = true;
     renderInput();
-
 }
 
 function renderInput(){
-
     const flow = document.getElementById("hook-flow");
     if(!flow) return;
 
     flow.innerHTML = `
         <div class="va-card">
-            <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">Describe the first seconds of your Short. The AI will evaluate how strong your opening concept is.</p>
-            <textarea id="hook-input" class="hook-textarea" placeholder='Describe the first seconds of your Short.
+            <div class="hook-mode-tabs">
+                <button type="button" class="hook-mode-tab ${activeMode === "video" ? "active" : ""}" data-mode="video">🎬 Upload video</button>
+                <button type="button" class="hook-mode-tab ${activeMode === "text" ? "active" : ""}" data-mode="text">✏️ Write it</button>
+            </div>
+            <div id="hook-mode-content"></div>
+        </div>`;
+
+    flow.querySelectorAll(".hook-mode-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            activeMode = btn.dataset.mode;
+            renderInput();
+        });
+    });
+
+    if(activeMode === "video"){
+        renderVideoMode();
+    } else {
+        renderTextMode();
+    }
+}
+
+function renderVideoMode(){
+    const content = document.getElementById("hook-mode-content");
+    if(!content) return;
+
+    content.innerHTML = `
+        <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">Upload your Short and Gemini will analyze the actual opening seconds — same scoring as the text mode.</p>
+        <label class="va-dropzone" id="hook-dropzone">
+            <input id="hook-video-input" type="file" accept="video/*">
+            <span class="va-upload-icon">↑</span>
+            <strong>Drop your video here</strong>
+            <small>or browse files from your device · MP4, MOV</small>
+        </label>
+        <div class="va-upload-progress" id="hook-upload-progress" hidden>
+            <div><span id="hook-file-name">short.mp4</span><span id="hook-upload-value">0%</span></div>
+            <p><i id="hook-upload-bar"></i></p>
+            <small id="hook-upload-copy">Preparing secure upload…</small>
+        </div>`;
+
+    const input = document.getElementById("hook-video-input");
+    const dropzone = document.getElementById("hook-dropzone");
+
+    input.addEventListener("change", event => startHookVideoUpload(event.target.files?.[0]));
+
+    ["dragenter", "dragover"].forEach(eventName => {
+        dropzone.addEventListener(eventName, event => {
+            event.preventDefault();
+            dropzone.classList.add("is-dragging");
+        });
+    });
+
+    ["dragleave", "drop"].forEach(eventName => {
+        dropzone.addEventListener(eventName, event => {
+            event.preventDefault();
+            dropzone.classList.remove("is-dragging");
+        });
+    });
+
+    dropzone.addEventListener("drop", event => startHookVideoUpload(event.dataTransfer.files?.[0]));
+}
+
+function renderTextMode(){
+    const content = document.getElementById("hook-mode-content");
+    if(!content) return;
+
+    content.innerHTML = `
+        <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">Describe the first seconds of your Short. The AI will evaluate how strong your opening concept is.</p>
+        <textarea id="hook-input" class="hook-textarea" placeholder='Describe the first seconds of your Short.
 
 Example:
 I pretend that the new Brawler is completely broken.
 I immediately show an impossible clip while saying:
 "Everyone thinks this is fake..."
-Then I reveal what actually happened.
+Then I reveal what actually happened.'></textarea>
+        <button class="va-primary" id="hook-analyze-btn" type="button">Analyze Concept <span>→</span></button>`;
 
-The AI will evaluate how strong this opening concept is.'></textarea>
-            <button class="va-primary" id="hook-analyze-btn" type="button">Analyze Concept <span>→</span></button>
-        </div>`;
+    document.getElementById("hook-analyze-btn").addEventListener("click", handleTextAnalyzeClick);
+}
 
-    document.getElementById("hook-analyze-btn").addEventListener("click", handleAnalyzeClick);
+function startHookVideoUpload(file){
+    if(!file) return;
 
+    uploadedHookVideoFile = file;
+
+    if(activeUploadTimer){
+        clearInterval(activeUploadTimer);
+        activeUploadTimer = null;
+    }
+
+    const fileNameEl = document.getElementById("hook-file-name");
+    const dropzoneEl = document.getElementById("hook-dropzone");
+    const progressEl = document.getElementById("hook-upload-progress");
+    const barEl = document.getElementById("hook-upload-bar");
+    const valueEl = document.getElementById("hook-upload-value");
+    const copyEl = document.getElementById("hook-upload-copy");
+
+    if(!dropzoneEl || !progressEl || !barEl || !valueEl) return;
+
+    fileNameEl.textContent = file.name;
+    dropzoneEl.hidden = true;
+    progressEl.hidden = false;
+
+    let value = 0;
+
+    activeUploadTimer = setInterval(() => {
+        value = Math.min(100, value + 10 + Math.random() * 12);
+        barEl.style.width = `${value}%`;
+        valueEl.textContent = `${Math.round(value)}%`;
+        if(copyEl){
+            copyEl.textContent = value < 70 ? "Encrypting upload…" : "Video ready — starting Gemini analysis…";
+        }
+
+        if(value >= 100){
+            clearInterval(activeUploadTimer);
+            activeUploadTimer = null;
+            setTimeout(() => handleVideoAnalyzeClick(), 400);
+        }
+    }, 190);
 }
 
 async function getChannelProfile() {
@@ -61,8 +169,7 @@ async function getChannelProfile() {
     return channelProfileCache;
 }
 
-async function handleAnalyzeClick(){
-
+async function handleTextAnalyzeClick(){
     const input = document.getElementById("hook-input");
     const text = input?.value.trim();
 
@@ -79,7 +186,6 @@ async function handleAnalyzeClick(){
     renderLoading();
 
     try{
-        // Get channel profile for personalized analysis
         const channelProfile = await getChannelProfile();
 
         const response = await fetch(AI_ENDPOINT, {
@@ -107,10 +213,56 @@ async function handleAnalyzeClick(){
             throw new Error(msg || `HTTP ${response.status}`);
         }
 
-        renderResults(data);
+        renderResults(data, "text");
     }
     catch(error){
-        console.error("AI Coach error:", error);
+        console.error("Hook Analyzer error:", error);
+        renderError();
+    }
+}
+
+async function handleVideoAnalyzeClick(){
+
+    if(!uploadedHookVideoFile){
+        return;
+    }
+
+    if(getCurrentPlan() !== "pro"){
+        openUpgradeModal();
+        return;
+    }
+
+    renderLoading();
+
+    try{
+        const formData = new FormData();
+        formData.append("video", uploadedHookVideoFile);
+
+        const response = await fetch(HOOK_VIDEO_ENDPOINT, {
+            method: "POST",
+            body: formData
+        });
+
+        if (response.status === 429) {
+            renderRateLimitError();
+            return;
+        }
+
+        const payload = await response.json();
+
+        if(!response.ok || payload?.error || payload?.success === false){
+            const msg = String(payload?.errors?.message || payload?.error?.message || payload?.error || "");
+            if (msg.toLowerCase().includes("rate limit")) {
+                renderRateLimitError();
+                return;
+            }
+            throw new Error(msg || `HTTP ${response.status}`);
+        }
+
+        renderResults(payload.data, "video");
+    }
+    catch(error){
+        console.error("Hook Analyzer (video) error:", error);
         renderError();
     }
 }
@@ -129,41 +281,33 @@ function renderRateLimitError(){
 }
 
 function renderLoading(){
-
     const flow = document.getElementById("hook-flow");
+    const label = activeMode === "video" ? "Reading your video with Gemini" : "Analyzing your opening concept";
 
     flow.innerHTML = `
         <div class="va-analysis">
             <div class="va-radar"><i></i></div>
             <span class="va-eyebrow">HOOK & CONCEPT ANALYZER</span>
-            <h3>Analyzing your opening concept<span class="va-loading">...</span></h3>
+            <h3>${label}<span class="va-loading">...</span></h3>
             <p id="hook-loading-text">${LOADING_MESSAGES[0]}</p>
         </div>`;
 
     let index = 0;
-
     if(loadingTimer) clearInterval(loadingTimer);
 
-    loadingTimer = setInterval(()=>{
-
+    loadingTimer = setInterval(() => {
         index = (index + 1) % LOADING_MESSAGES.length;
         const el = document.getElementById("hook-loading-text");
-
         if(!el){
             clearInterval(loadingTimer);
             return;
         }
-
         el.textContent = LOADING_MESSAGES[index];
-
     }, 900);
-
 }
 
 function renderError(){
-
     if(loadingTimer) clearInterval(loadingTimer);
-
     const flow = document.getElementById("hook-flow");
 
     flow.innerHTML = `
@@ -173,29 +317,23 @@ function renderError(){
         </div>`;
 
     document.getElementById("hook-retry-btn").addEventListener("click", renderInput);
-
 }
 
 function scoreRow(label, value){
-
     const safeValue = Number(value) || 0;
     return `<div><p><span>${label}</span><strong>${safeValue}</strong></p><div class="va-progress"><i style="width:${safeValue}%"></i></div></div>`;
-
 }
 
 function getQualitative(score){
-
     if(score >= 85) return "Excellent";
     if(score >= 70) return "Strong";
     if(score >= 55) return "Good";
     if(score >= 40) return "Moderate";
     if(score >= 25) return "Weak";
     return "Poor";
-
 }
 
-function renderResults(result){
-
+function renderResults(result, source = "text"){
     if(loadingTimer) clearInterval(loadingTimer);
 
     const flow = document.getElementById("hook-flow");
@@ -214,11 +352,13 @@ function renderResults(result){
         ["Clarity", clarityScore]
     ];
 
+    const sourceLabel = source === "video" ? "FROM YOUR VIDEO · GEMINI" : "FROM YOUR DESCRIPTION · GROQ";
+
     flow.innerHTML = `
         <div class="va-results">
             <div class="va-results-hero">
                 <div>
-                    <span class="va-eyebrow">HOOK & CONCEPT ANALYSIS</span>
+                    <span class="va-eyebrow">HOOK & CONCEPT ANALYSIS — ${sourceLabel}</span>
                     <h3>Your opening concept is <em>${getQualitative(hookScore).toLowerCase()}</em>.</h3>
                     <p>${result.finalSummary || ""}</p>
                 </div>
@@ -271,7 +411,7 @@ function renderResults(result){
             </section>` : ""}
 
             <div class="va-section-title"><div><span class="va-step">IMPROVED HOOKS</span><h3>3 Enhanced Versions</h3></div></div>
-            
+
             <section class="banner" style="margin-bottom:1rem">
                 <strong>Version A — Safe Improvement</strong>
                 <p style="color:var(--color-text);margin-top:.5rem">${result.improvedHookVersionA || ""}</p>
@@ -291,7 +431,10 @@ function renderResults(result){
             </section>
         </div>`;
 
-    document.getElementById("hook-restart").addEventListener("click", renderInput);
+    document.getElementById("hook-restart").addEventListener("click", () => {
+        uploadedHookVideoFile = null;
+        renderInput();
+    });
     document.getElementById("hook-copy-a").addEventListener("click", () => {
         navigator.clipboard?.writeText(result.improvedHookVersionA || "");
     });
@@ -301,5 +444,4 @@ function renderResults(result){
     document.getElementById("hook-copy-c").addEventListener("click", () => {
         navigator.clipboard?.writeText(result.improvedHookVersionC || "");
     });
-
 }

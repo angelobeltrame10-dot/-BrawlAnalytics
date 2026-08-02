@@ -1,6 +1,6 @@
-// Video Insights Worker - Single File Version
-
 const ALLOWED_ORIGINS = [
+  "https://brawl-analytics-official.vercel.app",
+  "https://www.brawl-analytics-official.vercel.app",
   "https://brawl-analystic-official.vercel.app",
   "https://www.brawl-analystic-official.vercel.app",
   "http://localhost:5500",
@@ -31,6 +31,10 @@ export default {
 
     if (url.pathname === '/analyze-video') {
       return await handleAnalyzeVideo(request, env, origin);
+    }
+
+    if (url.pathname === '/analyze-hook-video') {
+      return await handleAnalyzeHookVideo(request, env, origin);
     }
 
     return jsonResponse(
@@ -867,6 +871,117 @@ function validateStringArray(value, maxLength) {
     .map(item => item.trim())
     .filter(item => item.length > 0)
     .slice(0, maxLength);
+}
+
+
+const HOOK_VIDEO_ANALYSIS_PROMPT = `You are a world-class YouTube Shorts strategist specializing in hook analysis. You are watching a real video, but must judge ONLY its opening — the first 2-3 seconds, the "hook" that decides whether a viewer keeps watching or scrolls away. Use the rest of the video only as context for whether the opening delivers on what it promises.
+
+Follow this exact process:
+1. Identify the hook type and describe what actually happens visually and audibly in the opening seconds.
+2. Judge whether it creates curiosity.
+3. Judge whether it immediately communicates the video's topic.
+4. Judge whether it motivates the viewer to keep watching.
+5. Judge whether it is too generic or overused.
+6. Evaluate its emotional impact.
+7. Estimate how likely it is to stop the scroll.
+
+Never invent anything you did not actually observe in the video. Justify every score through the strengths/weaknesses you list.
+
+Always rewrite the hook into three genuinely stronger versions the creator could re-shoot or re-edit:
+- improvedHookVersionA: Safe improvement (conservative, reliable)
+- improvedHookVersionB: More aggressive (bold, attention-grabbing)
+- improvedHookVersionC: Highest viral potential (riskier but maximum impact)
+
+Return ONLY this JSON, no markdown, no extra text:
+{"hookScore":0,"curiosityScore":0,"scrollStopScore":0,"originalityScore":0,"clarityScore":0,"emotionalTrigger":"","viewerCuriosity":"high/medium/low","expectedRetention":"high/medium/low","predictedFirstImpression":"","strengths":[],"weaknesses":[],"missedOpportunities":[],"recommendedImprovements":[],"improvedHookVersionA":"","improvedHookVersionB":"","improvedHookVersionC":"","finalSummary":""}
+All scores 0-100. finalSummary max 60 words.`;
+
+function parseAndValidateHookResponse(text) {
+  const json = extractJSON(text);
+  if (!json) return null;
+
+  return {
+    hookScore: clampScore(json.hookScore),
+    curiosityScore: clampScore(json.curiosityScore),
+    scrollStopScore: clampScore(json.scrollStopScore),
+    originalityScore: clampScore(json.originalityScore),
+    clarityScore: clampScore(json.clarityScore),
+    emotionalTrigger: String(json.emotionalTrigger || 'Not detected').trim(),
+    viewerCuriosity: validateEnum(json.viewerCuriosity, ['high', 'medium', 'low']) || 'medium',
+    expectedRetention: validateEnum(json.expectedRetention, ['high', 'medium', 'low']) || 'medium',
+    predictedFirstImpression: String(json.predictedFirstImpression || 'Unknown').trim(),
+    strengths: validateStringArray(json.strengths, 6),
+    weaknesses: validateStringArray(json.weaknesses, 6),
+    missedOpportunities: validateStringArray(json.missedOpportunities, 6),
+    recommendedImprovements: validateStringArray(json.recommendedImprovements, 6),
+    improvedHookVersionA: String(json.improvedHookVersionA || '').trim(),
+    improvedHookVersionB: String(json.improvedHookVersionB || '').trim(),
+    improvedHookVersionC: String(json.improvedHookVersionC || '').trim(),
+    finalSummary: String(json.finalSummary || 'Analysis complete').trim()
+  };
+}
+
+async function handleAnalyzeHookVideo(request, env, origin) {
+  const headers = corsHeaders(origin);
+
+  if (!env.GEMINI_API_KEY) {
+    return jsonResponse({ error: 'Server configuration error: Missing GEMINI_API_KEY' }, 500, headers);
+  }
+
+  const resolvedModel = String(env.GEMINI_MODEL || 'gemini-2.5-flash').trim().toLowerCase();
+
+  try {
+    const { file, error: uploadError } = await handleVideoUpload(request, env);
+    if (uploadError) {
+      console.error('[Hook Upload Error]', uploadError);
+      return jsonResponse(buildErrorResponse(uploadError), 400, headers);
+    }
+
+    const { uri, error: geminiUploadError } = await uploadVideoToGemini(file, env.GEMINI_API_KEY);
+    if (geminiUploadError) {
+      console.error('[Hook Gemini Upload Error]', geminiUploadError);
+      return jsonResponse(buildErrorResponse(geminiUploadError), 502, headers);
+    }
+
+    const fileName = extractFileUri(uri);
+    const { success: processingSuccess, error: processingError } = await waitForFileProcessing(fileName, env.GEMINI_API_KEY);
+    if (!processingSuccess || processingError) {
+      console.error('[Hook Processing Error]', processingError);
+      return jsonResponse(
+        buildErrorResponse(processingError || { type: 'gemini', message: 'File processing failed', failedFields: ['processing'] }),
+        502,
+        headers
+      );
+    }
+
+    const { response: analysisText, error: generationError } = await generateVideoAnalysis(
+      uri,
+      HOOK_VIDEO_ANALYSIS_PROMPT,
+      resolvedModel,
+      env
+    );
+
+    if (generationError) {
+      console.error('[Hook Generation Error]', generationError);
+      const status = generationError.type === 'invalid_model' ? 500 : 502;
+      return jsonResponse(buildErrorResponse(generationError), status, headers);
+    }
+
+    const parsedData = parseAndValidateHookResponse(analysisText);
+
+    if (!parsedData) {
+      const parseError = { type: 'parsing', message: 'Failed to parse Gemini hook response as valid JSON', failedFields: ['parsing'] };
+      console.error('[Hook Parse Error]', parseError);
+      return jsonResponse(buildErrorResponse(parseError), 502, headers);
+    }
+
+    return jsonResponse({ success: true, data: parsedData }, 200, headers);
+
+  } catch (error) {
+    const errorInfo = categorizeError(error);
+    console.error('[Hook Unexpected Error]', errorInfo);
+    return jsonResponse(buildErrorResponse(errorInfo), 500, headers);
+  }
 }
 
 // ==================== ERROR HANDLER ====================

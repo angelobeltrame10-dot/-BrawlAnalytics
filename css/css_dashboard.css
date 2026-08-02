@@ -2703,3 +2703,35 @@
 .hook-textarea:focus{
     border-color:var(--color-primary);
 }
+
+/* ==========================================================
+   HOOK ANALYZER — MODE TABS (Write / Upload video)
+========================================================== */
+.hook-mode-tabs{
+    display:flex;
+    gap:.5rem;
+    padding:.35rem;
+    background:rgba(31,18,64,.5);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:var(--radius-round);
+    margin-bottom:1.5rem;
+}
+.hook-mode-tab{
+    flex:1;
+    padding:.65rem 1rem;
+    border-radius:var(--radius-round);
+    background:transparent;
+    color:var(--color-text-muted);
+    font-weight:700;
+    font-size:.85rem;
+    transition:all .2s ease;
+}
+.hook-mode-tab:hover{
+    color:var(--color-text);
+    background:rgba(255,255,255,.05);
+}
+.hook-mode-tab.active{
+    background:linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+    color:var(--color-background);
+    box-shadow:0 6px 16px rgba(255,201,60,.2);
+}

@@ -24,7 +24,6 @@ export async function buildChannelProfile(videos, customFormats = []) {
     const classifiedVideos = classifyVideos(videos, formats);
     const formatRanking = getFormatRanking(classifiedVideos, formats);
 
-    // Calculate global statistics
     const views = videos.map(v => getVideoViews(v)).filter(v => v > 0);
     const retentions = videos.map(v => getVideoRetention(v)).filter(v => v > 0);
 
@@ -33,20 +32,17 @@ export async function buildChannelProfile(videos, customFormats = []) {
     const medianViews = calculateMedian(views);
     const averageRetention = retentions.length > 0 ? retentions.reduce((a, b) => a + b, 0) / retentions.length : 0;
 
-    // Calculate duration statistics (if available)
     const durations = videos
         .map(v => v["Durata"] || v.duration || 0)
         .filter(d => d > 0);
     const averageDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
     const idealDuration = calculateIdealDuration(durations);
 
-    // Calculate format performance
     const formatPerformance = calculateFormatPerformance(classifiedVideos, formatRanking);
 
-    // Identify best and worst formats
     const sortedFormats = Object.entries(formatPerformance)
         .sort((a, b) => b[1].averageViews - a[1].averageViews);
-    
+
     const bestFormats = sortedFormats.slice(0, 3).map(([name]) => name);
     const worstFormats = sortedFormats.slice(-3).map(([name]) => name).reverse();
 
@@ -61,7 +57,7 @@ export async function buildChannelProfile(videos, customFormats = []) {
         bestFormats,
         worstFormats,
         formatPerformance,
-        historicalVideos: videos.map(video => ({
+        historicalVideos: classifiedVideos.map(video => ({
             title: getVideoTitle(video),
             views: getVideoViews(video),
             retention: getVideoRetention(video),
@@ -69,7 +65,7 @@ export async function buildChannelProfile(videos, customFormats = []) {
             format: video.format || "Unknown",
             publishedAt: video["Data pubblicazione"] instanceof Date
                 ? video["Data pubblicazione"].toISOString()
-                : null 
+                : null
         }))
     };
 }
