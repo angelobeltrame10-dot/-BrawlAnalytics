@@ -401,95 +401,156 @@
 
 
 /* ==========================================================
-   FORMAT PERFORMANCE BARS
+   GROWTH RATE — clarity
 ========================================================== */
+.stat-card-growth{
+    position: relative;
+}
+
+.growth-rate.growth-positive{
+    color: var(--color-success);
+}
+
+.growth-rate.growth-negative{
+    color: var(--color-danger);
+}
+
+.growth-rate-label{
+    margin-top: .4rem;
+    font-size: .72rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+}
+
+/* ==========================================================
+   FORMATS OVERVIEW — redesign
+========================================================== */
+.format-list{
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+}
 
 .format-row{
-
-    display:grid;
-
-    grid-template-columns:140px 1fr 120px;
-
-    gap:var(--space-3);
-
-    align-items:center;
-
-    padding-block:var(--space-3);
-
-    border-bottom:1px solid var(--color-border);
-
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    background: linear-gradient(135deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    transition: transform var(--transition-smooth), border-color var(--transition-smooth), box-shadow var(--transition-smooth);
 }
 
-
-
-.format-row:last-child{
-
-    border-bottom:none;
-
+.format-row:hover{
+    transform: translateX(3px);
+    border-color: rgba(255,201,60,.3);
+    box-shadow: 0 8px 24px rgba(0,0,0,.2);
 }
 
+.format-row-rank{
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: .95rem;
+    background: rgba(255,255,255,.05);
+    color: var(--color-text-muted);
+    border: 1px solid rgba(255,255,255,.08);
+}
 
+.format-row.best-format .format-row-rank{
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+    color: var(--color-background);
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(255,201,60,.35);
+}
 
-.format-name{
+.format-row-main{
+    min-width: 0;
+}
 
-    font-family:var(--font-display);
+.format-row-name{
+    font-family: var(--font-display);
+    font-size: 1.05rem;
     color: var(--color-text);
-    font-weight: 700;
-    letter-spacing: -.02em;
-    line-height: 1.1;
-    margin-bottom: 0.35rem;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-
+    gap: .5rem;
+    margin-bottom: .5rem;
 }
 
-
-
-.bar{
-
-    height:20px;
-
-    background:var(--color-surface-light);
-
-    border-radius:var(--radius-sm);
-
-    overflow:hidden;
-
+.format-row-badge{
+    font-family: var(--font-mono);
+    font-size: .62rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    padding: .2rem .5rem;
+    border-radius: 999px;
+    background: rgba(255,201,60,.15);
+    color: var(--color-primary);
+    border: 1px solid rgba(255,201,60,.3);
 }
 
-
-
-.bar-fill{
-
-    height:100%;
-
-    background:
-
-    linear-gradient(
-        90deg,
-        var(--color-accent),
-        var(--color-primary)
-    );
-
-    border-radius:inherit;
-
+.format-row-bar{
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-surface-light);
+    overflow: hidden;
 }
 
+.format-row-bar-fill{
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-primary));
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+}
 
+.format-row-stats{
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: .15rem;
+}
 
-.format-value{
+.format-row-views{
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--color-text);
+    font-size: .95rem;
+}
 
-    text-align:right;
+.format-row-count{
+    font-size: .72rem;
+    color: var(--color-text-muted);
+}
 
-    font-family:var(--font-mono);
+.format-list-empty{
+    text-align: center;
+    padding: 2rem;
+    color: var(--color-text-muted);
+    border: 1px dashed rgba(255,255,255,.1);
+    border-radius: 14px;
+}
 
-    color:var(--color-text-muted);
-
-    font-size:.85rem;
-    font-weight: 600;
-
+@media(max-width:650px){
+    .format-row{
+        grid-template-columns: 36px 1fr;
+    }
+    .format-row-stats{
+        grid-column: 2;
+        align-items: flex-start;
+        text-align: left;
+        margin-top: .5rem;
+    }
+    .format-row-bar{
+        margin-top: .5rem;
+    }
 }
 
 

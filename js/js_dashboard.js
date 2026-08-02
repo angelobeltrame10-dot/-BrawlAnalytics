@@ -29,7 +29,7 @@ import { generaIdeeConAI } from "./js_api.js";
 
 import { showAnalysis } from "./js_router.js";
 
-import { initFormatsManager, renderFormatCards } from "./js_formats_manager.js";
+import { initFormatsManager, renderFormatCards, getEffectiveAssociatedVideos } from "./js_formats_manager.js";
 
 import { initSubscription, consumeIdeaGeneration } from "./js_subscription.js";
 
@@ -180,6 +180,11 @@ async function initDashboard(){
     setupTrendsTabNavigation();
     setupCreatorTrendsRetry();
     initSubscription();
+
+    // Aggiorna la dashboard quando i formati personalizzati cambiano altrove
+    window.addEventListener("brawl:formats-changed", () => {
+        refreshDashboard();
+    });
 
     customFormats = await loadCustomFormats();
 
@@ -365,84 +370,64 @@ function formatCompactNumber(value){
 
 function renderFormatRows(){
 
-    const classified =
-    classifyVideos(
-        dashboardData,
-        customFormats
-    );
-
-    const ranking =
-    getFormatRanking(
-        classified,
-        customFormats
-    );
-
-    // Calculate views per format
     const formatViews = {};
-    classified.forEach(video => {
-        const format = video.format || "Other";
-        if (!formatViews[format]) {
-            formatViews[format] = 0;
-        }
-        formatViews[format] += getVideoViews(video);
+    const formatCounts = {};
+
+    customFormats.forEach(format => {
+        const effectiveVideos = getEffectiveAssociatedVideos(format, customFormats, dashboardData);
+        const titleSet = new Set(effectiveVideos);
+
+        let sumViews = 0;
+        dashboardData.forEach(video => {
+            if (titleSet.has(getVideoTitle(video))) {
+                sumViews += getVideoViews(video);
+            }
+        });
+
+        formatViews[format.name] = sumViews;
+        formatCounts[format.name] = effectiveVideos.length;
     });
 
-    const entries =
-    Object.entries(ranking)
-    .filter(([name]) => name !== "Other") // Remove "Other" from display
-    .sort(
-        ([nameA], [nameB]) => {
-            // Sort by views in descending order
-            const viewsA = formatViews[nameA] || 0;
-            const viewsB = formatViews[nameB] || 0;
-            return viewsB - viewsA;
-        }
-    );
+    const entries = Object.entries(formatCounts)
+        .filter(([, count]) => count > 0)
+        .sort(([nameA], [nameB]) => (formatViews[nameB] || 0) - (formatViews[nameA] || 0));
 
-    const maxViews =
-    entries.length > 0
-        ? Math.max(...entries.map(([name]) => formatViews[name] || 0))
-        : 1;
+    if (entries.length === 0) {
+        document.querySelectorAll(".format-list").forEach(list => {
+            list.innerHTML = `<div class="format-list-empty">No format data yet — upload a CSV or create a format.</div>`;
+        });
+        return;
+    }
 
-    const html = entries.map(
-        ([name, count], index)=>{
+    const maxViews = Math.max(...entries.map(([name]) => formatViews[name] || 0), 1);
 
-            const views = formatViews[name] || 0;
-            const percentage =
-            maxViews > 0
-                ? Math.round((views / maxViews) * 100)
-                : 0;
+    const html = entries.map(([name, count], index) => {
+        const views = formatViews[name] || 0;
+        const percentage = Math.round((views / maxViews) * 100);
+        const isBest = index === 0;
 
-            const label =
-            index === 0
-                ? "best-format"
-                : "";
-
-            return `
-                <div class="format-row">
-                    <div class="format-name ${label}">${name}</div>
-                    <div class="bar">
-                        <div class="bar-fill" style="width:${percentage}%"></div>
+        return `
+            <div class="format-row ${isBest ? "best-format" : ""}">
+                <div class="format-row-rank">${index + 1}</div>
+                <div class="format-row-main">
+                    <div class="format-row-name">
+                        ${name}
+                        ${isBest ? `<span class="format-row-badge">Best</span>` : ""}
                     </div>
-                    <div class="format-value">${formatCompactNumber(views)} views</div>
-                </div>`;
+                    <div class="format-row-bar">
+                        <div class="format-row-bar-fill" style="width:${percentage}%"></div>
+                    </div>
+                </div>
+                <div class="format-row-stats">
+                    <span class="format-row-views">${formatCompactNumber(views)} views</span>
+                    <span class="format-row-count">${count} video${count === 1 ? "" : "s"}</span>
+                </div>
+            </div>`;
+    }).join("");
 
-        }
-    ).join("");
-
-    document.querySelectorAll(
-        ".format-list"
-    ).forEach(
-        list=>{
-
-            list.innerHTML =
-            html || `
-                <div class="format-row">
-                    <div class="format-name">No format data yet</div>
-                </div>`;
-
-        }
-    );
+    document.querySelectorAll(".format-list").forEach(list => {
+        list.innerHTML = html;
+    });
 
 }
 
@@ -1010,6 +995,46 @@ function setupIdeaGeneration(){
 
 }
 
+function calculateGrowthRate(videos){
+
+    const videosWithDate = videos.filter(v => v["Data pubblicazione"] instanceof Date);
+    const pool = videosWithDate.length >= 4 ? videosWithDate : videos;
+
+    if (pool.length < 4) {
+        return { rate: null, reason: "insufficient-data" };
+    }
+
+    const sorted = videosWithDate.length >= 4
+        ? [...videosWithDate].sort((a, b) => a["Data pubblicazione"].getTime() - b["Data pubblicazione"].getTime())
+        : pool;
+
+    const midPoint = Math.floor(sorted.length / 2);
+    const firstHalf = sorted.slice(0, midPoint);
+    const secondHalf = sorted.slice(midPoint);
+
+    const avg = arr => arr.length > 0
+        ? arr.reduce((sum, v) => sum + getVideoViews(v), 0) / arr.length
+        : 0;
+
+    const firstAvg = avg(firstHalf);
+    const secondAvg = avg(secondHalf);
+
+    if (firstAvg <= 0) {
+        return { rate: null, reason: "no-baseline" };
+    }
+
+    const rate = ((secondAvg - firstAvg) / firstAvg) * 100;
+
+    return {
+        rate,
+        reason: "ok",
+        firstAvg: Math.round(firstAvg),
+        secondAvg: Math.round(secondAvg),
+        usedDates: videosWithDate.length >= 4
+    };
+
+}
+
 async function refreshDashboard(){
 
     // Rete di sicurezza: qualunque cosa abbia aggiornato i formati
@@ -1064,67 +1089,26 @@ async function refreshDashboard(){
         bestVideoViewsElement.textContent = bestVideo ? formatCompactNumber(getVideoViews(bestVideo)) : "0";
     }
 
-    // Calculate growth rate (prima metà vs seconda metà, ORDINATE per
-    // data di pubblicazione crescente — non nell'ordine grezzo del CSV,
-    // che non è garantito essere cronologico e in passato produceva
-    // percentuali negative/casuali indipendenti dalla reale crescita
-    // del canale). I video senza data valida vengono ESCLUSI dal calcolo
-    // per evitare che falsino la statistica (venivano trattati come
-    // più recenti con Infinity, finendo sempre nella seconda metà).
-    let growthRate = 0;
-    const videosWithDate = dashboardData.filter(v => v["Data pubblicazione"] instanceof Date);
-    
-    console.log(`Growth Rate Calculation: Total videos=${dashboardData.length}, Videos with valid dates=${videosWithDate.length}`);
-    
-    if (videosWithDate.length >= 2) {
+    const growth = calculateGrowthRate(dashboardData);
+    const growthRateElement = document.querySelector(".growth-rate");
+    const growthLabelElement = document.querySelector(".growth-rate-label");
 
-        const sortedByDate = [...videosWithDate].sort((a, b) => {
-
-            const timeA = a["Data pubblicazione"].getTime();
-            const timeB = b["Data pubblicazione"].getTime();
-
-            return timeA - timeB;
-
-        });
-
-        // Log sample dates for debugging
-        console.log(`Growth Rate Calculation: Sample dates - First: ${sortedByDate[0]["Data pubblicazione"].toISOString()}, Last: ${sortedByDate[sortedByDate.length-1]["Data pubblicazione"].toISOString()}`);
-
-        const midPoint = Math.floor(sortedByDate.length / 2);
-        const firstHalfViews = sortedByDate.slice(0, midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
-        const secondHalfViews = sortedByDate.slice(midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
-
-        console.log(`Growth Rate Calculation: First half views=${firstHalfViews}, Second half views=${secondHalfViews}`);
-
-        if (firstHalfViews > 0) {
-            growthRate = ((secondHalfViews - firstHalfViews) / firstHalfViews) * 100;
-            console.log(`Growth Rate Calculation: Calculated growth rate=${growthRate.toFixed(1)}%`);
+    if (growthRateElement) {
+        if (growth.rate === null) {
+            growthRateElement.textContent = "N/A";
+            growthRateElement.classList.remove("growth-positive", "growth-negative");
+            if (growthLabelElement) growthLabelElement.textContent = "Not enough data yet";
         } else {
-            console.log(`Growth Rate Calculation: First half views is 0, cannot calculate growth rate`);
-        }
-
-    } else {
-        console.log(`Growth Rate Calculation: Not enough videos with valid dates (${videosWithDate.length} < 2), trying fallback calculation`);
-        
-        // Fallback: use video order if dates are not available
-        if (dashboardData.length >= 2) {
-            const midPoint = Math.floor(dashboardData.length / 2);
-            const firstHalfViews = dashboardData.slice(0, midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
-            const secondHalfViews = dashboardData.slice(midPoint).reduce((sum, v) => sum + getVideoViews(v), 0);
-            
-            console.log(`Growth Rate Fallback: First half views=${firstHalfViews}, Second half views=${secondHalfViews}`);
-            
-            if (firstHalfViews > 0) {
-                growthRate = ((secondHalfViews - firstHalfViews) / firstHalfViews) * 100;
-                console.log(`Growth Rate Fallback: Calculated growth rate=${growthRate.toFixed(1)}%`);
+            const sign = growth.rate >= 0 ? "+" : "";
+            growthRateElement.textContent = `${sign}${growth.rate.toFixed(1)}%`;
+            growthRateElement.classList.toggle("growth-positive", growth.rate >= 0);
+            growthRateElement.classList.toggle("growth-negative", growth.rate < 0);
+            if (growthLabelElement) {
+                growthLabelElement.textContent = growth.rate >= 0
+                    ? `Avg views per video rising (${growth.firstAvg} → ${growth.secondAvg})`
+                    : `Avg views per video falling (${growth.firstAvg} → ${growth.secondAvg})`;
             }
         }
-    }
-    
-    const growthRateElement = document.querySelector(".growth-rate");
-    if (growthRateElement) {
-        const sign = growthRate >= 0 ? "+" : "";
-        growthRateElement.textContent = `${sign}${growthRate.toFixed(1)}%`;
     }
 
     // Toggle upload UI based on whether data is loaded

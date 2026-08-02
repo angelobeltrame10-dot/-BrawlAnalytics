@@ -39,6 +39,10 @@ let analysisError = null;
 // Video insights worker endpoint (must include the analyze path)
 const VIDEO_INSIGHTS_WORKER_URL = "https://video-analysis.angeskicollab10.workers.dev/analyze-video";
 
+function invalidateChannelProfileCache(){
+    cachedChannelProfile = null;
+}
+
 async function getDynamicQuestions() {
     if (!cachedChannelProfile) {
         cachedChannelProfile = await loadChannelProfile();
@@ -764,6 +768,7 @@ function setupResultActions(flow){
 export {
 
     initVideoAnalysis,
-    resetVideoAnalysisState
+    resetVideoAnalysisState,
+    invalidateChannelProfileCache
 
 };

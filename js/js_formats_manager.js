@@ -8,7 +8,8 @@ import { loadCustomFormats, saveCustomFormats } from "./js_storage.js";
 import { generateKeywordsForFormat } from "./js_api.js";
 import { classifyVideos } from "./js_fomats.js";
 import { getDashboardData } from "./js_dashboard.js";
-import { getVideoTitle } from "./js_csv_fields.js";
+import { getVideoTitle, getVideoViews } from "./js_csv_fields.js";
+import { invalidateChannelProfileCache } from "./js_video_analysis.js";
 
 let formatsManagerInitialized = false;
 
@@ -16,6 +17,20 @@ const ICON_COLORS = ['yellow', 'blue', 'green', 'purple'];
 
 function getIconColor(index) {
     return ICON_COLORS[index % ICON_COLORS.length];
+}
+
+function formatCompactNumber(value) {
+    const amount = Number(value) || 0;
+
+    if (amount >= 1000000) {
+        return `${(amount / 1000000).toFixed(amount % 1000000 === 0 ? 0 : 1)}M`;
+    }
+
+    if (amount >= 1000) {
+        return `${(amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1)}K`;
+    }
+
+    return `${Math.round(amount)}`;
 }
 
 function getIconForFormat(formatName) {
@@ -37,20 +52,26 @@ async function renderFormatCards() {
     const formats = await loadCustomFormats();
     const videos = getDashboardData();
 
-    // Conteggio video per formato: usa SEMPRE getEffectiveAssociatedVideos
+    // Calcolo metriche per formato: usa SEMPRE getEffectiveAssociatedVideos
     // (manuale se format.associatedVideos è presente/non vuoto, altrimenti
     // auto-classificazione via keyword) — è la STESSA funzione usata dal
-    // modal "View" per decidere quali video sono spuntati. Prima qui si
-    // usava getFormatRanking() (solo keyword matching), quindi aggiungere
-    // o togliere video a mano nel modal non cambiava mai il numero
-    // mostrato sotto il titolo della card.
+    // modal "View" per decidere quali video sono spuntati.
     const sortedFormats = formats
-        .map((format, index) => ({
-            ...format,
-            videoCount: getEffectiveAssociatedVideos(format, formats, videos).length,
-            originalIndex: index
-        }))
-        .sort((a, b) => b.videoCount - a.videoCount);
+        .map((format, index) => {
+            const associatedVideos = getEffectiveAssociatedVideos(format, formats, videos);
+            const titleSet = new Set(associatedVideos);
+            const totalViews = videos.reduce((sum, video) => {
+                return titleSet.has(getVideoTitle(video)) ? sum + getVideoViews(video) : sum;
+            }, 0);
+
+            return {
+                ...format,
+                videoCount: associatedVideos.length,
+                totalViews,
+                originalIndex: index
+            };
+        })
+        .sort((a, b) => (b.totalViews || 0) - (a.totalViews || 0));
 
         if (sortedFormats.length === 0) {
 
@@ -92,7 +113,7 @@ async function renderFormatCards() {
                         ${isBest ? '<span class="format-badge">Best performer</span>' : ''}
                     </div>
                     <div class="format-stats">
-                        ${format.videoCount} videos
+                        ${formatCompactNumber(format.totalViews || 0)} views · ${format.videoCount} video${format.videoCount === 1 ? '' : 's'}
                         ${format.description ? ` · ${format.description}` : ''}
                     </div>
                 </div>
@@ -122,9 +143,17 @@ function handleFormatAction(event) {
 }
 
 async function deleteFormat(index) {
+    const format = (await loadCustomFormats())[index];
+    const formatName = format?.name || "this format";
+
+    const confirmed = window.confirm(`Delete format "${formatName}"?`);
+    if (!confirmed) return;
+
     const formats = await loadCustomFormats();
     formats.splice(index, 1);
     await saveCustomFormats(formats);
+    window.dispatchEvent(new CustomEvent("brawl:formats-changed"));
+    invalidateChannelProfileCache();
     await renderFormatCards();
 }
 
@@ -164,6 +193,8 @@ async function renameFormat(index) {
     }
 
     await saveCustomFormats(formats);
+        window.dispatchEvent(new CustomEvent("brawl:formats-changed"));
+    invalidateChannelProfileCache();
     await renderFormatCards();
 }
 
@@ -262,6 +293,7 @@ async function viewFormat(index, options = {}) {
     const needsMigration = migrateVideoIdsToTitles(formats, allVideos);
     if (needsMigration) {
         await saveCustomFormats(formats);
+            window.dispatchEvent(new CustomEvent("brawl:formats-changed"));
     }
 
     const format = formats[index];
@@ -424,13 +456,11 @@ async function handleCreateFormat(selectedVideos) {
 
     try {
         const keywords = await generateKeywordsForFormat(name, description, selected);
-
         const newFormat = { name, description, keywords, associatedVideos: selected };
-
         const formats = await loadCustomFormats();
         formats.push(newFormat);
         await saveCustomFormats(formats);
-
+        invalidateChannelProfileCache();
         hideModal();
         await renderFormatCards();
 
@@ -442,6 +472,7 @@ async function handleCreateFormat(selectedVideos) {
         createBtn.textContent = 'Create';
     }
 }
+
 
 function initFormatsManager() {
     if (formatsManagerInitialized) return;
@@ -604,9 +635,10 @@ async function toggleAssociatedVideo(formatIndex, videoTitle, searchQuery) {
         : [...effectiveVideos, videoTitle];
 
     await saveCustomFormats(formats);
-
+        window.dispatchEvent(new CustomEvent("brawl:formats-changed"));
+    invalidateChannelProfileCache();
     await viewFormat(formatIndex, { searchQuery });
     await renderFormatCards();
 }
 
-export { initFormatsManager, renderFormatCards, createModal };
+export { initFormatsManager, renderFormatCards, createModal, getEffectiveAssociatedVideos };
