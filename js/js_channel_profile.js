@@ -180,33 +180,49 @@ function calculateFormatPerformance(classifiedVideos, formatRanking) {
  * This is used to populate the dynamic format selector.
  */
 export function getAvailableFormats(channelProfile) {
-    if (!channelProfile || !channelProfile.formatPerformance) {
+    if (!channelProfile?.formatPerformance) {
         return [];
     }
-    
+
     return Object.keys(channelProfile.formatPerformance)
-        .filter(format => channelProfile.formatPerformance[format].videoCount > 0)
+        .filter(format => (channelProfile.formatPerformance[format]?.videoCount || 0) > 0)
         .sort((a, b) => {
-            // Sort by video count, then by average views
             const perfA = channelProfile.formatPerformance[a];
             const perfB = channelProfile.formatPerformance[b];
-            
-            if (perfB.videoCount !== perfA.videoCount) {
-                return perfB.videoCount - perfA.videoCount;
+
+            if ((perfB?.averageViews ?? 0) !== (perfA?.averageViews ?? 0)) {
+                return (perfB?.averageViews ?? 0) - (perfA?.averageViews ?? 0);
             }
-            return perfB.averageViews - perfA.averageViews;
+            return (perfB?.videoCount ?? 0) - (perfA?.videoCount ?? 0);
         });
 }
 
 /**
- * Gets format-specific statistics for a given format.
+ * Gets statistics for a specific format from the Channel Profile.
  */
 export function getFormatStatistics(channelProfile, formatName) {
-    if (!channelProfile || !channelProfile.formatPerformance) {
+    if (!channelProfile || !formatName) {
         return null;
     }
-    
-    return channelProfile.formatPerformance[formatName] || null;
+
+    if (channelProfile.formatPerformance?.[formatName]) {
+        return channelProfile.formatPerformance[formatName];
+    }
+
+    const matchingVideos = (channelProfile.historicalVideos || []).filter(video => video.format === formatName);
+    if (matchingVideos.length === 0) {
+        return null;
+    }
+
+    const views = matchingVideos.map(video => video.views || 0).filter(value => value > 0);
+    const retentions = matchingVideos.map(video => video.retention || 0).filter(value => value > 0);
+
+    return {
+        videoCount: matchingVideos.length,
+        averageViews: views.length > 0 ? views.reduce((a, b) => a + b, 0) / views.length : 0,
+        medianViews: calculateMedian(views),
+        averageRetention: retentions.length > 0 ? retentions.reduce((a, b) => a + b, 0) / retentions.length : 0
+    };
 }
 
 /**

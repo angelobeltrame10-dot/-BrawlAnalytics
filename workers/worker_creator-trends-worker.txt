@@ -67,6 +67,25 @@ export default {
                 return jsonResponse({ success: false, error: "Invalid JSON payload" }, 400);
             }
 
+            // Valida che il payload non sia "vuoto" prima di sovrascrivere il KV.
+            // Se la generazione lato Make è fallita silenziosamente pur restituendo
+            // un payload strutturalmente valido, non vogliamo sovrascrivere l'ultimo
+            // risultato buono con uno vuoto.
+            const trendsData = data.trends && data.trends[0] ? data.trends[0] : null;
+            const hasValidData = trendsData && (
+                (trendsData.videosAnalyzed && trendsData.videosAnalyzed > 0) ||
+                (Array.isArray(trendsData.formats) && trendsData.formats.length > 0) ||
+                (Array.isArray(trendsData.topics) && trendsData.topics.length > 0) ||
+                (Array.isArray(trendsData.brawlers) && trendsData.brawlers.length > 0) ||
+                (Array.isArray(trendsData.keywords) && trendsData.keywords.length > 0) ||
+                (Array.isArray(trendsData.trends) && trendsData.trends.length > 0)
+            );
+
+            if (!hasValidData) {
+                console.log("Empty analysis payload rejected, previous data retained", data);
+                return jsonResponse({ success: false, error: "Empty analysis payload rejected, previous data retained" }, 400);
+            }
+
             data.receivedAt = new Date().toISOString();
 
             await env.BRAWL_KV.put("latest_creator_trends", JSON.stringify(data));

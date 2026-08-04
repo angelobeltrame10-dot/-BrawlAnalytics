@@ -121,6 +121,22 @@ export function extractFeatures(proposal, aiAnalysis, channelProfile, currentTre
         };
     }
 
+    if (videoInsights) {
+        baseFeatures.videoQuality = normalizeScore(videoInsights.overallQuality);
+        baseFeatures.hookStrength = normalizeScore(videoInsights.hookStrength);
+        baseFeatures.visualClarity = normalizeScore(videoInsights.visualClarity);
+        baseFeatures.audioQuality = normalizeScore(videoInsights.audioQuality);
+        baseFeatures.retentionRisk = normalizeRetentionRisk(videoInsights.retentionRisk);
+        baseFeatures.hasSubtitles = Boolean(videoInsights.hasSubtitles);
+    } else {
+        baseFeatures.videoQuality = 0.5;
+        baseFeatures.hookStrength = 0.5;
+        baseFeatures.visualClarity = 0.5;
+        baseFeatures.audioQuality = 0.5;
+        baseFeatures.retentionRisk = 0.5;
+        baseFeatures.hasSubtitles = false;
+    }
+
     return baseFeatures;
 }
 
@@ -158,7 +174,34 @@ function calculateHistoricalPerformance(format, channelProfile) {
     const stats = getFormatStatistics(channelProfile, format);
     if (!stats || stats.videoCount === 0) return 0.5;
     if (channelProfile.averageViews > 0) {
-        return Math.min(1.5, stats.averageViews / channelProfile.averageViews);
+        const ratio = stats.averageViews / channelProfile.averageViews;
+        
+        // Calcola bonus dinamico basato sulla differenza di performance tra formati
+        let performanceBonus = 0;
+        
+        if (channelProfile.formatPerformance && Object.keys(channelProfile.formatPerformance).length > 1) {
+            const allFormatStats = Object.values(channelProfile.formatPerformance);
+            const allAverageViews = allFormatStats.map(s => s.averageViews).filter(v => v > 0);
+            
+            if (allAverageViews.length > 1) {
+                const maxFormatViews = Math.max(...allAverageViews);
+                const medianFormatViews = allAverageViews.sort((a, b) => a - b)[Math.floor(allAverageViews.length / 2)];
+                
+                // Se questo formato è significativamente sopra la mediana dei formati
+                if (stats.averageViews > medianFormatViews) {
+                    const dominanceRatio = stats.averageViews / medianFormatViews;
+                    // Bonus crescente con la dominanza: max 0.4 per formati molto superiori
+                    performanceBonus = Math.min(0.4, (dominanceRatio - 1) * 0.3);
+                }
+                
+                // Bonus extra se è il formato assoluto migliore con grande margine
+                if (stats.averageViews === maxFormatViews && stats.averageViews > medianFormatViews * 2) {
+                    performanceBonus += 0.2; // Bonus aggiuntivo per dominanza estrema
+                }
+            }
+        }
+        
+        return Math.min(1.5, ratio + performanceBonus);
     }
     return 0.5;
 }

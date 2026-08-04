@@ -39,6 +39,10 @@ function checkCriticalFailures(features) {
         return { reason: "No trend alignment in a saturated market", maxScore: 25 };
     }
 
+    if ((features.videoQuality ?? 0.5) <= 0.25 && (features.hookStrength ?? 0.5) <= 0.25) {
+        return { reason: "Low production quality and poor hook", maxScore: 25 };
+    }
+
     return null;
 }
 
@@ -64,13 +68,30 @@ export function calculateScoreBreakdown(features, format, calibrationStats = nul
         }
     }
 
+    const videoQuality = features.videoQuality ?? 0.5;
+    const hookStrength = features.hookStrength ?? 0.5;
+    const audioQuality = features.audioQuality ?? 0.5;
+    const retentionRisk = features.retentionRisk ?? 0.5;
+
+    const retentionScore01 = Math.max(
+        0,
+        Math.min(
+            1,
+            (features.retentionSignal * 0.35) +
+            (videoQuality * 0.25) +
+            (hookStrength * 0.2) +
+            (audioQuality * 0.1) +
+            ((retentionRisk - 0.5) * 0.1)
+        )
+    );
+
     return {
         originality: { score: toScore100((features.videoOriginality + features.ideaOriginality) / 2) },
         trend: { score: toScore100((features.trendAlignment + features.semanticTrendSimilarity) / 2) },
         format: { score: toScore100(formatScore01), calibration: calibrationInfo },
         channel: { score: toScore100(features.channelConsistency) },
         competition: { score: toScore100(features.competition) },
-        retention: { score: toScore100(features.retentionSignal) },
+        retention: { score: toScore100(retentionScore01) },
         trendsOverlap: { score: toScore100((features.creatorTrendsOverlap + features.googleTrendsOverlap) / 2) }
     };
 }

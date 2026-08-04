@@ -25,7 +25,7 @@ import {
 from "./js_csv-parser.js";
 
 
-import { generaIdeeConAI } from "./js_api.js";
+import { generaIdeeConAI, generaIdeeSuFormatSingolo } from "./js_api.js";
 
 import { showAnalysis } from "./js_router.js";
 
@@ -319,6 +319,8 @@ function setActiveTab(tab){
                 ideaList.style.display = "flex";
                 ideasBlocked.hidden = true;
                 if (generateIdeasBtn) generateIdeasBtn.disabled = false;
+                // Populate format filter dropdown
+                populateFormatFilter();
             } else {
                 ideaList.style.display = "none";
                 ideasBlocked.hidden = false;
@@ -488,15 +490,37 @@ async function generateIdeasWithAI() {
         .sort((a, b) => getVideoViews(b) - getVideoViews(a))
         .slice(0, 5);
  
+    // Leggi il filtro formato selezionato
+    const filterSelect = document.getElementById('ideas-format-filter');
+    const selectedFormat = filterSelect ? filterSelect.value : 'all';
+    
+    // Leggi il livello di creatività selezionato (default Medium = 0.7)
+    const creativitySlider = document.getElementById('creativity-slider');
+    let creativity = 0.7;
+    if (creativitySlider) {
+        const sliderValue = creativitySlider.value;
+        if (sliderValue === 'low') creativity = 0.4;
+        else if (sliderValue === 'medium') creativity = 0.7;
+        else if (sliderValue === 'high') creativity = 1.0;
+    }
+ 
     let ideeGenerate = [];
-    if (videos.length > 0 && topFormats.length > 0) {
-        ideeGenerate = await generaIdeeConAI(topVideos, topFormats);
+    if (videos.length > 0) {
+        if (selectedFormat === 'all') {
+            // Comportamento default: 1 idea per ciascuno dei top-3 formati
+            if (topFormats.length > 0) {
+                ideeGenerate = await generaIdeeConAI(topVideos, topFormats);
+            }
+        } else {
+            // Formato specifico selezionato: tutte 3 idee per quel formato
+            ideeGenerate = await generaIdeeSuFormatSingolo(topVideos, selectedFormat, creativity);
+        }
     }
  
     if (ideeGenerate && ideeGenerate.length > 0) {
  
-        await saveGeneratedIdeas(ideeGenerate, topFormat);
-        ideaLists.forEach(list => { list.innerHTML = renderIdeaHtml(ideeGenerate, topFormat); });
+        await saveGeneratedIdeas(ideeGenerate, selectedFormat === 'all' ? topFormat : selectedFormat);
+        ideaLists.forEach(list => { list.innerHTML = renderIdeaHtml(ideeGenerate, selectedFormat === 'all' ? topFormat : selectedFormat); });
  
     } else {
  
@@ -509,13 +533,13 @@ async function generateIdeasWithAI() {
         console.warn("generaIdeeConAI ha restituito 0 idee: uso fallback statico (verrà comunque salvato).");
  
         const fallback = [
-            { text: "Try a double wall-bounce trickshot using Rico on the new Brawl Ball map.", format: "Trickshot" },
-            { text: "Can you win a Solo Showdown match without picking up a single Power Cube?", format: "Challenge" },
-            { text: "Compile 3 clips where players accidentally super into the poison gas.", format: "Funny Moments" }
+            { text: "Try a double wall-bounce trickshot using Rico on the new Brawl Ball map.", format: selectedFormat === 'all' ? "Trickshot" : selectedFormat },
+            { text: "Can you win a Solo Showdown match without picking up a single Power Cube?", format: selectedFormat === 'all' ? "Challenge" : selectedFormat },
+            { text: "Compile 3 clips where players accidentally super into the poison gas.", format: selectedFormat === 'all' ? "Funny Moments" : selectedFormat }
         ];
  
-        await saveGeneratedIdeas(fallback, topFormat || "Mixed");
-        ideaLists.forEach(list => { list.innerHTML = renderIdeaHtml(fallback, topFormat || "Mixed"); });
+        await saveGeneratedIdeas(fallback, selectedFormat === 'all' ? topFormat || "Mixed" : selectedFormat);
+        ideaLists.forEach(list => { list.innerHTML = renderIdeaHtml(fallback, selectedFormat === 'all' ? topFormat || "Mixed" : selectedFormat); });
  
     }
  
@@ -951,6 +975,24 @@ function setupCustomFormats(){
     "Genera Nuove Idee"
     alla generazione AI
 */
+
+function populateFormatFilter(){
+    const filterSelect = document.getElementById('ideas-format-filter');
+    if(!filterSelect) return;
+    
+    // Clear existing options except "All"
+    filterSelect.innerHTML = '<option value="all">All formats</option>';
+    
+    // Add each custom format as an option
+    customFormats.forEach(format => {
+        if(format && format.name){
+            const option = document.createElement('option');
+            option.value = format.name;
+            option.textContent = format.name;
+            filterSelect.appendChild(option);
+        }
+    });
+}
 
 function setupIdeaGeneration(){
 

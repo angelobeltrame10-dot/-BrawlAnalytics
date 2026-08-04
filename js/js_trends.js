@@ -252,6 +252,23 @@ function showCreatorTrendsError(message){
 function renderCreatorTrends(data){
     const trendsData = data.trends[0]; // Get the first (and should be only) trend analysis
     
+    // Controlla se trendsData è effettivamente vuoto (videosAnalyzed === 0 E tutti gli array vuoti)
+    // Se sì, mostra lo stato onesto invece di procedere con il rendering
+    const isEmpty = trendsData && (
+        (trendsData.videosAnalyzed === 0 || !trendsData.videosAnalyzed) &&
+        (!Array.isArray(trendsData.formats) || trendsData.formats.length === 0) &&
+        (!Array.isArray(trendsData.topics) || trendsData.topics.length === 0) &&
+        (!Array.isArray(trendsData.brawlers) || trendsData.brawlers.length === 0) &&
+        (!Array.isArray(trendsData.keywords) || trendsData.keywords.length === 0) &&
+        (!Array.isArray(trendsData.trends) || trendsData.trends.length === 0)
+    );
+    
+    if (isEmpty) {
+        console.warn('Creator trends data is empty, showing empty state');
+        showCreatorTrendsEmpty();
+        return;
+    }
+    
     // Update header metrics
     document.getElementById('creator-videos-analyzed').textContent = trendsData.videosAnalyzed || '-';
     document.getElementById('creator-freshness-score').textContent = trendsData.freshnessScore ? `${trendsData.freshnessScore}%` : '-';

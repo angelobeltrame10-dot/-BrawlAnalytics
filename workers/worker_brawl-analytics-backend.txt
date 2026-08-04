@@ -737,10 +737,13 @@ export default {
                 return jsonResponse({ error: "Missing messages" }, request, 400);
             }
 
+            // Clamp temperature tra 0.2 e 1.1 come guardia di sicurezza lato server
+            const clampedTemperature = clampValue(temperature, 0.2, 1.1, 0.7);
+
             const data = await callGroq(
                 messages,
                 env,
-                temperature ?? 0.7,
+                clampedTemperature,
                 max_tokens ?? 2000,
                 false
             );

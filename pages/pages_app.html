@@ -430,6 +430,14 @@
         <section class="panel">
             <h2 class="panel-title">Your Formats</h2>
             
+            <div class="search-box" id="formats-search-box">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" class="search-input" id="formats-search-input" placeholder="Search formats...">
+            </div>
+            
             <div id="formats-container" class="formats-container">
                 <!-- Format cards will be rendered here -->
             </div>
@@ -450,9 +458,22 @@
                     <h2 class="panel-title" style="margin: 0;">Suggested Ideas</h2>
                     <span class="usage-badge" id="idea-usage-badge">⚡ 3</span>
                 </div>
-                <button id="generate-ideas-btn" class="btn btn-primary" style="padding: var(--space-2) var(--space-4); font-size: 0.85rem;">
-                    Generate New Ideas
-                </button>
+                <div class="ideas-controls">
+                    <select id="ideas-format-filter" class="format-filter-select">
+                        <option value="all">All formats</option>
+                    </select>
+                    <div class="creativity-control">
+                        <span class="creativity-label">Creativity:</span>
+                        <select id="creativity-slider" class="creativity-select">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <button id="generate-ideas-btn" class="btn btn-primary">
+                        Generate New Ideas
+                    </button>
+                </div>
             </div>
             <div class="idea-list"></div>
             <section id="ideas-blocked" class="ideas-blocked" hidden>

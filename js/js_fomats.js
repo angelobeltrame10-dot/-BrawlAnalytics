@@ -3,7 +3,7 @@
    FORMAT DETECTOR
 ========================================================== */
 
-import { getVideoTitle } from "./js_csv_fields.js";
+import { getVideoTitle, getVideoViews } from "./js_csv_fields.js";
 
 const DEFAULT_FORMAT_RULES = {
 
@@ -162,30 +162,55 @@ function getFormatRanking(videos, customFormats = []) {
     return ranking;
 }
 
-function getTopFormat(videos, customFormats = []) {
-    if (!Array.isArray(videos) || videos.length === 0) {
-        return "Unknown";
-    }
+function calculateFormatScores(videos, customFormats = []) {
+    if (!Array.isArray(videos)) return {};
 
     const classified = videos.every(video => video.format)
         ? videos
         : classifyVideos(videos, customFormats);
 
-    const ranking = getFormatRanking(classified, customFormats);
-    let best = "Unknown";
-    let max = 0;
+    const performance = {};
 
-    Object.keys(ranking).forEach(format => {
-        // Skip "Other" format when determining top format
-        if (format === "Other") return;
-        
-        if (ranking[format] > max) {
-            max = ranking[format];
-            best = format;
+    classified.forEach(video => {
+        const format = video.format || "Other";
+        const views = getVideoViews(video);
+
+        if (!performance[format]) {
+            performance[format] = {
+                videoCount: 0,
+                totalViews: 0,
+                averageViews: 0
+            };
         }
+
+        performance[format].videoCount += 1;
+        performance[format].totalViews += views;
     });
 
-    return best;
+    Object.values(performance).forEach(formatStat => {
+        formatStat.averageViews = formatStat.videoCount > 0
+            ? formatStat.totalViews / formatStat.videoCount
+            : 0;
+    });
+
+    return performance;
+}
+
+function getTopFormat(videos, customFormats = []) {
+    if (!Array.isArray(videos) || videos.length === 0) {
+        return "Unknown";
+    }
+
+    const performance = calculateFormatScores(videos, customFormats);
+    const entries = Object.entries(performance)
+        .filter(([format]) => format !== "Other")
+        .sort(([, a], [, b]) => {
+            if (b.averageViews !== a.averageViews) return b.averageViews - a.averageViews;
+            if (b.totalViews !== a.totalViews) return b.totalViews - a.totalViews;
+            return b.videoCount - a.videoCount;
+        });
+
+    return entries.length > 0 ? entries[0][0] : "Unknown";
 }
 
 function getTopFormats(videos, customFormats = [], count = 3) {
@@ -193,20 +218,17 @@ function getTopFormats(videos, customFormats = [], count = 3) {
         return [];
     }
 
-    const classified = videos.every(video => video.format)
-        ? videos
-        : classifyVideos(videos, customFormats);
+    const performance = calculateFormatScores(videos, customFormats);
 
-    const ranking = getFormatRanking(classified, customFormats);
-    
-    // Convert to array and sort by count (descending), excluding "Other"
-    const sortedFormats = Object.entries(ranking)
+    return Object.entries(performance)
         .filter(([format]) => format !== "Other")
-        .sort(([, countA], [, countB]) => countB - countA)
+        .sort(([, a], [, b]) => {
+            if (b.averageViews !== a.averageViews) return b.averageViews - a.averageViews;
+            if (b.totalViews !== a.totalViews) return b.totalViews - a.totalViews;
+            return b.videoCount - a.videoCount;
+        })
         .slice(0, count)
         .map(([format]) => format);
-
-    return sortedFormats;
 }
 
 export {

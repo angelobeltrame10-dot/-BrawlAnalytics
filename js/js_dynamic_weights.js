@@ -12,13 +12,13 @@
 ========================================================== */
 
 const BASE_WEIGHTS = {
-    originality: 0.20,
-    trend: 0.18,
+    originality: 0.22,
+    trend: 0.20,
     format: 0.20,
-    channel: 0.12,
+    channel: 0.05,
     competition: 0.08,
-    retention: 0.14,
-    trendsOverlap: 0.08
+    retention: 0.18,
+    trendsOverlap: 0.07
 };
 
 /**
@@ -90,6 +90,15 @@ export function getDynamicWeights(features, format = "") {
         w.format += 0.05;
         w.competition -= 0.02;
         w.trend -= 0.03;
+    }
+
+    // Video analysis forte: se l'AI video mostra qualità alta, spostiamo
+    // peso verso segnali di contenuto e retention e riduciamo l'impatto
+    // del canale storico.
+    if (features.videoQuality >= 0.8 || features.hookStrength >= 0.75) {
+        w.retention += 0.05;
+        w.originality += 0.03;
+        w.channel -= 0.04;
     }
 
     // Alta competizione: differenziarsi (originalità) e cavalcare il

@@ -51,6 +51,8 @@ async function renderFormatCards() {
 
     const formats = await loadCustomFormats();
     const videos = getDashboardData();
+    const searchInput = document.getElementById('formats-search-input');
+    const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
 
     // Calcolo metriche per formato: usa SEMPRE getEffectiveAssociatedVideos
     // (manuale se format.associatedVideos è presente/non vuoto, altrimenti
@@ -73,7 +75,15 @@ async function renderFormatCards() {
         })
         .sort((a, b) => (b.totalViews || 0) - (a.totalViews || 0));
 
-        if (sortedFormats.length === 0) {
+    // Filtra per nome se c'è una query di ricerca
+    const filteredFormats = searchQuery
+        ? sortedFormats.filter(format => format.name.toLowerCase().includes(searchQuery))
+        : sortedFormats;
+
+        if (filteredFormats.length === 0) {
+
+        const emptyText = searchQuery ? "No formats match your search" : "No formats detected";
+        const emptySubtext = searchQuery ? "Try a different search term." : "Upload a YouTube CSV or create your first format manually.";
 
         container.innerHTML = `
 
@@ -81,10 +91,10 @@ async function renderFormatCards() {
 
                 <div class="format-empty-icon">📂</div>
 
-                <h3>No formats detected</h3>
+                <h3>${emptyText}</h3>
 
                 <p>
-                    Upload a YouTube CSV or create your first format manually.
+                    ${emptySubtext}
                 </p>
 
             </div>
@@ -95,12 +105,39 @@ async function renderFormatCards() {
 
         }
 
-    const bestPerformer = sortedFormats.length > 0 ? sortedFormats[0].name : null;
+    const bestPerformer = filteredFormats.length > 0 ? filteredFormats[0].name : null;
 
-    container.innerHTML = sortedFormats.map((format, index) => {
+    container.innerHTML = filteredFormats.map((format, index) => {
         const isBest = format.name === bestPerformer;
         const iconColor = getIconColor(index);
         const icon = getIconForFormat(format.name);
+        const isEditing = renameState.active && renameState.formatIndex === format.originalIndex;
+        const isEditingName = isEditing && !renameState.currentDescription;
+        const isEditingDescription = isEditing && renameState.currentDescription !== null;
+        
+        let nameContent, statsContent, actionsContent;
+        
+        if (isEditingName) {
+            // Fase 1: editing del nome
+            nameContent = `<input type="text" class="format-name-input" value="${renameState.currentName}" data-format-index="${format.originalIndex}">`;
+            statsContent = `<div class="format-stats">Press Enter to edit description, or Esc to cancel</div>`;
+            actionsContent = '';
+        } else if (isEditingDescription) {
+            // Fase 2: editing della descrizione
+            nameContent = `${renameState.currentName} ${isBest ? '<span class="format-badge">Best performer</span>' : ''}`;
+            statsContent = `<input type="text" class="format-description-input" value="${renameState.currentDescription}" data-format-index="${format.originalIndex}" placeholder="Enter description...">`;
+            actionsContent = '';
+        } else {
+            // Stato normale
+            nameContent = `${format.name} ${isBest ? '<span class="format-badge">Best performer</span>' : ''}`;
+            statsContent = `${formatCompactNumber(format.totalViews || 0)} views · ${format.videoCount} video${format.videoCount === 1 ? '' : 's'}
+                        ${format.description ? ` · ${format.description}` : ''}`;
+            actionsContent = `
+                <button class="format-action-btn view" data-action="view">View</button>
+                <button class="format-action-btn rename" data-action="rename">Rename</button>
+                <button class="format-action-btn delete" data-action="delete">Delete</button>
+            `;
+        }
         
         return `
             <div class="format-card ${isBest ? 'best-performer' : ''}" data-format-index="${format.originalIndex}">
@@ -109,27 +146,84 @@ async function renderFormatCards() {
                 </div>
                 <div class="format-content">
                     <div class="format-name">
-                        ${format.name}
-                        ${isBest ? '<span class="format-badge">Best performer</span>' : ''}
+                        ${nameContent}
                     </div>
                     <div class="format-stats">
-                        ${formatCompactNumber(format.totalViews || 0)} views · ${format.videoCount} video${format.videoCount === 1 ? '' : 's'}
-                        ${format.description ? ` · ${format.description}` : ''}
+                        ${statsContent}
                     </div>
                 </div>
                 <div class="format-actions">
-                    <button class="format-action-btn view" data-action="view">View</button>
-                    <button class="format-action-btn rename" data-action="rename">Rename</button>
-                    <button class="format-action-btn delete" data-action="delete">Delete</button>
+                    ${actionsContent}
                 </div>
             </div>
         `;
     }).join('');
 
-    // Add event listeners
+    // Add event listeners per i bottoni normali
     container.querySelectorAll('.format-action-btn').forEach(btn => {
         btn.addEventListener('click', handleFormatAction);
     });
+    
+    // Add event listeners per gli input di rename inline
+    const nameInput = container.querySelector('.format-name-input');
+    if (nameInput) {
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const newName = nameInput.value.trim();
+                if (newName) {
+                    renameState.currentName = newName;
+                    startDescriptionEdit();
+                } else {
+                    cancelRename();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelRename();
+            }
+        });
+        
+        nameInput.addEventListener('blur', () => {
+            // Blur con Enter viene gestito dal keydown, qui gestiamo solo
+            // il caso in cui l'utente clicca fuori senza premere Enter
+            setTimeout(() => {
+                if (document.querySelector('.format-name-input') === nameInput) {
+                    // L'input è ancora presente, quindi il blur è stato causato
+                    // da qualcosa che non ha sostituito l'input (es. click fuori)
+                    const newName = nameInput.value.trim();
+                    if (newName) {
+                        renameState.currentName = newName;
+                        startDescriptionEdit();
+                    } else {
+                        cancelRename();
+                    }
+                }
+            }, 100);
+        });
+    }
+    
+    const descInput = container.querySelector('.format-description-input');
+    if (descInput) {
+        descInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                renameState.currentDescription = descInput.value.trim();
+                completeRename();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelRename();
+            }
+        });
+        
+        descInput.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (document.querySelector('.format-description-input') === descInput) {
+                    renameState.currentDescription = descInput.value.trim();
+                    completeRename();
+                }
+            }, 100);
+        });
+    }
 }
 
 function handleFormatAction(event) {
@@ -157,14 +251,84 @@ async function deleteFormat(index) {
     await renderFormatCards();
 }
 
+// Stato per il rename inline: tiene traccia del formato in modifica
+// e dei valori originali per poter ripristinare in caso di cancel (Esc)
+let renameState = {
+    active: false,
+    formatIndex: null,
+    originalName: null,
+    originalDescription: null,
+    currentName: null,
+    currentDescription: null
+};
+
+// Avvia il flusso di rename inline: sostituisce il nome con un input
 async function renameFormat(index) {
     const formats = await loadCustomFormats();
     const format = formats[index];
     
-    const newName = prompt('Enter new name:', format.name);
-    if (!newName || newName.trim() === '') return;
+    // Inizializza lo stato di rename
+    renameState = {
+        active: true,
+        formatIndex: index,
+        originalName: format.name,
+        originalDescription: format.description || '',
+        currentName: format.name,
+        currentDescription: format.description || ''
+    };
     
-    const newDescription = prompt('Enter new description:', format.description || '');
+    // Rerender con stato di editing attivo
+    await renderFormatCards();
+    
+    // Focus e selezione automatica dell'input nome
+    setTimeout(() => {
+        const nameInput = document.querySelector('.format-name-input');
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.select();
+        }
+    }, 10);
+}
+
+// Passa alla fase di editing della descrizione (dopo che il nome è stato confermato)
+function startDescriptionEdit() {
+    renameState.currentDescription = renameState.originalDescription;
+    renderFormatCards();
+    
+    setTimeout(() => {
+        const descInput = document.querySelector('.format-description-input');
+        if (descInput) {
+            descInput.focus();
+            descInput.select();
+        }
+    }, 10);
+}
+
+// Cancella il rename e ripristina i valori originali
+function cancelRename() {
+    renameState.active = false;
+    renameState.formatIndex = null;
+    renameState.originalName = null;
+    renameState.originalDescription = null;
+    renameState.currentName = null;
+    renameState.currentDescription = null;
+    renderFormatCards();
+}
+
+// Completa il rename: genera nuove keyword e salva
+async function completeRename() {
+    if (!renameState.active || renameState.formatIndex === null) return;
+    
+    const newName = renameState.currentName.trim();
+    const newDescription = renameState.currentDescription.trim();
+    
+    if (!newName) {
+        cancelRename();
+        return;
+    }
+    
+    const formats = await loadCustomFormats();
+    const format = formats[renameState.formatIndex];
     
     // Titoli dei video attualmente classificati sotto QUESTO formato
     // (con le sue keyword vecchie), da usare come contesto reale per
@@ -177,24 +341,33 @@ async function renameFormat(index) {
         .map(video => getVideoTitle(video))
         .filter(Boolean);
 
-    formats[index] = {
+    formats[renameState.formatIndex] = {
         ...format,
-        name: newName.trim(),
-        description: newDescription?.trim() || format.description,
+        name: newName,
+        description: newDescription,
         associatedVideos: format.associatedVideos || []
     };
 
     try {
         const channelTitles = videos.map(video => getVideoTitle(video)).filter(Boolean);
-        const keywords = await generateKeywordsForFormat(newName.trim(), newDescription?.trim() || '', memberTitles, channelTitles);
-        formats[index].keywords = keywords;
+        const keywords = await generateKeywordsForFormat(newName, newDescription, memberTitles, channelTitles);
+        formats[renameState.formatIndex].keywords = keywords;
     } catch (error) {
         console.error('Error regenerating keywords:', error);
     }
 
     await saveCustomFormats(formats);
-        window.dispatchEvent(new CustomEvent("brawl:formats-changed"));
+    window.dispatchEvent(new CustomEvent("brawl:formats-changed"));
     invalidateChannelProfileCache();
+    
+    // Reset stato e rerender
+    renameState.active = false;
+    renameState.formatIndex = null;
+    renameState.originalName = null;
+    renameState.originalDescription = null;
+    renameState.currentName = null;
+    renameState.currentDescription = null;
+    
     await renderFormatCards();
 }
 
@@ -482,6 +655,14 @@ function initFormatsManager() {
         createBtn.addEventListener('click', () => {
             createModal();
             showModal();
+        });
+    }
+
+    // Setup search input listener for real-time filtering
+    const searchInput = document.getElementById('formats-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            renderFormatCards();
         });
     }
     

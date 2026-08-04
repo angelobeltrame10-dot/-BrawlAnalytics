@@ -111,16 +111,25 @@ function calculateBaseline(scoredSimilarVideos, channelProfile) {
  * Reduced impact range for more conservative predictions.
  */
 function calculatePerformanceMultiplier(features) {
-    const impact =
-        (features.videoOriginality - 0.5) * 0.10 + // Reduced from 0.12
-        (features.trendAlignment - 0.5) * 0.06 + // Reduced from 0.08
-        (Math.min(1.5, features.historicalPerformance) - 1.0) * 0.08 + // Reduced from 0.10
-        (features.innovation - 0.5) * 0.05 + // Reduced from 0.06
-        (0.5 - features.competition) * 0.04 + // Reduced from 0.05
-        (features.retentionSignal - 0.5) * 0.05 + // Reduced from 0.06
-        (features.googleTrendsOverlap - 0.3) * 0.03; // Reduced from 0.04
+    const videoQuality = features.videoQuality ?? 0.5;
+    const hookStrength = features.hookStrength ?? 0.5;
+    const audioQuality = features.audioQuality ?? 0.5;
+    const retentionRisk = features.retentionRisk ?? 0.5;
 
-    return Math.max(0.65, Math.min(1.20, 1.0 + impact)); // Reduced range from [0.55, 1.35] to [0.65, 1.20]
+    const impact =
+        (features.videoOriginality - 0.5) * 0.10 +
+        (features.trendAlignment - 0.5) * 0.06 +
+        (Math.min(1.5, features.historicalPerformance) - 1.0) * 0.08 +
+        (features.innovation - 0.5) * 0.05 +
+        (0.5 - features.competition) * 0.04 +
+        (features.retentionSignal - 0.5) * 0.05 +
+        (features.googleTrendsOverlap - 0.3) * 0.03 +
+        (videoQuality - 0.5) * 0.18 +
+        (hookStrength - 0.5) * 0.12 +
+        (audioQuality - 0.5) * 0.05 +
+        (retentionRisk - 0.5) * 0.08;
+
+    return Math.max(0.55, Math.min(1.50, 1.0 + impact));
 }
 
 function getBaselineCap(channelProfile, scoredSimilarVideos, baseline) {

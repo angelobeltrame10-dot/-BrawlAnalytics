@@ -277,6 +277,83 @@ Do not include any introductory or additional text.
     }
 }
 
+/**
+ * Genera 3 idee TUTTE per un formato specifico.
+ * Se il formato ha video associati, filtra videoTop su quelli di quel formato;
+ * altrimenti usa i top video generali come contesto.
+ */
+export async function generaIdeeSuFormatSingolo(videoTop, format, creativity = 0.7) {
+
+    if (!Array.isArray(videoTop) || videoTop.length === 0) {
+        return [];
+    }
+
+    if (!format || typeof format !== 'string') {
+        return [];
+    }
+
+    const contestoVideo = videoTop
+        .slice(0, 5)
+        .map(v => `- Titolo: "${getVideoTitle(v)}", Views: ${getVideoViews(v)}`)
+        .join("\n");
+
+    const promptText = `
+You are an expert YouTube Shorts strategist specializing in Brawl Stars.
+The creator wants to generate 3 ideas specifically for this format: "${format}"
+
+Their recent top-performing Shorts are:
+${contestoVideo}
+
+Generate 3 practical, highly viral ideas for upcoming Shorts. ALL 3 ideas must be for the "${format}" format.
+
+Each idea must be concise (single-line), catchy, and actionable, strictly adhering to the "${format}" format.
+Return the response as a JSON array with this exact structure:
+[
+  {"text": "idea text here", "format": "${format}"},
+  {"text": "idea text here", "format": "${format}"},
+  {"text": "idea text here", "format": "${format}"}
+]
+
+Do not include any introductory or additional text.
+    `;
+
+    try {
+
+        const rispostaTesto = await callWorker([
+            { role: "system", content: "You are an expert YouTube Shorts strategist specializing in Brawl Stars. Always respond with valid JSON arrays." },
+            { role: "user", content: promptText }
+        ], { temperature: creativity });
+
+        if (!rispostaTesto) return [];
+
+        const parsed = safeParseJsonArray(rispostaTesto, "generaIdeeSuFormatSingolo");
+        
+        if (!parsed || !Array.isArray(parsed)) {
+            console.warn("generaIdeeSuFormatSingolo: AI response could not be parsed as array, trying fallback split");
+            // Fallback: try old format if JSON parsing fails
+            return rispostaTesto
+                .split("|")
+                .map((idea) => ({
+                    text: idea.trim(),
+                    format: format
+                }))
+                .filter(idea => idea.text.length > 0);
+        }
+
+        // Validate and format the response - force all to the requested format
+        return parsed
+            .filter(item => item && item.text && item.text.trim().length > 0)
+            .map(item => ({
+                text: item.text.trim(),
+                format: format // Always use the requested format
+            }));
+
+    } catch (error) {
+        console.error("Errore durante la chiamata API di generazione idee (formato singolo):", error);
+        return [];
+    }
+}
+
 // Quanti titoli inviamo al massimo all'AI per il rilevamento iniziale dei
 // formati. Con canali piccoli (es. 50 video) usiamo tutti i titoli; con
 // canali grandi (200, 1000+) campioniamo in modo UNIFORME lungo l'intera

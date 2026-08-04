@@ -1,5 +1,4 @@
 import { loadChannelProfile } from "./js_storage.js";
-import { getAvailableFormats } from "./js_channel_profile.js";
 import { analyzeVirality } from "./js_virality_engine.js";
 import { consumeVideoAnalysis } from "./js_subscription.js";
 import { ensureTrendsLoaded } from "./js_trends.js";
@@ -44,13 +43,18 @@ function invalidateChannelProfileCache(){
 }
 
 async function getDynamicQuestions() {
-    if (!cachedChannelProfile) {
-        cachedChannelProfile = await loadChannelProfile();
-    }
-    const availableFormats = getAvailableFormats(cachedChannelProfile);
-    const formatOptions = availableFormats.length > 0 
-        ? availableFormats 
-        : ["Trickshot", "Challenge", "Funny Moments", "Ranked", "Guide", "Story", "Meme", "Other"];
+    // Usa TUTTI i formati personalizzati salvati (sempre aggiornati, indipendentemente dal video count)
+    // invece di filtrare per videoCount dal channelProfile. Questo risolve il bug per cui
+    // un formato appena creato (senza video associati) non appare nella domanda 3 finché
+    // non si ricarica un nuovo CSV.
+    const customFormats = await loadCustomFormats();
+    const customFormatNames = customFormats.map(f => f.name).filter(Boolean);
+    
+    // Formati di fallback solo se l'utente non ha ancora nessun formato personalizzato
+    const fallbackFormats = ["Trickshot", "Challenge", "Funny Moments", "Ranked", "Guide", "Story", "Meme", "Other"];
+    const formatOptions = customFormatNames.length > 0 
+        ? [...customFormatNames, "Other"] 
+        : fallbackFormats;
 
     return [
         baseQuestions[0],
@@ -616,10 +620,8 @@ function buildBreakdown(result, videoInsights = null, useRealData = false) {
             ["Originality", Math.round(result.scoreBreakdown.originality.score)],
             ["Trend", Math.round(result.scoreBreakdown.trend.score)],
             ["Format", Math.round(result.scoreBreakdown.format.score)],
-            ["Channel", Math.round(result.scoreBreakdown.channel.score)],
             ["Competition", Math.round(result.scoreBreakdown.competition.score)],
-            ["Retention", Math.round(result.scoreBreakdown.retention.score)],
-            ["Trends", Math.round(result.scoreBreakdown.trendsOverlap.score)]
+            ["Retention", Math.round(result.scoreBreakdown.retention.score)]
         ];
 
         if (videoInsights?.hookStrength != null) {
@@ -635,7 +637,6 @@ function buildBreakdown(result, videoInsights = null, useRealData = false) {
         ["Trend", 91],
         ["Retention", 83],
         ["Format", 89],
-        ["Channel", 87],
         ["Competition", 76]
     ];
 }
@@ -715,12 +716,12 @@ async function renderResults(flow, videoInsights = null){
         <div class="va-results">
             ${errorBannerHtml}
             <div class="va-results-hero"><div><span class="va-eyebrow">${useRealData ? "VIRALITY ANALYSIS" : "SIMULATED REPORT"} · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}</span><h3>Your Short has <em>${scoreCategory.toLowerCase()}</em> viral potential.</h3><p>${useRealData ? summary : "All values below are demonstrative placeholders, ready to be connected to a real analysis engine later."}</p></div><button class="va-outline" id="va-restart" type="button">Analyse another video →</button></div>
-            <div class="va-score-grid"><article class="va-metric va-score"><span>VIRALITY SCORE</span><strong><b id="va-score-value">0</b><small>/ 100</small></strong><i>${scoreIcon} ${scoreCategory}</i><p>${useRealData ? "Based on originality, trend alignment, format performance, and channel history." : "Strong early signals, format fit and audience relevance."}</p></article><article class="va-metric"><span>CONFIDENCE</span><strong>${confidence}%</strong><i>${useRealData ? (confidence >= 70 ? "High confidence" : confidence >= 40 ? "Moderate confidence" : "Low confidence") : "High confidence"}</i><div class="va-progress"><i style="width:${confidence}%"></i></div><p>${useRealData ? "Based on historical data volume and channel consistency." : "Based on available simulated signals."}</p></article><article class="va-metric va-views"><span>ESTIMATED VIEWS</span><strong>${viewRange}</strong><p>This range is an estimate, not a guarantee.</p><div class="va-spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article></div>
+            <div class="va-score-grid"><article class="va-metric va-score"><span>VIRALITY SCORE</span><strong><b id="va-score-value">0</b><small>/ 100</small></strong><i>${scoreIcon} ${scoreCategory}</i><p>${useRealData ? "Based on originality, trend alignment, format performance, and historical context." : "Strong early signals, format fit and audience relevance."}</p></article><article class="va-metric"><span>CONFIDENCE</span><strong>${confidence}%</strong><i>${useRealData ? (confidence >= 70 ? "High confidence" : confidence >= 40 ? "Moderate confidence" : "Low confidence") : "High confidence"}</i><div class="va-progress"><i style="width:${confidence}%"></i></div><p>${useRealData ? "Based on historical data volume and consistency." : "Based on available simulated signals."}</p></article><article class="va-metric va-views"><span>ESTIMATED VIEWS</span><strong>${viewRange}</strong><p>This range is an estimate, not a guarantee.</p><div class="va-spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article></div>
             <div class="va-section-title"><div><span class="va-step">SIGNAL MAP</span><h3>Score breakdown</h3></div><p>${useRealData ? "How each factor contributed to your score." : "Where the simulated score comes from."}</p></div>
             <div class="va-breakdown">${breakdown.map(([name,value])=> `<div><p><span>${name}</span><strong>${value}</strong></p><div class="va-progress"><i style="width:${value}%"></i></div></div>`).join("")}</div>
             <div class="va-insights"><article class="va-insight good"><span>✦</span><h4>Strengths</h4><ul>${strengths.map(s => `<li>${s}</li>`).join("")}</ul></article><article class="va-insight weak"><span>↗</span><h4>Weaknesses</h4><ul>${weaknesses.map(w => `<li>${w}</li>`).join("")}</ul></article>${technicalIssues.length > 0 ? `<article class="va-insight critical"><span>⚙️</span><h4>Technical issues</h4><ul>${technicalIssues.map(t => `<li>${t}</li>`).join("")}</ul></article>` : ''}${criticalIssues.length > 0 ? `<article class="va-insight critical"><span>!</span><h4>Critical issues</h4><ul>${criticalIssues.map(c => `<li>${c}</li>`).join("")}</ul></article>` : ''}</div>
             <section class="va-suggestions"><div><span class="va-step">ACTION PLAN</span><h3>Recommendations</h3><p>${useRealData ? "Based on your analysis results." : "A future engine can make these recommendations unique to every upload."}</p></div><ol>${actionPlan.map((item, index) => `<li><b>0${index + 1}</b> ${item}</li>`).join("")}</ol></section>
-            <section class="va-channel"><span class="va-channel-mark">B</span><div><span>CHANNEL INSIGHTS</span><h3>Built for your audience.</h3><p>${useRealData && result.predictionContext ? `This video is predicted to perform ${result.predictionContext.comparison.toLowerCase()} compared to your historical content.` : "This video is better than <strong>82%</strong> of your previous Shorts. It is very similar to your best-performing content and uses a strong format for your audience."}</p></div><strong>${useRealData && result.predictionContext ? `P${result.predictionContext.percentile}` : "+18%"}<small>${useRealData ? "percentile vs<br>your history" : "above your average<br>demo score"}</small></strong></section>
+            <section class="va-channel"><span class="va-channel-mark">B</span><div><span>HISTORICAL CONTEXT</span><h3>How this video compares to your past Shorts.</h3><p>${useRealData && result.predictionContext ? `This video is predicted to perform ${result.predictionContext.comparison.toLowerCase()} compared to your historical content.` : "This video is stronger than <strong>82%</strong> of your previous Shorts and uses a format that historically works well for your channel."}</p></div><strong>${useRealData && result.predictionContext ? `P${result.predictionContext.percentile}` : "+18%"}<small>${useRealData ? "percentile vs<br>your history" : "above your average<br>demo score"}</small></strong></section>
             <div class="va-end-grid"><aside><span>EDUCATIONAL TIP</span><h4 id="va-tip">Trending topics usually perform best within 48 hours.</h4><button id="va-next-tip" type="button">Show another tip →</button></aside><section class="va-faq"><span class="va-step">FAQ</span><h3>A few good questions</h3><details open><summary>Why is this only a prediction? <b>+</b></summary><p>Performance depends on timing, audience behaviour and distribution. A score is a decision aid, not a promise.</p></details><details><summary>How accurate is the score? <b>+</b></summary><p>${useRealData ? "Accuracy depends on your channel's historical data volume and consistency. More data = higher confidence." : "This demo uses placeholder data. The production score can be calibrated against your data."}</p></details><details><summary>How is the Virality Score calculated? <b>+</b></summary><p>${useRealData ? "The score combines originality, trend alignment, format performance, channel history, and competition factors using dynamic weighting." : "A future version can combine video, content, trend and channel signals transparently."}</p></details><details><summary>Can the prediction be wrong? <b>+</b></summary><p>Yes. Use it to spot opportunities and refine your creative process.</p></details></section></div>
         </div>`;
 
