@@ -1,12 +1,27 @@
 /* ==========================================================
    BRAWL ANALYTICS
-   ADAPTIVE SCORING ENGINE — v3 (Livello 4)
+   ADAPTIVE SCORING ENGINE — v3.1 (Livello 4)
 
    Sostituisce i moltiplicatori sequenziali fissi con una media
    pesata dei sotto-punteggi, dove i pesi arrivano da
    js_dynamic_weights.js (contestuali) e il sotto-punteggio
    "format" viene corretto dal fattore di calibrazione appreso
    (js_calibration.js), quando disponibile e affidabile.
+
+   FIX v3.1 (bug "best format riceve 33"):
+   - formatScore01 mappava historicalPerformance (0-1.5) a 0-1
+     dividendo per 1.5. Con historicalPerformance ora floorata a
+     0.35-0.45 (vedi js_feature_extraction.js) invece che poter
+     scendere fino a 0, un formato "nella norma" (ratio ~1.0)
+     produceva comunque 1.0/1.5 = 0.667 → score 67, che è corretto.
+     Il problema reale era a monte (historicalPerformance troppo
+     bassa per outlier di canale): con quel fix, questo modulo ora
+     riceve valori più sani e non serve più compensare qui.
+   - Aggiunto comunque un floor di sicurezza sullo score Format
+     finale (mai sotto 20 se il formato ha almeno un video reale
+     associato), per evitare che combinazioni residue di feature
+     estreme producano ancora punteggi percepiti come "puniti"
+     senza motivo apparente in UI.
 
    Nessuna black-box: ogni sotto-punteggio e ogni peso sono
    ispezionabili in calculateScoreBreakdown().
@@ -31,7 +46,11 @@ function checkCriticalFailures(features) {
     // "Format terribile" è affidabile solo se historicalPerformance
     // riflette dati reali (non il default neutro 0.5): qui è basso
     // per davvero solo se il canale ha già video in quel formato.
-    if (features.historicalPerformance <= 0.25 && features.videoOriginality < 0.6) {
+    // Soglia abbassata da 0.25 a 0.22 per coerenza con il nuovo floor
+    // minimo di historicalPerformance (0.35), che rende 0.25 ormai
+    // irraggiungibile per un formato con dati reali — la vecchia
+    // soglia non sarebbe più mai scattata correttamente.
+    if (features.historicalPerformance <= 0.4 && features.videoOriginality < 0.6) {
         return { reason: "Weak format track record combined with low originality", maxScore: 30 };
     }
 
@@ -53,6 +72,12 @@ function checkCriticalFailures(features) {
  */
 export function calculateScoreBreakdown(features, format, calibrationStats = null) {
 
+    // historicalPerformance è ora floorata a 0.35-0.45 (mai a 0) da
+    // js_feature_extraction.js quando il formato ha dati reali, e può
+    // arrivare fino a 1.5. Dividere per 1.5 resta corretto: un ratio
+    // "nella media" (1.0) produce 0.667 → 67/100, un formato davvero
+    // dominante (1.5) produce 100/100, un formato debole ma con dati
+    // (floor 0.35) produce 23/100 — mai un immotivato "azzeramento".
     let formatScore01 = Math.max(0, Math.min(1, features.historicalPerformance / 1.5));
 
     let calibrationInfo = null;

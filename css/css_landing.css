@@ -149,6 +149,66 @@
 }
 
 
+/* ==========================================================
+   HERO CHART LINE (scroll-driven SVG)
+========================================================== */
+
+.hero-chart-svg{
+
+    position:absolute;
+
+    inset:0;
+
+    width:100%;
+
+    height:100%;
+
+    z-index:0;
+
+    pointer-events:none;
+
+    opacity:0;
+
+    transition:opacity .3s ease;
+
+}
+
+.hero-chart-svg.hero-chart-visible{
+
+    opacity:.45;
+
+}
+
+.hero:hover .hero-chart-svg.hero-chart-visible{
+
+    opacity:.55;
+
+}
+
+.hero-chart-path,
+.hero-chart-glow{
+
+    transition:stroke-dashoffset 0.08s linear;
+
+}
+
+@media(max-width:768px){
+
+    .hero-chart-svg.hero-chart-visible{
+
+        opacity:.3;
+
+    }
+
+    .hero:hover .hero-chart-svg.hero-chart-visible{
+
+        opacity:.35;
+
+    }
+
+}
+
+
 
 /* ==========================================================
    EYEBROW
@@ -378,7 +438,7 @@
 
 
 
-/* ==========================================================
+/* /* ==========================================================
    TORN DIVIDER
 ========================================================== */
 
@@ -415,16 +475,233 @@
 .stat-mini:hover strong{color:var(--color-primary-hover)}
 .stat-mini span{font-size:.8rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em}
 
-.before-after{width:min(100% - 2rem,var(--container));margin:var(--space-8) auto;display:grid;grid-template-columns:1fr auto 1fr;gap:var(--space-6);align-items:center}
-.ba-col{background:var(--color-surface);border:var(--border);border-radius:var(--radius-md);padding:var(--space-5);transition:transform var(--transition),border-color var(--transition)}
-.ba-col:hover{transform:translateY(-2px)}
-.ba-with{border-color:rgba(62,220,154,.35)}
-.ba-with:hover{border-color:rgba(62,220,154,.5)}
-.ba-label{display:block;font-family:var(--font-mono);font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--color-text-muted);margin-bottom:var(--space-3)}
-.ba-col ul{display:flex;flex-direction:column;gap:.6rem;font-size:.95rem}
-.ba-arrow{font-size:1.8rem;color:var(--color-primary);transition:transform var(--transition)}
-@media(max-width:700px){.before-after{grid-template-columns:1fr}.ba-arrow{transform:rotate(90deg);justify-self:center}}
+/* ==========================================================
+   LAYOUT 417 STYLES (Relume Scroll-Locked Comparison)
+========================================================== */
 
+.layout-417{
+    padding-block:var(--space-8);
+    position:relative;
+    background:var(--color-background);
+    background-image: linear-gradient(180deg, 
+        transparent 0%, 
+        rgba(255,201,60,.03) 30%, 
+        rgba(61,220,255,.02) 70%, 
+        transparent 100%
+    );
+}
+
+.layout-417__container{
+    width:min(100% - 2.5rem,var(--container));
+    margin-inline:auto;
+}
+
+.layout-417__header{
+    text-align:center;
+    max-width:620px;
+    margin-inline:auto;
+    margin-bottom:var(--space-6);
+}
+
+/* Extra spacing specifically when header is inside the sticky stack */
+.layout-417__stack > .layout-417__header{
+    margin-bottom:2rem;
+}
+
+.layout-417__eyebrow{
+    font-family:var(--font-mono);
+    font-size:.8rem;
+    font-weight:700;
+    letter-spacing:.14em;
+    color:var(--color-accent);
+    text-transform:uppercase;
+    margin-bottom:var(--space-2);
+}
+
+.layout-417__title{
+    font-family:var(--font-display);
+    font-size:clamp(1.8rem,4vw,2.8rem);
+    font-weight:800;
+    line-height:1.1;
+    letter-spacing:.01em;
+    color:var(--color-text);
+}
+
+/* Track invisibile e alto: determina quanto scroll serve per
+   attraversare le card. Non produce spazio vuoto visibile perché
+   lo stack sticky resta sempre pinnato e compatto sullo schermo. */
+.layout-417__track{
+    position:relative;
+    height:650vh;
+}
+
+/* Stack (card + indicatori + torn divider) resta fisso al centro del viewport
+   mentre il track scorre "sotto". */
+.layout-417__stack{
+    position:sticky;
+    /* fixed top offset; avoid transforms */
+    top:120px;
+    /* increased height to accommodate header + cards + indicators + torn divider */
+    height:560px;
+    max-width:840px;
+    margin-inline:auto;
+    display:flex;
+    flex-direction:column;
+    /* place header at top so it's above the cards */
+    justify-content:flex-start;
+    align-items:center;
+    padding-block:1.5rem 0; /* bottom padding removed to let torn divider touch viewport bottom */
+    gap:1rem;
+}
+
+.layout-417__cards{
+    position:relative;
+    height:300px; /* larger area so header sits comfortably above the card area */
+    width:100%;
+}
+
+.layout-417__card{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .4s ease;
+}
+
+.layout-417__card.active{
+    opacity:1;
+    pointer-events:auto;
+    z-index:2;
+}
+
+.layout-417__step-badge{
+    position:absolute;
+    top:1.2rem;
+    right:1.5rem;
+    font-family:var(--font-mono);
+    font-size:.75rem;
+    font-weight:700;
+    color:var(--color-primary);
+    background:rgba(255,201,60,.1);
+    border:1px solid rgba(255,201,60,.25);
+    padding:.25rem .75rem;
+    border-radius:999px;
+}
+
+.layout-417__card-content{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:center;
+    gap:2rem;
+    width:100%;
+}
+
+.layout-417__col{
+    padding:1.4rem 1.6rem;
+    border-radius:var(--radius-md);
+    background:rgba(21,11,46,.6);
+    border:1px solid var(--color-border);
+    text-align:center;
+}
+
+.layout-417__col--without{
+    border-color:rgba(255,84,112,.25);
+}
+
+.layout-417__col--with{
+    border-color:rgba(62,220,154,.35);
+    background:rgba(62,220,154,.06);
+}
+
+.layout-417__col-label{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:.75rem;
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    color:var(--color-text-muted);
+    margin-bottom:.6rem;
+}
+
+.layout-417__item{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:.75rem;
+    font-family:var(--font-display);
+    font-size:1.2rem;
+    font-weight:700;
+    color:var(--color-text);
+}
+
+.layout-417__arrow{
+    font-size:2rem;
+    color:var(--color-primary);
+}
+
+.layout-417__indicators{
+    display:flex;
+    justify-content:center;
+    gap:.6rem;
+    margin-top:5.5rem; /* move indicators further below the cards */
+    margin-bottom:0; /* no margin since torn divider is directly below */
+    position:relative;
+    z-index:7;
+}
+
+.layout-417__dot{
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    background:rgba(244,240,255,.2);
+    border:none;
+    cursor:pointer;
+    transition:all .3s ease;
+}
+
+.layout-417__dot.active{
+    background:var(--color-primary);
+    width:28px;
+    box-shadow:0 0 10px rgba(255,201,60,.4);
+}
+
+@media(max-width:768px){
+    .layout-417__cards{
+        min-height:340px;
+    }
+    .layout-417__card{
+        padding:1.8rem 1.2rem;
+    }
+    .layout-417__card-content{
+        grid-template-columns:1fr;
+        gap:.75rem;
+    }
+    .layout-417__arrow{
+        transform:rotate(90deg);
+        justify-self:center;
+        margin-block:-.25rem;
+    }
+    .layout-417__step-badge{
+        top:.8rem;
+        right:1rem;
+        font-size:.7rem;
+    }
+    .layout-417__track{
+        /* smaller total track for mobile; JS will override if data-vh-per-card set */
+        height:500vh;
+        /* Force smaller height on mobile to prevent cards going too low */
+        height:250vh !important;
+    }
+
+    .layout-417__stack{
+        top:90px;
+        height:360px;
+        padding-block:1.5rem;
+    }
+}
 
 
 /* ==========================================================
@@ -650,3 +927,359 @@
     }
 
 }
+
+
+/* ==========================================================
+   RELUME PRICING 18 STYLES
+========================================================== */
+
+.pricing-18{
+
+    background:var(--color-background);
+
+    padding-block:var(--space-8);
+
+    position:relative;
+
+    overflow:hidden;
+
+}
+
+.pricing-18::before{
+
+    content:"";
+
+    position:absolute;
+
+    top:-150px;
+
+    right:10%;
+
+    width:500px;
+
+    height:500px;
+
+    background:radial-gradient(
+        circle,
+        rgba(255,201,60,.08),
+        transparent 65%
+    );
+
+    pointer-events:none;
+
+}
+
+.pricing-18__container{
+
+    width:min(100% - 2.5rem,var(--container));
+
+    margin-inline:auto;
+
+    position:relative;
+
+    z-index:1;
+
+}
+
+.pricing-18__header{
+
+    max-width:640px;
+
+    margin-inline:auto;
+
+    text-align:center;
+
+    margin-bottom:var(--space-7);
+
+}
+
+.pricing-18__tagline{
+
+    font-family:var(--font-mono);
+
+    font-size:.8rem;
+
+    font-weight:700;
+
+    letter-spacing:.14em;
+
+    text-transform:uppercase;
+
+    color:var(--color-primary);
+
+    margin-bottom:var(--space-3);
+
+}
+
+.pricing-18__heading{
+
+    font-family:var(--font-display);
+
+    font-size:clamp(2rem,4vw,3.2rem);
+
+    font-weight:800;
+
+    line-height:1.15;
+
+    margin-bottom:var(--space-4);
+
+    color:var(--color-text);
+
+}
+
+.pricing-18__description{
+
+    color:var(--color-text-muted);
+
+    font-size:1.1rem;
+
+    line-height:1.6;
+
+}
+
+.pricing-18__grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(3,1fr);
+
+    gap:2rem;
+
+    align-items:stretch;
+
+}
+
+.pricing-18__grid--two{
+
+    grid-template-columns:repeat(2,1fr);
+
+    max-width:860px;
+
+    margin-inline:auto;
+
+}
+
+.pricing-18__card{
+
+    background:var(--color-surface);
+
+    border:1px solid var(--color-border);
+
+    border-radius:var(--radius-lg);
+
+    padding:2.2rem 2rem;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:space-between;
+
+    position:relative;
+
+    transition:transform var(--transition-smooth),border-color var(--transition-smooth),box-shadow var(--transition-smooth);
+
+}
+
+.pricing-18__card:hover{
+
+    transform:translateY(-5px);
+
+    border-color:rgba(255,201,60,.35);
+
+    box-shadow:var(--shadow-floating);
+
+}
+
+.pricing-18__card--featured{
+
+    border-color:var(--color-primary);
+
+    background:linear-gradient(180deg,var(--color-surface-light) 0%,var(--color-surface) 100%);
+
+    box-shadow:var(--shadow-glow-primary);
+
+}
+
+.pricing-18__badge{
+
+    position:absolute;
+
+    top:-13px;
+
+    right:1.8rem;
+
+    background:var(--color-primary);
+
+    color:#150B2E;
+
+    font-family:var(--font-mono);
+
+    font-weight:800;
+
+    font-size:.7rem;
+
+    padding:.35rem .85rem;
+
+    border-radius:999px;
+
+    letter-spacing:.08em;
+
+    text-transform:uppercase;
+
+    box-shadow:0 4px 14px rgba(255,201,60,.35);
+
+}
+
+.pricing-18__card-header{
+
+    margin-bottom:1.5rem;
+
+    text-align:center;
+
+}
+
+.pricing-18__plan-name{
+
+    font-family:var(--font-display);
+
+    font-size:1.35rem;
+
+    font-weight:700;
+
+    margin-bottom:.75rem;
+
+    color:var(--color-text);
+
+}
+
+.pricing-18__price-box{
+
+    display:flex;
+
+    align-items:baseline;
+
+    justify-content:center;
+
+    gap:.25rem;
+
+    margin-bottom:.5rem;
+
+}
+
+.pricing-18__amount{
+
+    font-family:var(--font-display);
+
+    font-size:3.2rem;
+
+    font-weight:800;
+
+    line-height:1;
+
+    color:var(--color-text);
+
+}
+
+.pricing-18__period{
+
+    font-size:1.1rem;
+
+    color:var(--color-text-muted);
+
+    font-weight:600;
+
+}
+
+.pricing-18__subtext{
+
+    font-size:.85rem;
+
+    color:var(--color-text-muted);
+
+}
+
+.pricing-18__features{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:1rem;
+
+    margin-bottom:2rem;
+
+    flex-grow:1;
+
+    padding-top:1.25rem;
+
+    border-top:1px solid var(--color-border);
+
+}
+
+.pricing-18__feature{
+
+    display:flex;
+
+    align-items:flex-start;
+
+    gap:.75rem;
+
+    font-size:.95rem;
+
+    color:var(--color-text);
+
+    line-height:1.4;
+
+}
+
+.pricing-18__check{
+
+    width:20px;
+
+    height:20px;
+
+    flex-shrink:0;
+
+    stroke:var(--color-success);
+
+    margin-top:2px;
+
+}
+
+.pricing-18__card-footer{
+
+    margin-top:auto;
+
+}
+
+.pricing-18__btn{
+
+    width:100%;
+
+    text-align:center;
+
+    justify-content:center;
+
+    padding-block:.85rem;
+
+    border-radius:var(--radius-md);
+
+    font-weight:700;
+
+}
+
+@media(max-width:992px){
+
+    .pricing-18__grid{
+
+        grid-template-columns:1fr;
+
+        max-width:480px;
+
+        margin-inline:auto;
+
+    }
+
+}
+

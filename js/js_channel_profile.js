@@ -8,7 +8,7 @@
 ========================================================== */
 
 import { getVideoTitle, getVideoViews, getVideoRetention } from "./js_csv_fields.js";
-import { classifyVideos, getFormatRanking } from "./js_fomats.js";
+import { classifyVideosEffective, getFormatRanking } from "./js_fomats.js";
 import { loadCustomFormats } from "./js_storage.js";
 
 /**
@@ -21,7 +21,7 @@ export async function buildChannelProfile(videos, customFormats = []) {
     }
 
     const formats = customFormats.length > 0 ? customFormats : await loadCustomFormats();
-    const classifiedVideos = classifyVideos(videos, formats);
+    const classifiedVideos = classifyVideosEffective(videos, formats);
     const formatRanking = getFormatRanking(classifiedVideos, formats);
 
     const views = videos.map(v => getVideoViews(v)).filter(v => v > 0);
@@ -40,8 +40,15 @@ export async function buildChannelProfile(videos, customFormats = []) {
 
     const formatPerformance = calculateFormatPerformance(classifiedVideos, formatRanking);
 
-    const sortedFormats = Object.entries(formatPerformance)
-        .sort((a, b) => b[1].averageViews - a[1].averageViews);
+    // Calcola totalViews per ogni formato
+    const formatsWithTotalViews = Object.entries(formatPerformance).map(([name, stats]) => {
+        const formatVideos = classifiedVideos.filter(v => v.format === name);
+        const totalViews = formatVideos.reduce((sum, v) => sum + getVideoViews(v), 0);
+        return [name, { ...stats, totalViews }];
+    });
+
+    const sortedFormats = formatsWithTotalViews
+        .sort((a, b) => b[1].totalViews - a[1].totalViews);
 
     const bestFormats = sortedFormats.slice(0, 3).map(([name]) => name);
     const worstFormats = sortedFormats.slice(-3).map(([name]) => name).reverse();
@@ -143,7 +150,7 @@ function calculateIdealDuration(durations) {
  */
 function calculateFormatPerformance(classifiedVideos, formatRanking) {
     const performance = {};
-    
+
     // Group videos by format
     const formatGroups = {};
     classifiedVideos.forEach(video => {
@@ -153,25 +160,27 @@ function calculateFormatPerformance(classifiedVideos, formatRanking) {
         }
         formatGroups[format].push(video);
     });
-    
+
     // Calculate metrics for each format
     Object.entries(formatGroups).forEach(([format, formatVideos]) => {
         const views = formatVideos.map(v => getVideoViews(v)).filter(v => v > 0);
         const retentions = formatVideos.map(v => getVideoRetention(v)).filter(v => v > 0);
-        
-        const averageViews = views.length > 0 ? views.reduce((a, b) => a + b, 0) / views.length : 0;
+
+        const totalViews = views.reduce((a, b) => a + b, 0);
+        const averageViews = views.length > 0 ? totalViews / views.length : 0;
         const medianViews = calculateMedian(views);
         const averageRetention = retentions.length > 0 ? retentions.reduce((a, b) => a + b, 0) / retentions.length : 0;
         const videoCount = formatVideos.length;
-        
+
         performance[format] = {
             videoCount,
+            totalViews,
             averageViews,
             medianViews,
             averageRetention
         };
     });
-    
+
     return performance;
 }
 
@@ -190,9 +199,15 @@ export function getAvailableFormats(channelProfile) {
             const perfA = channelProfile.formatPerformance[a];
             const perfB = channelProfile.formatPerformance[b];
 
+            // Ordina per totalViews PRIMA (criterio principale)
+            if ((perfB?.totalViews ?? 0) !== (perfA?.totalViews ?? 0)) {
+                return (perfB?.totalViews ?? 0) - (perfA?.totalViews ?? 0);
+            }
+            // Tie-breaker: averageViews
             if ((perfB?.averageViews ?? 0) !== (perfA?.averageViews ?? 0)) {
                 return (perfB?.averageViews ?? 0) - (perfA?.averageViews ?? 0);
             }
+            // Tie-breaker finale: videoCount
             return (perfB?.videoCount ?? 0) - (perfA?.videoCount ?? 0);
         });
 }
@@ -216,10 +231,12 @@ export function getFormatStatistics(channelProfile, formatName) {
 
     const views = matchingVideos.map(video => video.views || 0).filter(value => value > 0);
     const retentions = matchingVideos.map(video => video.retention || 0).filter(value => value > 0);
+    const totalViews = views.reduce((a, b) => a + b, 0);
 
     return {
         videoCount: matchingVideos.length,
-        averageViews: views.length > 0 ? views.reduce((a, b) => a + b, 0) / views.length : 0,
+        totalViews,
+        averageViews: views.length > 0 ? totalViews / views.length : 0,
         medianViews: calculateMedian(views),
         averageRetention: retentions.length > 0 ? retentions.reduce((a, b) => a + b, 0) / retentions.length : 0
     };
@@ -230,15 +247,15 @@ export function getFormatStatistics(channelProfile, formatName) {
  * Higher consistency = more predictable performance.
  */
 export function calculateChannelConsistency(channelProfile) {
-    if (!channelProfile || channelProfile.historicalVideos.length < 3) {
+    if (!channelProfile || channelProfile.historicalVideos.length < 2) {
         return 0.5; // Default medium consistency for new channels
     }
-    
+
     const views = channelProfile.historicalVideos
         .map(v => v.views)
         .filter(v => v > 0);
-    
-    if (views.length < 3) return 0.5;
+
+    if (views.length < 2) return 0.5;
     
     const mean = views.reduce((a, b) => a + b, 0) / views.length;
     const variance = views.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / views.length;

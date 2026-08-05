@@ -77,26 +77,35 @@ function initNavigation(){
 
 
             <button
-                class="btn btn-ghost hidden"
                 id="nav-home"
+                class="hidden"
             >
                 Home
             </button>
 
 
             <a
-                href="../about.html"
+                href="about.html"
                 id="nav-about"
             >
-                about
+                About
             </a>
+
+            
+            <a
+                href="#pricing"
+                id="nav-pricing"
+            >
+                Pricing
+            </a>
+
 
 
             <a
                 href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener"
                 id="nav-contact"
             >
-                contact
+                Contact
             </a>
 
         </nav>
@@ -135,20 +144,35 @@ function initNavigation(){
 
     `;
 
-    const logo =
-    document.getElementById(
-        "nav-logo"
-    );
-
-    const home =
-    document.getElementById(
-        "nav-home"
-    );
+    const logo = document.getElementById("nav-logo");
+    const home = document.getElementById("nav-home");
 
     document.getElementById("nav-plan-badge")?.addEventListener("click", ()=>{
         if(getCurrentPlan() !== "pro"){
             openUpgradeModal();
         }
+    });
+
+    // Wire Pricing buttons on landing page
+    document.getElementById("pricing-free-btn")?.addEventListener("click", () => {
+        if (isLoggedIn()) {
+            showApp();
+            switchToAppMode();
+        } else {
+            openAuthModal("signup");
+        }
+    });
+
+    document.getElementById("pricing-pro-btn")?.addEventListener("click", () => {
+        if (isLoggedIn()) {
+            openUpgradeModal();
+        } else {
+            openAuthModal("signup");
+        }
+    });
+
+    document.getElementById("pricing-enterprise-btn")?.addEventListener("click", () => {
+        window.open("https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com", "_blank");
     });
 
     home?.addEventListener(
@@ -266,6 +290,14 @@ function switchToAppMode(){
 
     document
     .getElementById(
+        "nav-pricing"
+    )
+    ?.classList.add(
+        "hidden"
+    );
+
+    document
+    .getElementById(
         "nav-about"
     )
     ?.classList.add(
@@ -296,6 +328,14 @@ function switchToHomeMode(){
     document
     .getElementById(
         "nav-faq"
+    )
+    ?.classList.remove(
+        "hidden"
+    );
+
+    document
+    .getElementById(
+        "nav-pricing"
     )
     ?.classList.remove(
         "hidden"

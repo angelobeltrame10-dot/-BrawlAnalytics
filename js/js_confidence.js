@@ -15,18 +15,19 @@ import { getTypicalErrorSpread } from "./js_calibration.js";
 
 function dataVolumeConfidence(profile) {
     const n = profile?.totalVideos || 0;
-    if (n >= 50) return 1.0;
-    if (n >= 20) return 0.75;
-    if (n >= 10) return 0.55;
-    if (n >= 5) return 0.4;
+    // Ridotti i threshold per permettere canali con meno video di avere alta confidence
+    if (n >= 10) return 1.0;
+    if (n >= 5) return 0.75;
+    if (n >= 3) return 0.55;
+    if (n >= 2) return 0.4;
     return 0.25;
 }
 
 function formatHistoryConfidence(format, profile) {
     const stats = getFormatStatistics(profile, format);
     if (!stats || stats.videoCount === 0) return 0.35;
-    if (stats.videoCount >= 15) return 1.0;
-    if (stats.videoCount >= 5) return 0.75;
+    // Rimosso il blocco minimo: basta 2+ video per avere alta confidence
+    if (stats.videoCount >= 2) return 1.0;
     return 0.55;
 }
 
@@ -56,7 +57,7 @@ function learnedAccuracyConfidence(calibrationStats, format) {
     const sampleCount = formatStats?.sampleCount ?? calibrationStats.global.sampleCount;
     const spread = getTypicalErrorSpread(calibrationStats, format);
 
-    const sampleTrust = Math.min(1, sampleCount / 15);
+    const sampleTrust = Math.min(1, sampleCount / 5); // Ridotto da 15 a 5 per formati con pochi video
     const spreadPenalty = Math.max(0, 1 - spread); // spread alto → penalità
 
     return Math.max(0.2, Math.min(1, sampleTrust * 0.7 + spreadPenalty * 0.3));

@@ -46,6 +46,8 @@ from "./js_auth.js";
 
 import { loadPublicStats } from "./js_public_stats.js";
 import { initScrollReveal } from "./js_scroll_reveal.js";
+import { initHeroChartLine } from "./js_hero_chart.js";
+import { initLayout417 } from "./js_layout417.js";
 
 
 
@@ -97,6 +99,8 @@ async function startApp(){
     }
 
     initScrollReveal();
+    initHeroChartLine();
+    initLayout417();
     loadPublicStats();
 
     // Prevent default browser behavior for file drops globally

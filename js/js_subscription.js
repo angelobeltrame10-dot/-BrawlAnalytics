@@ -285,6 +285,18 @@ function injectUpgradeModal(){
                 </ul>
                 <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta">Pro is coming soon</button>
             </div>
+
+            <div class="pricing-card pricing-card-pro">
+                <span class="pricing-label pricing-label-pro">💎 BEST VALUE</span>
+                <h4 class="pricing-plan-name">PRO ANNUAL</h4>
+                <div class="pricing-price">€75<small>/ year</small></div>
+                <ul class="pricing-features">
+                    <li><strong>Everything in Pro monthly</strong></li>
+                    <li><strong>Save 11%</strong> compared to monthly</li>
+                    <li><strong>Priority support</strong> — faster response times</li>
+                </ul>
+                <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta-annual">Pro Annual is coming soon</button>
+            </div>
         </div>
 
         <div class="upgrade-footer"><span>Trusted by Brawl Stars creators</span></div>
@@ -305,6 +317,7 @@ function injectUpgradeModal(){
 
     document.getElementById("upgrade-modal-later").addEventListener("click", closeUpgradeModal);
     document.getElementById("upgrade-modal-cta").addEventListener("click", startCheckout);
+    document.getElementById("upgrade-modal-cta-annual").addEventListener("click", startCheckout);
 
 }
 

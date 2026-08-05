@@ -144,15 +144,68 @@ function classifyVideos(videos, customFormats = []) {
     }));
 }
 
+/**
+ * Mappa titolo → nome formato per tutte le assegnazioni MANUALI
+ * (format.associatedVideos, gestite dal Formats Manager). Se lo
+ * stesso titolo è associato a più formati, vince il primo in ordine
+ * di customFormats — un video non deve mai contare due volte.
+ */
+function buildManualAssignmentMap(customFormats = []) {
+    const map = new Map();
+
+    (customFormats || []).forEach(format => {
+        const name = String(format?.name || "").trim();
+        if (!name) return;
+
+        if (Array.isArray(format.associatedVideos) && format.associatedVideos.length > 0) {
+            format.associatedVideos.forEach(title => {
+                if (title && !map.has(title)) {
+                    map.set(title, name);
+                }
+            });
+        }
+    });
+
+    return map;
+}
+
+/**
+ * Come detectFormat(), ma controlla PRIMA le assegnazioni manuali e
+ * ricade sul keyword-matching solo per i video non assegnati a mano.
+ */
+function detectFormatEffective(video, customFormats, manualMap) {
+    const title = getVideoTitle(video);
+
+    if (manualMap.has(title)) {
+        return manualMap.get(title);
+    }
+
+    return detectFormat(video, customFormats);
+}
+
+function classifyVideosEffective(videos, customFormats = []) {
+    if (!Array.isArray(videos)) {
+        return [];
+    }
+
+    const manualMap = buildManualAssignmentMap(customFormats);
+
+    return videos.map(video => ({
+        ...video,
+        format: detectFormatEffective(video, customFormats, manualMap)
+    }));
+}
+
 function getFormatRanking(videos, customFormats = []) {
     if (!Array.isArray(videos)) {
         return {};
     }
 
+    const manualMap = buildManualAssignmentMap(customFormats);
     const ranking = {};
 
     videos.forEach(video => {
-        const format = video.format || detectFormat(video, customFormats);
+        const format = video.format || detectFormatEffective(video, customFormats, manualMap);
         if (!ranking[format]) {
             ranking[format] = 0;
         }
@@ -167,7 +220,7 @@ function calculateFormatScores(videos, customFormats = []) {
 
     const classified = videos.every(video => video.format)
         ? videos
-        : classifyVideos(videos, customFormats);
+        : classifyVideosEffective(videos, customFormats);
 
     const performance = {};
 
@@ -205,8 +258,11 @@ function getTopFormat(videos, customFormats = []) {
     const entries = Object.entries(performance)
         .filter(([format]) => format !== "Other")
         .sort(([, a], [, b]) => {
-            if (b.averageViews !== a.averageViews) return b.averageViews - a.averageViews;
+            // Ordina per totalViews PRIMA (criterio principale)
             if (b.totalViews !== a.totalViews) return b.totalViews - a.totalViews;
+            // Tie-breaker: averageViews
+            if (b.averageViews !== a.averageViews) return b.averageViews - a.averageViews;
+            // Tie-breaker finale: videoCount
             return b.videoCount - a.videoCount;
         });
 
@@ -239,5 +295,9 @@ export {
     getTopFormats,
     getFormatRanking,
     buildFormatRules,
-    normalizeKeywords
+    normalizeKeywords,
+    classifyVideosEffective,
+    buildManualAssignmentMap,
+    detectFormatEffective,
+    calculateFormatScores
 };

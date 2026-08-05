@@ -252,6 +252,56 @@
 
 }
 
+/* ==========================================================
+   HOME BUTTON IN DASHBOARD
+========================================================== */
+
+#nav-home{
+
+    color:var(--color-text-muted);
+
+    font-size:.9rem;
+
+    font-weight:700;
+
+    transition:color var(--transition-fast);
+
+    position:relative;
+
+}
+
+#nav-home::after{
+
+    content:"";
+
+    position:absolute;
+
+    bottom:-4px;
+
+    left:0;
+
+    width:0;
+
+    height:2px;
+
+    background:linear-gradient(90deg,var(--color-primary),var(--color-secondary));
+
+    transition:width var(--transition);
+
+}
+
+#nav-home:hover::after{
+
+    width:100%;
+
+}
+
+#nav-home:hover{
+
+    color:var(--color-text);
+
+}
+
 
 /* ==========================================================
    MOBILE MENU BUTTON

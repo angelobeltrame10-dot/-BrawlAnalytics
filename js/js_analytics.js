@@ -17,13 +17,7 @@
 
 
 
-import {
-
-    classifyVideos,
-    getTopFormat
-
-}
-from "./js_fomats.js";
+import { classifyVideosEffective, getTopFormat } from "./js_fomats.js";
 
 import { getVideoViews } from "./js_csv_fields.js";
 
@@ -296,36 +290,10 @@ function calculateViralityScore(
 
 */
 
-function getBestFormat(
-    videos,
-    customFormats = []
-){
-
-
-
-    const classified =
-
-    classifyVideos(
-        videos,
-        customFormats
-    );
-
-
-
-    return getTopFormat(
-        classified,
-        customFormats
-    );
-
-
+function getBestFormat(videos, customFormats = []) {
+    const classified = classifyVideosEffective(videos, customFormats);
+    return getTopFormat(classified, customFormats);
 }
-
-
-
-
-
-
-
 
 
 /*

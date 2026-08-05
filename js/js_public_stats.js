@@ -101,11 +101,29 @@ export async function loadPublicStats(){
         const ideasValue = formatStat(data.total_ideas_generated);
         const feedbackValue = `${data.positive_feedback_percentage}%`;
 
-        // Animate all stats with slight delays
-        setTimeout(() => animateCounter(creatorsEl, creatorsValue, 1200), 100);
-        setTimeout(() => animateCounter(videosEl, videosValue, 1400), 200);
-        setTimeout(() => animateCounter(ideasEl, ideasValue, 1600), 300);
-        setTimeout(() => animateCounter(feedbackEl, feedbackValue, 1000), 400);
+        // Set up IntersectionObserver to trigger animation only when section is visible
+        const statsBar = document.querySelector('.stats-bar');
+        if(!statsBar) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting){
+                    // Animate all stats with slight delays when section becomes visible
+                    setTimeout(() => animateCounter(creatorsEl, creatorsValue, 1200), 100);
+                    setTimeout(() => animateCounter(videosEl, videosValue, 1400), 200);
+                    setTimeout(() => animateCounter(ideasEl, ideasValue, 1600), 300);
+                    setTimeout(() => animateCounter(feedbackEl, feedbackValue, 1000), 400);
+                    
+                    // Stop observing after animation starts
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.3, // Trigger when 30% of the section is visible
+            rootMargin: '0px 0px -50px 0px'
+        });
+
+        observer.observe(statsBar);
 
     }
     catch(error){

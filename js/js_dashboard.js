@@ -52,8 +52,7 @@ import { initTitleOptimizer } from "./js_title_optimizer.js";
 
 import {
 
-    classifyVideos,
-    detectFormat,
+    classifyVideosEffective,
     getFormatRanking,
     getTopFormat,
     getTopFormats
@@ -481,7 +480,7 @@ async function generateIdeasWithAI() {
     ideaLists.forEach(list => { list.innerHTML = loadingHtml; });
  
     const videos = getDashboardData();
-    const classified = classifyVideos(videos, customFormats);
+    const classified = classifyVideosEffective(videos, customFormats);
     const topFormats = getTopFormats(classified, customFormats, 3);
     const topFormat = topFormats[0] || "Gameplay";
  
@@ -1040,13 +1039,13 @@ function setupIdeaGeneration(){
 function calculateGrowthRate(videos){
 
     const videosWithDate = videos.filter(v => v["Data pubblicazione"] instanceof Date);
-    const pool = videosWithDate.length >= 4 ? videosWithDate : videos;
+    const pool = videosWithDate.length >= 2 ? videosWithDate : videos;
 
-    if (pool.length < 4) {
+    if (pool.length < 2) {
         return { rate: null, reason: "insufficient-data" };
     }
 
-    const sorted = videosWithDate.length >= 4
+    const sorted = videosWithDate.length >= 2
         ? [...videosWithDate].sort((a, b) => a["Data pubblicazione"].getTime() - b["Data pubblicazione"].getTime())
         : pool;
 
@@ -1206,38 +1205,30 @@ export function getDashboardData(){
 }
 
 
-
-
-
-
-
 function getAiInsights(){
 
     const videos = getDashboardData();
 
     if(!videos.length){
-
         return {
             summary: "Upload a CSV to unlock AI insights.",
             topFormat: "—",
             topVideos: []
         };
-
     }
 
+    const classified = classifyVideosEffective(videos, customFormats);
+    const topFormat = getTopFormat(classified, customFormats) || "—";
 
-    const topFormat = getTopFormat(classifyVideos(videos, customFormats), customFormats) || "—";
-
-    const topVideos = videos
+    const topVideos = classified
         .slice()
         .sort((a, b) => getVideoViews(b) - getVideoViews(a))
         .slice(0, 3)
         .map(video => ({
             title: getVideoTitle(video),
             views: getVideoViews(video),
-            format: video.format || detectFormat(video, customFormats)
+            format: video.format
         }));
-
 
     return {
         summary: `Your strongest signal is ${topFormat}.`,

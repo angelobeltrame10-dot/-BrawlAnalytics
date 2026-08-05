@@ -25,7 +25,7 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/css_variables.css">
     <link rel="stylesheet" href="css/css_reset.css">
     <link rel="stylesheet" href="css/css_layout.css">
@@ -56,7 +56,8 @@
       "description": "AI-powered analytics platform for Brawl Stars YouTube Shorts creators. Predicts viral Shorts, detects content formats, analyzes hooks, optimizes titles, and generates video ideas from YouTube Studio CSV data.",
       "offers": [
         { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "EUR" },
-        { "@type": "Offer", "name": "Pro", "price": "6.99", "priceCurrency": "EUR" }
+        { "@type": "Offer", "name": "Pro", "price": "6.99", "priceCurrency": "EUR" },
+        { "@type": "Offer", "name": "Pro Annual", "price": "75", "priceCurrency": "EUR" }
       ]
     }
     </script>
@@ -135,19 +136,150 @@
                 </div>
             </section>
 
-            <section class="before-after scroll-reveal">
-                <div class="ba-col ba-without">
-                    <span class="ba-label">Without Brawl Analytics</span>
-                    <ul><li>❌ Guess the title</li><li>❌ Guess the format</li><li>❌ Hope it goes viral</li></ul>
+            <!-- ==========================================================
+                 RELUME LAYOUT 417 SECTION (Scroll-Locked Card Comparison)
+            ========================================================== -->
+            <section class="layout-417" id="comparison-section">
+                <div class="layout-417__container">
+                    <!-- header moved inside the track so it follows the sticky stack -->
+
+                    <div id="layout417-track" class="layout-417__track" data-vh-per-card="40">
+                        <div class="layout-417__stack">
+                        <!-- Header: moved here so it scrolls with the stack -->
+                        <div class="layout-417__header">
+                            <p class="layout-417__eyebrow">THE DIFFERENCE</p>
+                            <h2 class="layout-417__title">Why creators choose Brawl Analytics</h2>
+                        </div>
+
+                        <!-- Cards wrapper: keeps absolute-positioned cards inside a fixed rectangle -->
+                        <div class="layout-417__cards">
+                        <!-- Card 1 -->
+                        <div class="layout-417__card active" data-card-index="0">
+                            <div class="layout-417__step-badge">1 of 5</div>
+                            <div class="layout-417__card-content">
+                                <div class="layout-417__col layout-417__col--without">
+                                    <span class="layout-417__col-label">Without Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--without">
+                                        <span class="layout-417__icon">❌</span>
+                                        <span class="layout-417__text">Hope it goes viral</span>
+                                    </div>
+                                </div>
+                                <div class="layout-417__arrow" aria-hidden="true">→</div>
+                                <div class="layout-417__col layout-417__col--with">
+                                    <span class="layout-417__col-label">With Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--with">
+                                        <span class="layout-417__icon">✅</span>
+                                        <span class="layout-417__text">AI predicts virality</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2 -->
+                        <div class="layout-417__card" data-card-index="1">
+                            <div class="layout-417__step-badge">2 of 5</div>
+                            <div class="layout-417__card-content">
+                                <div class="layout-417__col layout-417__col--without">
+                                    <span class="layout-417__col-label">Without Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--without">
+                                        <span class="layout-417__icon">❌</span>
+                                        <span class="layout-417__text">Guess the title</span>
+                                    </div>
+                                </div>
+                                <div class="layout-417__arrow" aria-hidden="true">→</div>
+                                <div class="layout-417__col layout-417__col--with">
+                                    <span class="layout-417__col-label">With Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--with">
+                                        <span class="layout-417__icon">✅</span>
+                                        <span class="layout-417__text">AI optimizes titles</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3 -->
+                        <div class="layout-417__card" data-card-index="2">
+                            <div class="layout-417__step-badge">3 of 5</div>
+                            <div class="layout-417__card-content">
+                                <div class="layout-417__col layout-417__col--without">
+                                    <span class="layout-417__col-label">Without Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--without">
+                                        <span class="layout-417__icon">❌</span>
+                                        <span class="layout-417__text">Guess the format</span>
+                                    </div>
+                                </div>
+                                <div class="layout-417__arrow" aria-hidden="true">→</div>
+                                <div class="layout-417__col layout-417__col--with">
+                                    <span class="layout-417__col-label">With Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--with">
+                                        <span class="layout-417__icon">✅</span>
+                                        <span class="layout-417__text">AI analyzes the hook</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 4 -->
+                        <div class="layout-417__card" data-card-index="3">
+                            <div class="layout-417__step-badge">4 of 5</div>
+                            <div class="layout-417__card-content">
+                                <div class="layout-417__col layout-417__col--without">
+                                    <span class="layout-417__col-label">Without Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--without">
+                                        <span class="layout-417__icon">❌</span>
+                                        <span class="layout-417__text">Miss current trends</span>
+                                    </div>
+                                </div>
+                                <div class="layout-417__arrow" aria-hidden="true">→</div>
+                                <div class="layout-417__col layout-417__col--with">
+                                    <span class="layout-417__col-label">With Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--with">
+                                        <span class="layout-417__icon">✅</span>
+                                        <span class="layout-417__text">Current trends</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 5 -->
+                        <div class="layout-417__card" data-card-index="4">
+                            <div class="layout-417__step-badge">5 of 5</div>
+                            <div class="layout-417__card-content">
+                                <div class="layout-417__col layout-417__col--without">
+                                    <span class="layout-417__col-label">Without Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--without">
+                                        <span class="layout-417__icon">❌</span>
+                                        <span class="layout-417__text">Generic advice</span>
+                                    </div>
+                                </div>
+                                <div class="layout-417__arrow" aria-hidden="true">→</div>
+                                <div class="layout-417__col layout-417__col--with">
+                                    <span class="layout-417__col-label">With Brawl Analytics</span>
+                                    <div class="layout-417__item layout-417__item--with">
+                                        <span class="layout-417__icon">✅</span>
+                                        <span class="layout-417__text">Personalized coach</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+
+                        <div class="layout-417__indicators">
+                            <button class="layout-417__dot active" data-dot-index="0" aria-label="Step 1"></button>
+                            <button class="layout-417__dot" data-dot-index="1" aria-label="Step 2"></button>
+                            <button class="layout-417__dot" data-dot-index="2" aria-label="Step 3"></button>
+                            <button class="layout-417__dot" data-dot-index="3" aria-label="Step 4"></button>
+                            <button class="layout-417__dot" data-dot-index="4" aria-label="Step 5"></button>
+                        </div>
+
+                        </div>
+
+                    </div>
                 </div>
-                <div class="ba-arrow">→</div>
-                <div class="ba-col ba-with">
-                   <span class="ba-label">With Brawl Analytics</span>
-                    <ul><li>✅ AI predicts virality</li><li>✅ AI analyzes the hook</li><li>✅ Personalized coach</li><li>✅ Current trends</li><li>✅ Channel-specific advice</li></ul>
-                </div>
+                
             </section>
 
-            <div class="torn-divider"></div>
+            <div class="torn-divider layout-417__torn-sticky"></div>
 
             <section class="faq" id="faq">
                 <div class="faq-header scroll-reveal">
@@ -189,6 +321,130 @@
                         <summary><span>Is the data I upload collected?</span><span class="faq-icon"></span></summary>
                         <p class="faq-answer">Yes. The data you upload is securely stored and used only to provide the features of Brawl Analytics, such as channel analytics, AI-powered predictions, and personalized recommendations. <strong>Your data is never sold or shared with third parties for marketing purposes.</strong> For more information, please read our <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
                     </details>
+                </div>
+            </section> 
+
+
+            <!-- ==========================================================
+                 PRICING SECTION
+            ========================================================== -->
+            <section class="pricing-18" id="pricing">
+                <div class="pricing-18__container scroll-reveal">
+                    <div class="pricing-18__header">
+                        <p class="pricing-18__tagline">PRICING</p>
+                        <h2 class="pricing-18__heading">Simple, transparent pricing</h2>
+                        <p class="pricing-18__description">Choose the plan that fits your growth goals as a Brawl Stars YouTube Shorts creator. Cancel or upgrade anytime.</p>
+                    </div>
+
+                    <div class="pricing-18__grid">
+                        <!-- Free Plan -->
+                        <div class="pricing-18__card">
+                            <div class="pricing-18__card-header">
+                                <h3 class="pricing-18__plan-name">Free Plan</h3>
+                                <div class="pricing-18__price-box">
+                                    <span class="pricing-18__amount">€0</span>
+                                    <span class="pricing-18__period">/mo</span>
+                                </div>
+                                <p class="pricing-18__subtext">Free forever • No credit card required</p>
+                            </div>
+                            <div class="pricing-18__features">
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span><strong>3 AI idea generations</strong> per day</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span><strong>1 AI video analysis</strong> per day</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span>Trend Explorer access</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span>YouTube Studio CSV analytics & format detection</span>
+                                </div>
+                            </div>
+                            <div class="pricing-18__card-footer">
+                                <button class="btn btn-outline pricing-18__btn" id="pricing-free-btn">Get Started Free</button>
+                            </div>
+                        </div>
+
+                        <!-- Pro Plan (Featured) -->
+                        <div class="pricing-18__card pricing-18__card--featured">
+                            <div class="pricing-18__badge">MOST POPULAR</div>
+                            <div class="pricing-18__card-header">
+                                <h3 class="pricing-18__plan-name">Pro Plan</h3>
+                                <div class="pricing-18__price-box">
+                                    <span class="pricing-18__amount">€6.99</span>
+                                    <span class="pricing-18__period">/month</span>
+                                </div>
+                                <p class="pricing-18__subtext">Full AI suite for serious creators</p>
+                            </div>
+                            <div class="pricing-18__features">
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span><strong>Unlimited</strong> AI idea generations</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span><strong>Unlimited</strong> AI video analyses</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span>Trend Explorer & Virality Engine</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span>Hook Strength Analyzer</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span>Personal AI Coach feedback</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span>AI Title Optimizer</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span>Priority AI processing & future updates</span>
+                                </div>
+                            </div>
+                            <div class="pricing-18__card-footer">
+                                <button class="btn btn-primary pricing-18__btn" id="pricing-pro-btn">Upgrade to Pro</button>
+                            </div>
+                        </div>
+
+                        <!-- Pro Annual Plan -->
+                        <div class="pricing-18__card pricing-18__card--featured">
+                            <div class="pricing-18__badge">BEST VALUE</div>
+                            <div class="pricing-18__card-header">
+                                <h3 class="pricing-18__plan-name">Pro Annual</h3>
+                                <div class="pricing-18__price-box">
+                                    <span class="pricing-18__amount">€75</span>
+                                    <span class="pricing-18__period">/year</span>
+                                </div>
+                                <p class="pricing-18__subtext">Save 11% • Priority support included</p>
+                            </div>
+                            <div class="pricing-18__features">
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span><strong>Everything in Pro monthly</strong></span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span><strong>Save 11%</strong> compared to monthly</span>
+                                </div>
+                                <div class="pricing-18__feature">
+                                    <svg class="pricing-18__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <span><strong>Priority support</strong> — faster response times</span>
+                                </div>
+                            <div class="pricing-18__card-footer">
+                                <button class="btn btn-primary pricing-18__btn" id="pricing-pro-annual-btn">Get Pro Annual</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section> 
 

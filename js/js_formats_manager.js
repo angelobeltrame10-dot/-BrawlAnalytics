@@ -6,7 +6,7 @@
 
 import { loadCustomFormats, saveCustomFormats } from "./js_storage.js";
 import { generateKeywordsForFormat } from "./js_api.js";
-import { classifyVideos } from "./js_fomats.js";
+import { classifyVideos, classifyVideosEffective } from "./js_fomats.js";
 import { getDashboardData } from "./js_dashboard.js";
 import { getVideoTitle, getVideoViews } from "./js_csv_fields.js";
 import { invalidateChannelProfileCache } from "./js_video_analysis.js";
@@ -331,11 +331,11 @@ async function completeRename() {
     const format = formats[renameState.formatIndex];
     
     // Titoli dei video attualmente classificati sotto QUESTO formato
-    // (con le sue keyword vecchie), da usare come contesto reale per
+    // (inclusi quelli assegnati manualmente), da usare come contesto reale per
     // l'AI invece di rigenerare le keyword indovinando da nome +
     // descrizione soltanto.
     const videos = getDashboardData();
-    const classified = classifyVideos(videos, formats);
+    const classified = classifyVideosEffective(videos, formats);
     const memberTitles = classified
         .filter(video => video.format === format.name)
         .map(video => getVideoTitle(video))
@@ -446,13 +446,14 @@ function migrateVideoIdsToTitles(formats, allVideos) {
 function getEffectiveAssociatedVideos(format, formats, allVideos) {
 
     if (Array.isArray(format.associatedVideos) && format.associatedVideos.length > 0) {
-
         const currentVideoTitles = new Set(allVideos.map(v => getVideoTitle(v)));
         return format.associatedVideos.filter(title => currentVideoTitles.has(title));
-
     }
 
-    const classified = classifyVideos(allVideos, formats);
+    // Usa classifyVideosEffective (non classifyVideos): un video già
+    // assegnato manualmente a un ALTRO formato non deve comparire
+    // anche qui solo perché matcha le keyword di questo formato.
+    const classified = classifyVideosEffective(allVideos, formats);
     return classified
         .filter(video => video.format === format.name)
         .map(video => getVideoTitle(video));

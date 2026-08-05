@@ -136,7 +136,7 @@ async function handleAnalyzeClick(){
 }
 
 const RECENT_VIDEO_WINDOW = 10;
-const MIN_VIDEOS_FOR_RECENT_TREND = 5;
+const MIN_VIDEOS_FOR_RECENT_TREND = 2;
 
 function buildHistoricalData(videos) {
     if (!Array.isArray(videos) || videos.length === 0) {

@@ -11,7 +11,7 @@
 
 import { getSupabaseClient } from "./js_supabase_client.js";
 
-const MIN_SAMPLES_TO_TRUST_FORMAT = 8;
+const MIN_SAMPLES_TO_TRUST_FORMAT = 2;
 
 /**
  * Carica tutte le righe di calibration_stats dell'utente corrente e le
@@ -79,7 +79,7 @@ export function getCorrectionFactor(calibrationStats, format) {
         const clampedError = Math.max(-0.35, Math.min(0.5, formatStats.meanError));
         return {
             factor: 1 + clampedError * 0.6,
-            trust: Math.min(0.55, formatStats.sampleCount / 25),
+            trust: Math.min(0.55, formatStats.sampleCount / 5), // Ridotto da 25 a 5 per formati con pochi video
             source: "format",
             sampleCount: formatStats.sampleCount
         };
@@ -90,7 +90,7 @@ export function getCorrectionFactor(calibrationStats, format) {
     const clampedGlobal = Math.max(-0.25, Math.min(0.4, calibrationStats.global.meanError));
     return {
         factor: 1 + clampedGlobal * 0.4,
-        trust: Math.min(0.35, calibrationStats.global.sampleCount / 45),
+        trust: Math.min(0.35, calibrationStats.global.sampleCount / 10), // Ridotto da 45 a 10
         source: "global",
         sampleCount: calibrationStats.global.sampleCount
     };

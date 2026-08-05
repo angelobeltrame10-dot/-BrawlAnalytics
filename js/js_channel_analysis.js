@@ -1,6 +1,6 @@
 import { discoverChannelFormats, expandFormatCoverage } from "./js_api.js";
 import { saveCustomFormats, loadCustomFormats } from "./js_storage.js";
-import { classifyVideos, getFormatRanking } from "./js_fomats.js";
+import { classifyVideosEffective, getFormatRanking } from "./js_fomats.js";
 import { showMessage } from "./js_ui.js";
 import { getVideoTitle as extractTitle } from "./js_csv_fields.js";
 
@@ -13,8 +13,11 @@ import { getVideoTitle as extractTitle } from "./js_csv_fields.js";
        fisso, sia con 200 sia con 1000 video.
 
     2) La classificazione VERA di tutti i video (anche 1000) avviene
-       SEMPRE in locale con classifyVideos(), non tramite l'AI: è
+       SEMPRE in locale con classifyVideosEffective(), non tramite l'AI: è
        istantanea qualunque sia il numero di righe del CSV.
+       classifyVideosEffective rispetta sia le assegnazioni manuali
+       (format.associatedVideos) che il matching automatico via keyword,
+       garantendo coerenza con la dashboard.
 
     3) Se dopo la prima passata resta "Other" una quota rilevante di
        video, facciamo un SECONDO giro mirato SOLO su un campione dei
@@ -39,7 +42,8 @@ const MIN_VIDEOS_FOR_REFINEMENT = 15;
 
 // Un formato viene mostrato in dashboard solo se, alla classificazione
 // REALE contro tutti i video, matcha almeno questo numero di video.
-// Impostato a 1 per la fase iniziale per evitare dashboard vuote.
+// Impostato a 1 per garantire che anche formati con pochi video (es. 2-7)
+// possano essere considerati se hanno performance elevate.
 const MIN_VIDEOS_PER_FORMAT = 1;
 
 export async function simulateChannelAnalysis(videoData = []){
@@ -108,7 +112,7 @@ export async function simulateChannelAnalysis(videoData = []){
     progress.style.width = "60%";
     text.textContent = "60%";
 
-    const firstPass = classifyVideos(videoData, initialFormats);
+    const firstPass = classifyVideosEffective(videoData, initialFormats);
 
     const unmatchedTitles = firstPass
         .filter(video => !video.format || video.format === "Other")
@@ -155,7 +159,7 @@ export async function simulateChannelAnalysis(videoData = []){
     // criterio di verità usato per decidere quali formati sopravvivono.
     // Un formato che l'AI ha proposto ma che alla prova dei fatti non
     // matcha nessun video reale non arriva mai in dashboard.
-    const finalClassified = classifyVideos(videoData, candidateFormats);
+    const finalClassified = classifyVideosEffective(videoData, candidateFormats);
     const finalRanking = getFormatRanking(finalClassified, candidateFormats);
 
     // NOTA: confrontiamo sempre con il nome TRIMMATO, perché

@@ -169,7 +169,7 @@ function calculateRangeWidth(confidence, similarVideoCount, channelProfile, cali
         upside *= 1.02;
     }
 
-    if (channelProfile.totalVideos < 10) {
+    if (channelProfile.totalVideos < 2) {
         downside *= 1.04;
         upside *= 1.02;
     }
@@ -245,7 +245,8 @@ export function formatViewRange(range) {
 export function getComparableVideos(proposal, channelProfile) {
     if (!channelProfile?.historicalVideos) return [];
     const matches = channelProfile.historicalVideos.filter(v => v.format === proposal.format);
-    const pool = matches.length >= 5 ? matches : channelProfile.historicalVideos;
+    // Ridotto da 5 a 2 per formati con pochi video
+    const pool = matches.length >= 2 ? matches : channelProfile.historicalVideos;
     return [...pool].sort((a, b) => b.views - a.views).slice(0, 5);
 }
 

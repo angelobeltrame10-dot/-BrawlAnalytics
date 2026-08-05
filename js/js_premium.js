@@ -75,7 +75,7 @@ function setupStatCounters(){
 function initPremiumPolish(){
     setupNavbarScrollState();
     setupReveal();
-    setupStatCounters();
+    // setupStatCounters(); // Disabled - stats animation now handled by js_public_stats.js with IntersectionObserver
 }
 
 if(document.readyState === "loading"){

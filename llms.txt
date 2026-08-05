@@ -16,6 +16,7 @@ Users upload their own YouTube Studio "Contenuti" CSV export (Lifetime range). N
 ## Pricing
 - Free: 1 video analysis/day, 3 idea generations/day, basic stats
 - Pro (€6.99/month): unlimited AI analyses, Virality Engine, Hook Analyzer, AI Coach, Title Optimizer
+- Pro Annual (€75/year): everything in Pro monthly, save 11%, priority support with faster response times
 
 ## Links
 - Website: https://brawl-analytics-official.vercel.app/
