@@ -168,6 +168,27 @@ let isUploadingCSV = false;
 */
 
 
+async function refreshChannelProfileIfNeeded(){
+
+    if (!Array.isArray(dashboardData) || dashboardData.length === 0) {
+        return;
+    }
+
+    try {
+
+        customFormats = await loadCustomFormats();
+        const channelProfile = await buildChannelProfile(dashboardData, customFormats);
+        await saveChannelProfile(channelProfile);
+
+    }
+    catch (error) {
+
+        console.error("Dashboard: impossibile aggiornare il channel profile dopo una modifica ai formati.", error);
+
+    }
+
+}
+
 async function initDashboard(){
 
     setupUpload();
@@ -180,8 +201,8 @@ async function initDashboard(){
     setupCreatorTrendsRetry();
     initSubscription();
 
-    // Aggiorna la dashboard quando i formati personalizzati cambiano altrove
-    window.addEventListener("brawl:formats-changed", () => {
+    window.addEventListener("brawl:formats-changed", async () => {
+        await refreshChannelProfileIfNeeded();
         refreshDashboard();
     });
 
@@ -189,8 +210,6 @@ async function initDashboard(){
 
     const savedData = await loadDashboardData();
 
-    // Sempre sovrascritto: [] per un utente nuovo senza CSV,
-    // i suoi dati reali altrimenti. MAI i dati del vecchio utente.
     dashboardData = Array.isArray(savedData) ? savedData : [];
 
     await refreshDashboard();

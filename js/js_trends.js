@@ -75,8 +75,29 @@ export async function initTrends(force = false){
     container.innerHTML = `<div class="trends-loading">Loading trends...</div>`;
 
     try{
-        cachedTrends = await fetchTrends();
-        trendsLoaded = true;
+        const fetched = await fetchTrends();
+        cachedTrends = fetched;
+
+        // FIX: se il fetch ritorna un array vuoto (es. nessun trend
+        // disponibile in quel momento), NON marchiamo trendsLoaded = true.
+        //
+        // trendsLoaded è una variabile di MODULO condivisa con
+        // ensureTrendsLoaded() (usata dalla Video Analysis, vedi sotto).
+        // Prima di questo fix: se l'utente apriva il tab "Trends" quando
+        // il worker non aveva ancora dati, questo blocco impostava
+        // trendsLoaded = true anche con cachedTrends = []. Da quel
+        // momento in poi, per TUTTA la sessione (finché non si ricarica
+        // la pagina), ensureTrendsLoaded() vedeva trendsLoaded === true
+        // e restituiva sempre quella cache vuota SENZA MAI riprovare a
+        // scaricare i trend — anche dopo aver inserito nuovi dati lato
+        // backend. Risultato osservato: Video Analysis riceveva sempre
+        // "No trend data available", l'AI rispondeva trendAlignment:
+        // "none" e semanticTrendSimilarity: 0, quindi il Trend score
+        // restava bloccato a 0 anche con trend reali disponibili.
+        if(fetched.length > 0){
+            trendsLoaded = true;
+        }
+
         renderTrends(container, cachedTrends);
     }
     catch(error){
@@ -108,18 +129,26 @@ export function getCachedTrends(){
 /*
     Garantisce che i trend siano disponibili prima di un'analisi che ne
     ha bisogno (es. Video Analysis), anche se l'utente non ha mai aperto
-    la tab "Trends" in questa sessione. Se sono già stati caricati,
-    riusa la cache senza rifare la richiesta di rete.
+    la tab "Trends" in questa sessione. Se sono già stati caricati CON
+    successo (dati non vuoti), riusa la cache senza rifare la richiesta
+    di rete. Se invece la cache è vuota (mai caricata, oppure caricata
+    ma senza trend disponibili al momento), riprova sempre a scaricare
+    dati freschi: un array vuoto non deve mai essere considerato uno
+    stato "definitivo" per la sessione.
 */
 export async function ensureTrendsLoaded(){
 
-    if(trendsLoaded){
+    if(trendsLoaded && cachedTrends.length > 0){
         return getCachedTrends();
     }
 
     try{
-        cachedTrends = await fetchTrends();
-        trendsLoaded = true;
+        const fetched = await fetchTrends();
+        cachedTrends = fetched;
+
+        if(fetched.length > 0){
+            trendsLoaded = true;
+        }
     }
     catch(error){
         console.error("Trends fetch failed (ensureTrendsLoaded):", error);

@@ -213,7 +213,19 @@ export function getAvailableFormats(channelProfile) {
 }
 
 /**
+ * Confronto "tollerante": trim + case-insensitive. Usato SOLO come
+ * fallback dopo un match esatto fallito (es. formato rinominato,
+ * differenza di spaziatura) — mai come strategia primaria.
+ */
+function normalizeFormatKey(name) {
+    return String(name || "").trim().toLowerCase();
+}
+
+/**
  * Gets statistics for a specific format from the Channel Profile.
+ * Ritenta con match normalizzato prima di arrendersi a null (che
+ * più a monte diventa uno score neutro 0.5/33 — da evitare quando
+ * il dato in realtà esiste sotto una chiave leggermente diversa).
  */
 export function getFormatStatistics(channelProfile, formatName) {
     if (!channelProfile || !formatName) {
@@ -224,7 +236,21 @@ export function getFormatStatistics(channelProfile, formatName) {
         return channelProfile.formatPerformance[formatName];
     }
 
-    const matchingVideos = (channelProfile.historicalVideos || []).filter(video => video.format === formatName);
+    const normalizedTarget = normalizeFormatKey(formatName);
+
+    if (channelProfile.formatPerformance) {
+        const fallbackKey = Object.keys(channelProfile.formatPerformance)
+            .find(key => normalizeFormatKey(key) === normalizedTarget);
+
+        if (fallbackKey) {
+            console.warn(`getFormatStatistics: match esatto fallito per "${formatName}", usato match normalizzato su "${fallbackKey}".`);
+            return channelProfile.formatPerformance[fallbackKey];
+        }
+    }
+
+    const matchingVideos = (channelProfile.historicalVideos || [])
+        .filter(video => normalizeFormatKey(video.format) === normalizedTarget);
+
     if (matchingVideos.length === 0) {
         return null;
     }

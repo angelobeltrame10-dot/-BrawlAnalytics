@@ -635,6 +635,9 @@ async function handleCreateFormat(selectedVideos) {
         formats.push(newFormat);
         await saveCustomFormats(formats);
         invalidateChannelProfileCache();
+
+        window.dispatchEvent(new CustomEvent("brawl:formats-changed"));
+
         hideModal();
         await renderFormatCards();
 
