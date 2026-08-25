@@ -3,9 +3,11 @@
    TITLE OPTIMIZER — Pro only, reuse gating/popup/stile esistenti
 ========================================================== */
 
-import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
+import { getCurrentPlan, isProPlan, openUpgradeModal } from "./js_subscription.js?v=20260825-profile-18";
 import { loadChannelProfile } from "./js_storage.js";
 import { ensureTrendsLoaded } from "./js_trends.js";
+import { getAuthHeaders } from "./js_auth_fetch.js";
+import { escapeHtml } from "./js_trends.js";
 
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
 
@@ -64,7 +66,7 @@ async function handleAnalyzeClick(){
         return;
     }
 
-    if(getCurrentPlan() !== "pro"){
+    if(!isProPlan(getCurrentPlan())){
         openUpgradeModal();
         return;
     }
@@ -80,7 +82,7 @@ async function handleAnalyzeClick(){
 
         const response = await fetch(AI_ENDPOINT, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: await getAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
                 type: "title_optimizer",
                 title: text,
@@ -218,8 +220,8 @@ function renderResults(result){
             <div class="va-results-hero">
                 <div>
                     <span class="va-eyebrow">TITLE OPTIMIZATION</span>
-                    <h3>Your title is <em>${getQualitative(overallScore).toLowerCase()}</em>.</h3>
-                    <p>${result.summary || ""}</p>
+                    <h3>Your title is <span class="va-emphasis">${getQualitative(overallScore).toLowerCase()}</span>.</h3>
+                    <p>${escapeHtml(result.summary || "")}</p>
                 </div>
                 <button class="va-outline" id="title-restart" type="button">Analyze another title →</button>
             </div>
@@ -244,21 +246,21 @@ function renderResults(result){
                 <article class="coach-card">
                     <span class="coach-icon">🎯</span>
                     <h4>CTR Prediction</h4>
-                    <strong style="font-size:1.5rem;margin-top:0.5rem;text-transform:capitalize">${result.ctrLevel || "—"}</strong>
+                    <strong style="font-size:1.5rem;margin-top:0.5rem;text-transform:capitalize">${escapeHtml(result.ctrLevel || "—")}</strong>
                     <small style="color:var(--color-text-muted)">${ctrPrediction}/100</small>
                 </article>
 
                 <article class="coach-card">
                     <span class="coach-icon">🔍</span>
                     <h4>SEO Level</h4>
-                    <strong style="font-size:1.5rem;margin-top:0.5rem;text-transform:capitalize">${result.seoLevel || "—"}</strong>
+                    <strong style="font-size:1.5rem;margin-top:0.5rem;text-transform:capitalize">${escapeHtml(result.seoLevel || "—")}</strong>
                     <small style="color:var(--color-text-muted)">${seo}/100</small>
                 </article>
 
                 <article class="coach-card">
                     <span class="coach-icon">📏</span>
                     <h4>Length</h4>
-                    <strong style="font-size:1.5rem;margin-top:0.5rem;text-transform:capitalize">${result.length || "—"}</strong>
+                    <strong style="font-size:1.5rem;margin-top:0.5rem;text-transform:capitalize">${escapeHtml(result.length || "—")}</strong>
                 </article>
 
                 <article class="coach-card">
@@ -275,22 +277,22 @@ function renderResults(result){
                 <article class="coach-card">
                     <span class="coach-icon">🤔</span>
                     <h4>Curiosity</h4>
-                    <p>${result.curiosityExplanation || "No explanation provided"}</p>
+                    <p>${escapeHtml(result.curiosityExplanation || "No explanation provided")}</p>
                     <strong style="margin-top:0.5rem">${curiosity}/100</strong>
                 </article>
 
                 <article class="coach-card">
                     <span class="coach-icon">💭</span>
                     <h4>Emotional Impact</h4>
-                    <p>Dominant emotion: <span style="text-transform:capitalize">${result.emotionType || "unknown"}</span></p>
+                    <p>Dominant emotion: <span style="text-transform:capitalize">${escapeHtml(result.emotionType || "unknown")}</span></p>
                     <strong style="margin-top:0.5rem">${emotion}/100</strong>
                 </article>
 
                 <article class="coach-card">
                     <span class="coach-icon">👥</span>
                     <h4>Audience Match</h4>
-                    <p>Target: <span style="text-transform:capitalize">${result.audience || "general"}</span></p>
-                    <p style="color:var(--color-text-muted);margin-top:0.25rem;font-size:0.9rem">${result.audienceExplanation || ""}</p>
+                    <p>Target: <span style="text-transform:capitalize">${escapeHtml(result.audience || "general")}</span></p>
+                    <p style="color:var(--color-text-muted);margin-top:0.25rem;font-size:0.9rem">${escapeHtml(result.audienceExplanation || "")}</p>
                 </article>
 
                 <article class="coach-card">
@@ -307,7 +309,7 @@ function renderResults(result){
                 <span class="coach-timing-icon">📊</span>
                 <div>
                     <h4>Historical Insights</h4>
-                    <p>${result.historicalInsights}</p>
+                    <p>${escapeHtml(result.historicalInsights)}</p>
                 </div>
             </div>` : ""}
 
@@ -318,9 +320,9 @@ function renderResults(result){
                 <div>
                     <h4>Trend Detection</h4>
                     ${result.trendsDetected && result.trendsDetected.length > 0 ? `
-                    <p><strong>Trends detected:</strong> ${result.trendsDetected.join(", ")}</p>` : ""}
+                    <p><strong>Trends detected:</strong> ${result.trendsDetected.map(escapeHtml).join(", ")}</p>` : ""}
                     ${result.trendsMissed && result.trendsMissed.length > 0 ? `
-                    <p style="color:var(--color-text-muted);margin-top:0.25rem"><strong>Trends you could include:</strong> ${result.trendsMissed.join(", ")}</p>` : ""}
+                    <p style="color:var(--color-text-muted);margin-top:0.25rem"><strong>Trends you could include:</strong> ${result.trendsMissed.map(escapeHtml).join(", ")}</p>` : ""}
                 </div>
             </div>` : ""}
 
@@ -330,7 +332,7 @@ function renderResults(result){
                 <span class="coach-timing-icon">📝</span>
                 <div>
                     <h4>Length Suggestion</h4>
-                    <p>${result.lengthSuggestion}</p>
+                    <p>${escapeHtml(result.lengthSuggestion)}</p>
                 </div>
             </div>` : ""}
 
@@ -354,13 +356,13 @@ function renderAlternativesCategory(categoryName, alternatives, icon = "") {
     
     return `
         <div style="margin-bottom: 1.5rem;">
-            <div class="va-section-title" style="margin-bottom: 1rem;"><div><span class="va-step">${icon}</span><h3>${categoryName}</h3></div></div>
+            <div class="va-section-title" style="margin-bottom: 1rem;"><div><span class="va-step">${escapeHtml(icon)}</span><h3>${escapeHtml(categoryName)}</h3></div></div>
             <div class="coach-insights-grid">
                 ${alternatives.map((alt, index) => `
                     <article class="coach-card">
                         <span class="coach-icon">${index + 1}</span>
-                        <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">${alt.title || ""}</h4>
-                        <p style="color:var(--color-text-muted);font-size:0.9rem;margin-bottom:0.75rem">${alt.reason || ""}</p>
+                        <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">${escapeHtml(alt.title || "")}</h4>
+                        <p style="color:var(--color-text-muted);font-size:0.9rem;margin-bottom:0.75rem">${escapeHtml(alt.reason || "")}</p>
                         <button class="btn btn-outline btn-sm" data-title="${encodeURIComponent(alt.title || "")}" type="button">Copy</button>
                     </article>
                 `).join("")}

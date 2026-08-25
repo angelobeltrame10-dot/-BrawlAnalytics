@@ -5,11 +5,12 @@
 ========================================================== */
 
 import { loadCustomFormats, saveCustomFormats } from "./js_storage.js";
-import { generateKeywordsForFormat } from "./js_api.js";
+import { generateKeywordsForFormat } from "./js_api.js?v=20260825-profile-18";
 import { classifyVideos, classifyVideosEffective } from "./js_fomats.js";
-import { getDashboardData } from "./js_dashboard.js";
+import { getDashboardData } from "./js_dashboard.js?v=20260825-profile-18";
 import { getVideoTitle, getVideoViews } from "./js_csv_fields.js";
-import { invalidateChannelProfileCache } from "./js_video_analysis.js";
+import { invalidateChannelProfileCache } from "./js_video_analysis.js?v=20260825-profile-18";
+import { escapeHtml } from "./js_trends.js";
 
 let formatsManagerInitialized = false;
 
@@ -119,19 +120,19 @@ async function renderFormatCards() {
         
         if (isEditingName) {
             // Fase 1: editing del nome
-            nameContent = `<input type="text" class="format-name-input" value="${renameState.currentName}" data-format-index="${format.originalIndex}">`;
+            nameContent = `<input type="text" class="format-name-input" value="${escapeHtml(renameState.currentName)}" data-format-index="${format.originalIndex}">`;
             statsContent = `<div class="format-stats">Press Enter to edit description, or Esc to cancel</div>`;
             actionsContent = '';
         } else if (isEditingDescription) {
             // Fase 2: editing della descrizione
-            nameContent = `${renameState.currentName} ${isBest ? '<span class="format-badge">Best performer</span>' : ''}`;
-            statsContent = `<input type="text" class="format-description-input" value="${renameState.currentDescription}" data-format-index="${format.originalIndex}" placeholder="Enter description...">`;
+            nameContent = `${escapeHtml(renameState.currentName)} ${isBest ? '<span class="format-badge">Best performer</span>' : ''}`;
+            statsContent = `<input type="text" class="format-description-input" value="${escapeHtml(renameState.currentDescription)}" data-format-index="${format.originalIndex}" placeholder="Enter description...">`;
             actionsContent = '';
         } else {
             // Stato normale
-            nameContent = `${format.name} ${isBest ? '<span class="format-badge">Best performer</span>' : ''}`;
+            nameContent = `${escapeHtml(format.name)} ${isBest ? '<span class="format-badge">Best performer</span>' : ''}`;
             statsContent = `${formatCompactNumber(format.totalViews || 0)} views · ${format.videoCount} video${format.videoCount === 1 ? '' : 's'}
-                        ${format.description ? ` · ${format.description}` : ''}`;
+                        ${format.description ? ` · ${escapeHtml(format.description)}` : ''}`;
             actionsContent = `
                 <button class="format-action-btn view" data-action="view">View</button>
                 <button class="format-action-btn rename" data-action="rename">Rename</button>
@@ -506,9 +507,9 @@ function createModal() {
         </div>
         <div class="video-picker-list video-picker-list-compact improved-list" id="format-videos-picker">
             ${allTitles.map(title => `
-                <div class="video-picker-row improved-row" data-video-title="${title}">
+                <div class="video-picker-row improved-row" data-video-title="${escapeHtml(title)}">
                     <span class="video-picker-check improved-check"></span>
-                    <span class="video-picker-title improved-title">${title}</span>
+                    <span class="video-picker-title improved-title">${escapeHtml(title)}</span>
                 </div>
             `).join('')}
         </div>
@@ -695,9 +696,9 @@ function createFormatDetailModal(format, associatedVideos, allVideos, formatInde
     const rowsHtml = orderedTitles.map(title => {
         const included = includedSet.has(title);
         return `
-            <div class="video-picker-row ${included ? 'selected' : ''}" data-video-title="${title}">
+            <div class="video-picker-row ${included ? 'selected' : ''}" data-video-title="${escapeHtml(title)}">
                 <span class="video-picker-check">${included ? checkIcon : ''}</span>
-                <span class="video-picker-title">${title}</span>
+                <span class="video-picker-title">${escapeHtml(title)}</span>
             </div>`;
     }).join('');
 
@@ -711,8 +712,8 @@ function createFormatDetailModal(format, associatedVideos, allVideos, formatInde
                     <div class="format-detail-heading">
                         <span class="format-detail-icon">${icon}</span>
                         <div>
-                            <h3 class="modal-title">${format.name}</h3>
-                            <p class="modal-subtitle">${format.description || 'No description yet'}</p>
+                            <h3 class="modal-title">${escapeHtml(format.name)}</h3>
+                            <p class="modal-subtitle">${escapeHtml(format.description || 'No description yet')}</p>
                         </div>
                     </div>
                     <div class="format-badge">

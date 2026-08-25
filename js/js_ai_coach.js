@@ -3,9 +3,11 @@
    PERSONAL AI COACH — Pro only feature
 ========================================================== */
 
-import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
+import { getCurrentPlan, isProPlan, openUpgradeModal } from "./js_subscription.js?v=20260825-profile-18";
 import { loadChannelProfile, loadDashboardData } from "./js_storage.js";
 import { getVideoViews } from "./js_csv_fields.js";
+import { escapeHtml } from "./js_trends.js";
+import { getAuthHeaders } from "./js_auth_fetch.js";
 
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
 
@@ -51,6 +53,15 @@ const PLAYBOOK_TIPS = [
 let initialized = false;
 let loadingTimer = null;
 let channelProfileCache = null;
+let coachChatContext = "";
+let coachChatRequestInFlight = false;
+let companionMessageTimer = null;
+const COMPANION_MESSAGES = [
+    ["your coach has a note", "make the next upload easier to win."],
+    ["one useful question", "which format deserves another test?"],
+    ["before you publish", "check the first two seconds again."],
+    ["small change, clearer signal", "change one variable in the next Short."]
+];
 
 
 export function initAICoach(){
@@ -66,6 +77,11 @@ export function initAICoach(){
 
 
 function renderInput(){
+
+    if(companionMessageTimer) {
+        clearInterval(companionMessageTimer);
+        companionMessageTimer = null;
+    }
 
     const flow = document.getElementById("coach-flow");
     if(!flow) return;
@@ -88,7 +104,7 @@ async function getChannelProfile() {
 
 async function handleAnalyzeClick(){
 
-    if(getCurrentPlan() !== "pro"){
+    if(!isProPlan(getCurrentPlan())){
         openUpgradeModal();
         return;
     }
@@ -108,7 +124,7 @@ async function handleAnalyzeClick(){
 
         const response = await fetch(AI_ENDPOINT, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: await getAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
                 type: "personal_coach",
                 channelProfile: channelProfile,
@@ -210,7 +226,7 @@ function renderError(message){
 
     flow.innerHTML = `
         <div class="va-card" style="text-align:center">
-            <p>${message || "Something went wrong while generating insights. Please try again."}</p>
+            <p>${escapeHtml(message || "Something went wrong while generating insights. Please try again.")}</p>
             <button class="va-outline" id="coach-retry-btn" type="button" style="margin-top:1rem">Try again</button>
         </div>`;
 
@@ -230,7 +246,7 @@ function listCard(title, icon, items, variant = ""){
     return `
         <div class="coach-list-card ${variant}">
             <h4>${icon ? `<span>${icon}</span>` : ""}${title}</h4>
-            <ul>${items.map(item => `<li>${item}</li>`).join("")}</ul>
+            <ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
         </div>`;
 
 }
@@ -240,124 +256,202 @@ function renderResults(result){
     if(loadingTimer) clearInterval(loadingTimer);
 
     const flow = document.getElementById("coach-flow");
+    if(!flow) return;
 
-    const originalityLevel = (result.originalityRisk?.level || "medium").toLowerCase();
-    const originalityLabel = { low: "Low risk", medium: "Medium risk", high: "High risk" }[originalityLevel] || "Medium risk";
-    const originalityIcon = { low: "✓", medium: "⚠", high: "⛔" }[originalityLevel] || "⚠";
+    const rating = String(result.overallCreatorRating || "B");
+    const winningFormats = Array.isArray(result.performancePatterns?.winningFormats)
+        ? result.performancePatterns.winningFormats.slice(0, 3)
+        : [];
+    const keyInsights = Array.isArray(result.keyInsights) ? result.keyInsights.slice(0, 3) : [];
+    const originalityLevel = ["low", "medium", "high"].includes(String(result.originalityRisk?.level).toLowerCase())
+        ? String(result.originalityRisk.level).toLowerCase()
+        : "medium";
+
+    coachChatContext = [
+        `Overall rating: ${rating}`,
+        `Biggest strength: ${result.biggestStrength || "not available"}`,
+        `Biggest weakness: ${result.biggestWeakness || "not available"}`,
+        `Current opportunity: ${result.currentOpportunity || "not available"}`,
+        `Next week recommendation: ${result.nextWeekRecommendation || "not available"}`,
+        `Recent progress: ${result.recentProgress || "not available"}`,
+        `Winning formats: ${winningFormats.join(", ") || "not available"}`
+    ].join("\n");
 
     flow.innerHTML = `
-        <div class="va-results">
+        <div class="va-results coach-report">
             <div class="va-results-hero">
                 <div>
                     <span class="va-eyebrow">PERSONAL AI COACH</span>
-                    <h3>Channel Analysis Complete</h3>
-                    <p>Here are your personalized insights and recommendations.</p>
+                    <h3>Your channel, in focus</h3>
+                    <p>A short briefing with the signals that deserve your attention first.</p>
                 </div>
-                <button class="va-outline" id="coach-restart" type="button">Refresh Insights →</button>
+                <button class="va-outline" id="coach-restart" type="button">Refresh insights →</button>
             </div>
 
-            <!-- Overall Rating -->
-            <div class="va-score-grid">
-                <article class="va-metric va-score">
-                    <span>OVERALL RATING</span>
-                    <strong><b>${result.overallCreatorRating || "B"}</b></strong>
-                    <i>Based on consistency, originality & execution</i>
-                </article>
-            </div>
+            <section class="coach-priority-card">
+                <div class="coach-rating-block">
+                    <span class="va-step">OVERALL RATING</span>
+                    <strong>${escapeHtml(rating)}</strong>
+                    <small>based on consistency, originality and execution</small>
+                </div>
+                <div class="coach-priority-copy">
+                    <span class="va-step">PRIORITY MOVE</span>
+                    <h3>${escapeHtml(result.nextWeekRecommendation || "Keep your next upload focused.")}</h3>
+                    <p>${escapeHtml(result.aiStrategy || "Use your strongest format and make one clear improvement at a time.")}</p>
+                </div>
+            </section>
 
-            <!-- Insight Cards -->
-            <div class="va-section-title"><div><span class="va-step">INSIGHTS</span><h3>Channel Analysis</h3></div></div>
-            
-            <div class="coach-insights-grid">
+            <div class="va-section-title"><div><span class="va-step">THE SIGNALS</span><h3>What matters most</h3></div><p>Useful context, without the noise.</p></div>
+            <div class="coach-insights-grid coach-insights-grid--compact">
                 <article class="coach-card coach-strength">
-                    <span class="coach-icon">🏆</span>
-                    <h4>Biggest Strength</h4>
-                    <p>${result.biggestStrength || "Analyzing..."}</p>
+                    <span class="coach-icon">↑</span>
+                    <h4>Keep doing this</h4>
+                    <p>${escapeHtml(result.biggestStrength || "Your strongest signal is still being measured.")}</p>
                 </article>
-
                 <article class="coach-card coach-weakness">
-                    <span class="coach-icon">⚠</span>
-                    <h4>Biggest Weakness</h4>
-                    <p>${result.biggestWeakness || "Analyzing..."}</p>
+                    <span class="coach-icon">→</span>
+                    <h4>Fix this next</h4>
+                    <p>${escapeHtml(result.biggestWeakness || "No clear weakness has been identified yet.")}</p>
                 </article>
-
-                <article class="coach-card coach-progress">
-                    <span class="coach-icon">📈</span>
-                    <h4>Recent Progress</h4>
-                    <p>${result.recentProgress || "Insufficient data"}</p>
-                </article>
-
                 <article class="coach-card coach-opportunity">
-                    <span class="coach-icon">🔥</span>
-                    <h4>Current Opportunity</h4>
-                    <p>${result.currentOpportunity || "Continue current strategy"}</p>
+                    <span class="coach-icon">*</span>
+                    <h4>Try this opportunity</h4>
+                    <p>${escapeHtml(result.currentOpportunity || "Keep testing your strongest format with a fresh angle.")}</p>
+                </article>
+                <article class="coach-card coach-progress">
+                    <span class="coach-icon">~</span>
+                    <h4>Recent progress</h4>
+                    <p>${escapeHtml(result.recentProgress || "More recent uploads are needed to measure a trend.")}</p>
                 </article>
             </div>
 
-            <!-- Originality Risk -->
-            <div class="coach-alert coach-alert-${originalityLevel}">
-                <span class="coach-alert-icon">${originalityIcon}</span>
+            <section class="coach-action-strip">
                 <div>
-                    <h4>Originality Risk — ${originalityLabel}</h4>
-                    <p>${result.originalityRisk?.explanation || ""}</p>
+                    <span class="va-step">PUBLISHING NOTE</span>
+                    <h3>Make the next upload easier to win.</h3>
+                    <p>${escapeHtml(result.uploadTimingAdvice || "Schedule uploads in a consistent time slot instead of publishing immediately after editing.")}</p>
                 </div>
-            </div>
-
-            <!-- Upload Timing -->
-            <div class="coach-timing-box">
-                <span class="coach-timing-icon">📅</span>
-                <div>
-                    <h4>Publishing & Scheduling</h4>
-                    <p>${result.uploadTimingAdvice || ""}</p>
-                </div>
-            </div>
-
-            <!-- Strategy Section -->
-            <div class="va-section-title"><div><span class="va-step">STRATEGY</span><h3>AI Strategy</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <p style="color:var(--color-text)">${result.aiStrategy || "Developing strategy..."}</p>
+                <span class="coach-risk coach-risk-${originalityLevel}">${originalityLevel} originality risk</span>
             </section>
 
-            <!-- Next Week Recommendation -->
-            <div class="va-section-title"><div><span class="va-step">ACTION</span><h3>Next Week Recommendation</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <p style="color:var(--color-text)">${result.nextWeekRecommendation || "Maintain upload schedule"}</p>
-            </section>
+            ${winningFormats.length ? `
+                <section class="coach-list-card coach-list-card--primary">
+                    <h4><span>+</span>Formats worth repeating</h4>
+                    <ul>${winningFormats.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+                </section>` : ""}
 
-            <!-- Performance Patterns -->
-            <div class="va-section-title"><div><span class="va-step">PATTERNS</span><h3>Performance Patterns</h3></div></div>
-            <div class="coach-patterns-grid">
-                <article class="coach-pattern-card">
-                    <span>Best Day</span>
-                    <strong>${result.performancePatterns?.bestDay || "Unknown"}</strong>
-                </article>
-                <article class="coach-pattern-card">
-                    <span>Ideal Duration</span>
-                    <strong>${result.performancePatterns?.idealDuration || 58}s</strong>
-                </article>
+            ${keyInsights.length ? `
+                <section class="coach-list-card">
+                    <h4><span>i</span>Keep these in mind</h4>
+                    <ul>${keyInsights.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+                </section>` : ""}
+
+            <div class="coach-companion-wrap">
+                <button type="button" class="coach-companion" id="coach-companion-trigger" aria-controls="coach-chat-panel" aria-expanded="false">
+                    <span class="coach-robot" aria-hidden="true">◉</span>
+                    <span class="coach-companion-bubble"><strong>your coach has a note</strong><small>Ask me what to do next.</small></span>
+                </button>
+                <section class="coach-chat-panel" id="coach-chat-panel" hidden aria-label="Chat with your AI coach">
+                    <header class="coach-chat-header">
+                        <div><span class="coach-robot coach-robot--small" aria-hidden="true">◉</span><div><strong>personal coach</strong><small>grounded in this report</small></div></div>
+                        <button type="button" class="coach-chat-close" id="coach-chat-close" aria-label="Close coach chat">×</button>
+                    </header>
+                    <div class="coach-chat-messages" id="coach-chat-messages" role="log" aria-live="polite">
+                        <div class="coach-chat-message coach-chat-message--ai">Hi, I'm your personal coach. Ask me about your next Short, your formats or how to improve this report.</div>
+                    </div>
+                    <form class="coach-chat-form" id="coach-chat-form">
+                        <textarea id="coach-chat-input" rows="2" maxlength="2000" placeholder="Ask your coach a question…" required></textarea>
+                        <button type="submit" class="va-primary">Send <span>→</span></button>
+                    </form>
+                </section>
             </div>
-
-            ${listCard("Winning Formats", "✅", result.performancePatterns?.winningFormats)}
-            ${listCard("Formats to Avoid", "⚠", result.performancePatterns?.weakFormats, "weak")}
-            ${listCard("Key Insights", "💡", result.keyInsights)}
-
-            <!-- Platform Playbook (static, always-true advice) -->
-            <div class="va-section-title"><div><span class="va-step">PLAYBOOK</span><h3>What Actually Moves the Needle</h3></div><p>Battle-tested principles, not generic tips.</p></div>
-            <div class="coach-playbook">
-                ${PLAYBOOK_TIPS.map(tip => `
-                    <article class="coach-playbook-item">
-                        <span>${tip.icon}</span>
-                        <div>
-                            <h5>${tip.title}</h5>
-                            <p>${tip.text}</p>
-                        </div>
-                    </article>
-                `).join("")}
-            </div>
-
-            ${listCard("Strategic Recommendations", "🧭", result.longTermRecommendations)}
         </div>`;
 
-    document.getElementById("coach-restart").addEventListener("click", handleAnalyzeClick);
+    document.getElementById("coach-restart")?.addEventListener("click", handleAnalyzeClick);
+    setupCoachChat();
+    startCompanionMessageRotation();
+
+}
+
+function startCompanionMessageRotation(){
+    const title = document.querySelector("#coach-companion-trigger .coach-companion-bubble strong");
+    const copy = document.querySelector("#coach-companion-trigger .coach-companion-bubble small");
+    if(!title || !copy) return;
+
+    let index = 0;
+    if(companionMessageTimer) clearInterval(companionMessageTimer);
+    companionMessageTimer = setInterval(() => {
+        index = (index + 1) % COMPANION_MESSAGES.length;
+        title.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
+        copy.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
+        title.textContent = COMPANION_MESSAGES[index][0];
+        copy.textContent = COMPANION_MESSAGES[index][1];
+    }, 4200);
+}
+
+function setupCoachChat(){
+    const trigger = document.getElementById("coach-companion-trigger");
+    const panel = document.getElementById("coach-chat-panel");
+    const close = document.getElementById("coach-chat-close");
+    const form = document.getElementById("coach-chat-form");
+    const input = document.getElementById("coach-chat-input");
+
+    if(!trigger || !panel || !form || !input) return;
+
+    const setOpen = open => {
+        panel.hidden = !open;
+        trigger.setAttribute("aria-expanded", String(open));
+        if(open) setTimeout(() => input.focus(), 50);
+    };
+
+    trigger.addEventListener("click", () => setOpen(panel.hidden));
+    close?.addEventListener("click", () => setOpen(false));
+    form.addEventListener("submit", handleCoachChatSubmit);
+}
+
+function appendCoachMessage(text, role){
+    const messages = document.getElementById("coach-chat-messages");
+    if(!messages) return;
+    const message = document.createElement("div");
+    message.className = `coach-chat-message coach-chat-message--${role}`;
+    message.textContent = text;
+    messages.appendChild(message);
+    messages.scrollTop = messages.scrollHeight;
+}
+
+async function handleCoachChatSubmit(event){
+    event.preventDefault();
+    if(coachChatRequestInFlight) return;
+
+    const input = document.getElementById("coach-chat-input");
+    const form = document.getElementById("coach-chat-form");
+    const submit = form?.querySelector("button[type=submit]");
+    const message = input?.value.trim();
+    if(!message) return;
+
+    coachChatRequestInFlight = true;
+    appendCoachMessage(message, "user");
+    input.value = "";
+    if(submit) submit.disabled = true;
+
+    try{
+        const response = await fetch(`${AI_ENDPOINT}/coach-chat`, {
+            method: "POST",
+            headers: await getAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ message, context: coachChatContext })
+        });
+        const data = await response.json().catch(() => ({}));
+        if(!response.ok || !data.reply){
+            throw new Error(data?.error || `HTTP ${response.status}`);
+        }
+        appendCoachMessage(String(data.reply), "ai");
+    } catch(error){
+        console.error("AI Coach chat error:", error);
+        appendCoachMessage("I couldn't reach the coach right now. Please try again in a moment.", "ai");
+    } finally{
+        coachChatRequestInFlight = false;
+        if(submit) submit.disabled = false;
+        input?.focus();
+    }
 
 }

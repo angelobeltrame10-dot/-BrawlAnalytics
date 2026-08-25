@@ -43,11 +43,137 @@ create table if not exists public.calibration_stats (
 alter table public.prediction_log enable row level security;
 alter table public.calibration_stats enable row level security;
 
-create policy "prediction_log_all_own" on public.prediction_log
-    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "prediction_log_all_own" on public.prediction_log;
+drop policy if exists "prediction_log_select_own" on public.prediction_log;
+drop policy if exists "prediction_log_insert_own" on public.prediction_log;
+drop policy if exists "prediction_log_delete_own" on public.prediction_log;
+create policy "prediction_log_select_own" on public.prediction_log
+    for select using (auth.uid() = user_id);
+create policy "prediction_log_insert_own" on public.prediction_log
+    for insert with check (auth.uid() = user_id);
+create policy "prediction_log_delete_own" on public.prediction_log
+    for delete using (auth.uid() = user_id);
 
-create policy "calibration_stats_all_own" on public.calibration_stats
-    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+-- Calibration outcomes are server-owned. The browser may read them, but
+-- cannot forge actual views or calibration weights through PostgREST.
+drop policy if exists "calibration_stats_all_own" on public.calibration_stats;
+drop policy if exists "calibration_stats_select_own" on public.calibration_stats;
+create policy "calibration_stats_select_own" on public.calibration_stats
+    for select using (auth.uid() = user_id);
 
-grant select, insert, update, delete on public.prediction_log to authenticated;
-grant select, insert, update, delete on public.calibration_stats to authenticated;
+revoke all on public.prediction_log from authenticated;
+grant select, insert, delete on public.prediction_log to authenticated;
+revoke all on public.calibration_stats from authenticated;
+grant select on public.calibration_stats to authenticated;
+
+drop function if exists public.resolve_prediction(uuid, numeric, numeric);
+
+create or replace function public.resolve_prediction(
+    p_id uuid,
+    p_actual_views numeric
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_uid uuid := auth.uid();
+    v_baseline numeric;
+    v_format text;
+    v_actual numeric := greatest(0, coalesce(p_actual_views, 0));
+    v_error numeric;
+    v_resolved boolean := false;
+begin
+    if v_uid is null then raise exception 'Not authenticated'; end if;
+
+    select predicted_baseline, format
+      into v_baseline, v_format
+      from public.prediction_log
+     where id = p_id and user_id = v_uid and resolved = false
+     for update;
+
+    if not found or coalesce(v_baseline, 0) <= 0 then
+        return false;
+    end if;
+
+    v_error := greatest(-10, least(10, (v_actual - v_baseline) / v_baseline));
+
+    update public.prediction_log
+       set actual_views = v_actual,
+           resolved = true,
+           error_ratio = v_error,
+           resolved_at = now()
+     where id = p_id and user_id = v_uid and resolved = false;
+
+    v_resolved := found;
+    if not v_resolved then return false; end if;
+
+    insert into public.calibration_stats(
+        user_id, dimension_type, dimension_key, sample_count,
+        mean_error, mean_abs_error, updated_at
+    ) values (
+        v_uid, 'global', 'global', 1, v_error, abs(v_error), now()
+    ) on conflict (user_id, dimension_type, dimension_key)
+    do update set
+        mean_error = (public.calibration_stats.mean_error * public.calibration_stats.sample_count + excluded.mean_error)
+            / (public.calibration_stats.sample_count + 1),
+        mean_abs_error = (public.calibration_stats.mean_abs_error * public.calibration_stats.sample_count + excluded.mean_abs_error)
+            / (public.calibration_stats.sample_count + 1),
+        sample_count = public.calibration_stats.sample_count + 1,
+        updated_at = now();
+
+    insert into public.calibration_stats(
+        user_id, dimension_type, dimension_key, sample_count,
+        mean_error, mean_abs_error, updated_at
+    ) values (
+        v_uid, 'format', left(coalesce(v_format, 'unknown'), 120), 1, v_error, abs(v_error), now()
+    ) on conflict (user_id, dimension_type, dimension_key)
+    do update set
+        mean_error = (public.calibration_stats.mean_error * public.calibration_stats.sample_count + excluded.mean_error)
+            / (public.calibration_stats.sample_count + 1),
+        mean_abs_error = (public.calibration_stats.mean_abs_error * public.calibration_stats.sample_count + excluded.mean_abs_error)
+            / (public.calibration_stats.sample_count + 1),
+        sample_count = public.calibration_stats.sample_count + 1,
+        updated_at = now();
+
+    return true;
+end;
+$$;
+
+create or replace function public.upsert_calibration_stat(
+    p_dimension_type text,
+    p_dimension_key text,
+    p_sample_count int,
+    p_mean_error numeric,
+    p_mean_abs_error numeric
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if auth.uid() is null then raise exception 'Not authenticated'; end if;
+    if p_dimension_type not in ('global', 'format', 'duration_bucket') then
+        raise exception 'Invalid dimension type';
+    end if;
+    insert into public.calibration_stats(
+        user_id, dimension_type, dimension_key, sample_count,
+        mean_error, mean_abs_error, updated_at
+    ) values (
+        auth.uid(), p_dimension_type, left(p_dimension_key, 120),
+        greatest(0, p_sample_count), p_mean_error, p_mean_abs_error, now()
+    )
+    on conflict (user_id, dimension_type, dimension_key)
+    do update set sample_count = excluded.sample_count,
+                  mean_error = excluded.mean_error,
+                  mean_abs_error = excluded.mean_abs_error,
+                  updated_at = now();
+end;
+$$;
+
+revoke all on function public.resolve_prediction(uuid, numeric) from public;
+revoke all on function public.upsert_calibration_stat(text, text, int, numeric, numeric) from public;
+revoke execute on function public.upsert_calibration_stat(text, text, int, numeric, numeric) from authenticated;
+grant execute on function public.resolve_prediction(uuid, numeric) to authenticated;

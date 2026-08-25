@@ -11,17 +11,20 @@
 
 import { getVideoTitle, getVideoViews } from "./js_csv_fields.js";
 
+import { getAuthHeaders } from "./js_auth_fetch.js";
+
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
 
 // Modello Groq di default (OpenAI-compatible). Vedi https://console.groq.com/docs/models
-const AI_MODEL = "llama-3.3-70b-versatile";
+const AI_MODEL = "openai/gpt-oss-120b";
 
 function buildRequestBody(messages, options = {}) {
     return {
         messages,
-        model: AI_MODEL,
+        // The Worker owns the model choice; this value is intentionally not sent.
         temperature: typeof options.temperature === "number" ? options.temperature : 0.7,
-        max_tokens: typeof options.maxTokens === "number" ? options.maxTokens : 2048
+        max_tokens: typeof options.maxTokens === "number" ? options.maxTokens : 2048,
+        ...(options.usageKind ? { usage_kind: options.usageKind } : {})
     };
 }
 
@@ -29,13 +32,27 @@ async function callWorker(messages, options = {}) {
 
     const response = await fetch(AI_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(buildRequestBody(messages, options))
     });
 
-    const data = await response.json();
+    let data = null;
+    try {
+        data = await response.json();
+    } catch {
+        data = {};
+    }
 
     if (!response.ok) {
+        // The backend returns { code: "usage_limit" } (HTTP 429) when the
+        // daily quota is exhausted. Surface that as a distinct, catchable
+        // signal instead of a generic message, so callers can open the
+        // upgrade modal and stop the pipeline instead of falling back.
+        if (data?.code === "usage_limit") {
+            const err = new Error(data?.error?.message || "Daily usage limit reached.");
+            err.code = "usage_limit";
+            throw err;
+        }
         const message = data?.error?.message || data?.error || `HTTP ${response.status}`;
         throw new Error(message);
     }
@@ -245,7 +262,7 @@ Do not include any introductory or additional text.
         const rispostaTesto = await callWorker([
             { role: "system", content: "You are an expert YouTube Shorts strategist specializing in Brawl Stars. Always respond with valid JSON arrays." },
             { role: "user", content: promptText }
-        ]);
+        ], { usageKind: "idea_generation" });
 
         if (!rispostaTesto) return [];
 
@@ -272,6 +289,12 @@ Do not include any introductory or additional text.
             }));
 
     } catch (error) {
+        // Quota giornaliera esaurita: non è un fallimento AI — va lasciata
+        // propagare come errore tipizzato così la UI apre il modale upgrade
+        // e NON mostra un fallback fasullo.
+        if (error?.code === "usage_limit") {
+            throw error;
+        }
         console.error("Errore durante la chiamata API di generazione idee:", error);
         return [];
     }
@@ -322,7 +345,7 @@ Do not include any introductory or additional text.
         const rispostaTesto = await callWorker([
             { role: "system", content: "You are an expert YouTube Shorts strategist specializing in Brawl Stars. Always respond with valid JSON arrays." },
             { role: "user", content: promptText }
-        ], { temperature: creativity });
+        ], { temperature: creativity, usageKind: "idea_generation" });
 
         if (!rispostaTesto) return [];
 
@@ -349,6 +372,12 @@ Do not include any introductory or additional text.
             }));
 
     } catch (error) {
+        // Quota giornaliera esaurita: non è un fallimento AI — va lasciata
+        // propagare come errore tipizzato così la UI apre il modale upgrade
+        // e NON mostra un fallback fasullo.
+        if (error?.code === "usage_limit") {
+            throw error;
+        }
         console.error("Errore durante la chiamata API di generazione idee (formato singolo):", error);
         return [];
     }

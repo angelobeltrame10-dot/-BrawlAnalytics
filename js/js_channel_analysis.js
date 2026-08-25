@@ -1,4 +1,4 @@
-import { discoverChannelFormats, expandFormatCoverage } from "./js_api.js";
+import { discoverChannelFormats, expandFormatCoverage } from "./js_api.js?v=20260825-profile-18";
 import { saveCustomFormats, loadCustomFormats } from "./js_storage.js";
 import { classifyVideosEffective, getFormatRanking } from "./js_fomats.js";
 import { showMessage } from "./js_ui.js";

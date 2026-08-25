@@ -25,15 +25,15 @@ import {
 from "./js_csv-parser.js";
 
 
-import { generaIdeeConAI, generaIdeeSuFormatSingolo } from "./js_api.js";
+import { generaIdeeConAI, generaIdeeSuFormatSingolo } from "./js_api.js?v=20260825-profile-18";
 
-import { showAnalysis } from "./js_router.js";
+import { showAnalysis } from "./js_router.js?v=20260825-profile-18";
 
-import { initFormatsManager, renderFormatCards, getEffectiveAssociatedVideos } from "./js_formats_manager.js";
+import { initFormatsManager, renderFormatCards, getEffectiveAssociatedVideos } from "./js_formats_manager.js?v=20260825-profile-18";
 
-import { initSubscription, consumeIdeaGeneration } from "./js_subscription.js";
+import { initSubscription } from "./js_subscription.js?v=20260825-profile-18";
 
-import { initTrends, setupTrendsRefresh, setupTrendsTabNavigation, setupCreatorTrendsRetry } from "./js_trends.js";
+import { initTrends, setupTrendsRefresh, setupTrendsTabNavigation, setupCreatorTrendsRetry, escapeHtml } from "./js_trends.js";
 
 import {
 
@@ -78,9 +78,9 @@ import {
     initVideoAnalysis
 
 }
-from "./js_video_analysis.js";
+from "./js_video_analysis.js?v=20260825-profile-18";
 
-import { reconcilePredictions } from "./js_learning_engine.js";
+import { reconcilePredictions, loadPredictionHistory } from "./js_learning_engine.js?v=20260825-1";
 
 
 import {
@@ -189,36 +189,96 @@ async function refreshChannelProfileIfNeeded(){
 
 }
 
+let dashboardInitialized = false;
+
 async function initDashboard(){
 
-    setupUpload();
-    setupTabs();
-    setupCustomFormats();
-    setupIdeaGeneration();
-    initFormatsManager();
-    setupTrendsRefresh();
-    setupTrendsTabNavigation();
-    setupCreatorTrendsRetry();
+    if (!dashboardInitialized) {
+        dashboardInitialized = true;
+        setupUpload();
+        setupTabs();
+        setupCustomFormats();
+        setupIdeaGeneration();
+        initFormatsManager();
+        setupTrendsRefresh();
+        setupTrendsTabNavigation();
+        setupCreatorTrendsRetry();
+
+        window.addEventListener("brawl:formats-changed", async () => {
+            await refreshChannelProfileIfNeeded();
+            refreshDashboard();
+        });
+    }
+
     initSubscription();
-
-    window.addEventListener("brawl:formats-changed", async () => {
-        await refreshChannelProfileIfNeeded();
-        refreshDashboard();
-    });
-
     customFormats = await loadCustomFormats();
-
     const savedData = await loadDashboardData();
-
     dashboardData = Array.isArray(savedData) ? savedData : [];
-
     await refreshDashboard();
-
 }
 
 
 
 function setupTabs(){
+
+    const appScreen = document.querySelector(".app-screen");
+    const appTabs = document.querySelector(".app-tabs");
+    let dashboardMenuButton = document.getElementById("dashboard-menu-button");
+    let dashboardMenuBackdrop = document.getElementById("dashboard-menu-backdrop");
+
+    if (appScreen && appTabs && !dashboardMenuButton) {
+        dashboardMenuButton = document.createElement("button");
+        dashboardMenuButton.type = "button";
+        dashboardMenuButton.id = "dashboard-menu-button";
+        dashboardMenuButton.className = "dashboard-menu-button";
+        dashboardMenuButton.setAttribute("aria-label", "open dashboard sections");
+        dashboardMenuButton.setAttribute("aria-expanded", "false");
+        dashboardMenuButton.innerHTML = "<span></span><span></span><span></span>";
+        appScreen.insertBefore(dashboardMenuButton, appTabs);
+
+        const dashboardMenuClose = document.createElement("button");
+        dashboardMenuClose.type = "button";
+        dashboardMenuClose.className = "dashboard-menu-close";
+        dashboardMenuClose.setAttribute("aria-label", "close dashboard sections");
+        dashboardMenuClose.textContent = "×";
+        appTabs.insertBefore(dashboardMenuClose, appTabs.firstChild);
+
+        dashboardMenuBackdrop = document.createElement("div");
+        dashboardMenuBackdrop.id = "dashboard-menu-backdrop";
+        dashboardMenuBackdrop.className = "dashboard-menu-backdrop";
+        appScreen.insertBefore(dashboardMenuBackdrop, appTabs.nextSibling);
+
+        const closeDashboardMenu = () => {
+            appTabs.classList.remove("dashboard-tabs-open");
+            dashboardMenuBackdrop.classList.remove("open");
+            dashboardMenuButton.setAttribute("aria-expanded", "false");
+            document.body.classList.remove("dashboard-menu-open");
+        };
+
+        const openDashboardMenu = () => {
+            appTabs.classList.add("dashboard-tabs-open");
+            dashboardMenuBackdrop.classList.add("open");
+            dashboardMenuButton.setAttribute("aria-expanded", "true");
+            document.body.classList.add("dashboard-menu-open");
+        };
+
+        dashboardMenuButton.addEventListener("click", () => {
+            if (appTabs.classList.contains("dashboard-tabs-open")) closeDashboardMenu();
+            else openDashboardMenu();
+        });
+        dashboardMenuClose.addEventListener("click", closeDashboardMenu);
+        dashboardMenuBackdrop.addEventListener("click", closeDashboardMenu);
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") closeDashboardMenu();
+        });
+        window.addEventListener("resize", () => {
+            if (window.innerWidth > 780) closeDashboardMenu();
+        });
+
+        appTabs.querySelectorAll(".app-tab").forEach(tab => {
+            tab.addEventListener("click", closeDashboardMenu);
+        });
+    }
 
     const tabs =
     document.querySelectorAll(
@@ -261,6 +321,14 @@ function setActiveTab(tab){
 
         }
     );
+
+    // On mobile, scroll to the top of the dashboard when switching sections
+    if(window.innerWidth <= 780){
+        const appScreen = document.querySelector('.app-screen');
+        if(appScreen){
+            appScreen.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+    }
 
     const sections = {
 
@@ -431,7 +499,7 @@ function renderFormatRows(){
                 <div class="format-row-rank">${index + 1}</div>
                 <div class="format-row-main">
                     <div class="format-row-name">
-                        ${name}
+                        ${escapeHtml(name)}
                         ${isBest ? `<span class="format-row-badge">Best</span>` : ""}
                     </div>
                     <div class="format-row-bar">
@@ -461,11 +529,11 @@ function renderIdeaHtml(ideas, topFormat) {
     return ideas.map((idea, index) => `
         <article class="idea-card fade-up" style="animation-delay: ${index * 0.1}s">
             <div class="idea-header">
-                <span class="idea-tag">${idea.format || topFormat || "Format"}</span>
+                <span class="idea-tag">${escapeHtml(idea.format || topFormat || "Format")}</span>
                 <span class="idea-score">${90 - index * 3}</span>
             </div>
             <div class="idea-body">
-                ${idea.text || idea}
+                ${escapeHtml(idea.text || idea)}
             </div>
         </article>
     `).join("");
@@ -489,13 +557,40 @@ async function renderIdeasFromCache() {
 
 }
 
-// Chiamata SOLO dal click su "Generate New Ideas" (dopo consumeIdeaGeneration).
+// Chiamata SOLO dal click su "Generate New Ideas".
+// Ritorna true se la generazione è stata bloccata dalla quota giornaliera
+// (così il chiamante può sopprimere il toast "Ideas updated"), false altrimenti.
 async function generateIdeasWithAI() {
  
     const ideaLists = document.querySelectorAll(".idea-list");
-    if (!ideaLists.length) return;
+    if (!ideaLists.length) return false;
  
-    const loadingHtml = `<div class="p-4 text-center">Generating personalized ideas with AI...</div>`;
+    // Pre-check rapido lato client (stato sincronizzato da get_usage_status):
+    // se la quota giornaliera per le idee è già a 0, apri subito il modale
+    // upgrade invece di avviare una generazione che il server rifiuterebbe.
+    try {
+        const sub = await import("./js_subscription.js?v=20260825-profile-18");
+        if (!sub.isProPlan(sub.getCurrentPlan()) && sub.getRemainingIdeaGenerations() <= 0) {
+            sub.openUpgradeModal();
+            // Non svuotare la lista: lascia visibili le ultime idee generate
+            // (rilette dallo storage) invece di "No ideas yet".
+            await renderIdeasFromCache();
+            showMessage("Daily idea limit reached. Upgrade to keep generating.");
+            return true;
+        }
+    } catch (err) {
+        console.warn("Ideas subscription precheck failed, continuing:", err);
+    }
+ 
+    const IDEA_GEAR_PATH = "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z";
+    const loadingHtml = `
+        <div class="idea-generating" role="status" aria-live="polite">
+            <div class="idea-generating__gears" aria-hidden="true">
+                <svg class="idea-gear idea-gear--big" viewBox="0 0 24 24"><path d="${IDEA_GEAR_PATH}"/></svg>
+                <svg class="idea-gear idea-gear--small" viewBox="0 0 24 24"><path d="${IDEA_GEAR_PATH}"/></svg>
+            </div>
+            <p>generating your ideas…</p>
+        </div>`;
     ideaLists.forEach(list => { list.innerHTML = loadingHtml; });
  
     const videos = getDashboardData();
@@ -523,16 +618,41 @@ async function generateIdeasWithAI() {
     }
  
     let ideeGenerate = [];
+    let quotaExhausted = false;
     if (videos.length > 0) {
-        if (selectedFormat === 'all') {
-            // Comportamento default: 1 idea per ciascuno dei top-3 formati
-            if (topFormats.length > 0) {
-                ideeGenerate = await generaIdeeConAI(topVideos, topFormats);
+        try {
+            if (selectedFormat === 'all') {
+                // Comportamento default: 1 idea per ciascuno dei top-3 formati
+                if (topFormats.length > 0) {
+                    ideeGenerate = await generaIdeeConAI(topVideos, topFormats);
+                }
+            } else {
+                // Formato specifico selezionato: tutte 3 idee per quel formato
+                ideeGenerate = await generaIdeeSuFormatSingolo(topVideos, selectedFormat, creativity);
             }
-        } else {
-            // Formato specifico selezionato: tutte 3 idee per quel formato
-            ideeGenerate = await generaIdeeSuFormatSingolo(topVideos, selectedFormat, creativity);
+        } catch (error) {
+            if (error?.code === "usage_limit") {
+                // Quota giornaliera esaurita: apri il modale upgrade e mostra lo
+                // stato reale, invece di ingannare l'utente con idee fasulle.
+                quotaExhausted = true;
+                console.warn("Ideas: quota giornaliera esaurita.", error.message);
+                const { openUpgradeModal } = await import("./js_subscription.js?v=20260825-profile-18");
+                openUpgradeModal();
+                showMessage("Daily idea limit reached. Upgrade to keep generating.");
+                // Niente idee fasulle e niente "No ideas yet": ripristina le
+                // ultime idee generate (lettura dallo storage) al posto del
+                // segnaposto "generating…" che abbiamo appena mostrato.
+                await renderIdeasFromCache();
+            } else {
+                // Altri errori AI: comportamento legacy — logga e lascia
+                // ideeGenerate vuoto, così si scende al fallback statico.
+                console.error("Ideas: generazione fallita.", error);
+            }
         }
+    }
+ 
+    if (quotaExhausted) {
+        return true;
     }
  
     if (ideeGenerate && ideeGenerate.length > 0) {
@@ -934,7 +1054,7 @@ function setupCustomFormats(){
         const html = customFormats.length > 0
             ? customFormats.map((entry, index) => `
                 <div class="ai-chip">
-                    <span>${entry.name}</span>
+                    <span>${escapeHtml(entry.name)}</span>
                     <button type="button" data-remove-format="${index}">×</button>
                 </div>`).join("")
             : '<div class="ai-empty-state">Add your first custom format</div>';
@@ -1037,22 +1157,55 @@ function setupIdeaGeneration(){
         return;
     }
 
-    const allowed = await consumeIdeaGeneration();
-
-    if(!allowed){
-        return;
-    }
-
     button.disabled = true;
 
-    await generateIdeasWithAI();
+    // generateIdeasWithAI() ritorna true quando la generazione è stata
+    // bloccata dalla quota giornaliera: in quel caso NON mostriamo il toast
+    // "Ideas updated", già sostituito dal messaggio di limite raggiunto.
+    const blockedByQuota = await generateIdeasWithAI();
 
     button.disabled = false;
 
-    showMessage("Ideas updated");
+    if(!blockedByQuota){
+        showMessage("Ideas updated");
+    }
 
 });
 
+}
+
+function formatHistoryViews(value){
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? formatCompactNumber(numeric) : "—";
+}
+
+async function renderPredictionHistory(){
+    const list = document.getElementById("prediction-history-list");
+    const status = document.getElementById("prediction-history-status");
+    if (!list) return;
+    const history = await loadPredictionHistory(8);
+    if (!history.length) {
+        list.innerHTML = '<div class="history-empty">No predictions logged yet.</div>';
+        if (status) status.textContent = "no data yet";
+        return;
+    }
+    list.innerHTML = history.map(item => {
+        const title = escapeHtml(item.video_title || "Untitled prediction");
+        const format = escapeHtml(item.format || "—");
+        const score = Number.isFinite(Number(item.virality_score)) ? Math.round(Number(item.virality_score)) : "—";
+        const baseline = formatHistoryViews(item.predicted_baseline);
+        const actual = item.resolved ? formatHistoryViews(item.actual_views) : "pending";
+        const date = item.created_at ? new Date(item.created_at).toLocaleDateString() : "—";
+        const state = item.resolved ? "resolved" : "waiting for a new CSV";
+        return `<article class="prediction-history-row">
+            <div class="prediction-history-main"><strong>${title}</strong><span>${format} · ${date}</span></div>
+            <div class="prediction-history-metric"><small>score</small><b>${score}</b></div>
+            <div class="prediction-history-metric"><small>forecast</small><b>${baseline}</b></div>
+            <div class="prediction-history-metric"><small>actual</small><b>${actual}</b></div>
+            <span class="prediction-history-state ${item.resolved ? "is-resolved" : ""}">${state}</span>
+        </article>`;
+    }).join("");
+    if (status) status.textContent = `${history.length} recent`;
 }
 
 function calculateGrowthRate(videos){
@@ -1195,6 +1348,7 @@ async function refreshDashboard(){
     }
 
     renderFormatRows();
+    await renderPredictionHistory();
     await renderIdeasFromCache();
     setActiveTab(activeTab);
 

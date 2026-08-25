@@ -28,11 +28,11 @@ import {
     isLoggedIn
 
 }
-from "./js_auth.js";
+from "./js_auth.js?v=20260825-profile-18";
 
-import { resetVideoAnalysisState } from "./js_video_analysis.js";
+import { resetVideoAnalysisState } from "./js_video_analysis.js?v=20260825-profile-18";
 
-import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
+import { getCurrentPlan, isProPlan, openUpgradeModal } from "./js_subscription.js?v=20260825-profile-18";
 
 function initNavigation(){
 
@@ -68,47 +68,27 @@ function initNavigation(){
 
         <nav class="navlinks">
 
-            <a
-                href="#faq"
-                id="nav-faq"
-            >
-                FAQ
-            </a>
+            <a href="#" id="nav-home" class="nav-home-top">Home</a>
 
+            <a href="#dashboard" id="nav-dashboard">Dashboard</a>
 
-            <button
-                id="nav-home"
-                class="hidden"
-            >
-                Home
-            </button>
+            <a href="#faq" id="nav-faq">FAQ</a>
 
+            <a href="about.html" id="nav-about">About</a>
 
-            <a
-                href="about.html"
-                id="nav-about"
-            >
-                About
-            </a>
+            <a href="#pricing" id="nav-pricing">Pricing</a>
 
-            
-            <a
-                href="#pricing"
-                id="nav-pricing"
-            >
-                Pricing
-            </a>
+            <a href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener" id="nav-contact">Contact</a>
 
-
-
-            <a
-                href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener"
-                id="nav-contact"
-            >
-                Contact
-            </a>
+            <button class="nav-drawer-close" id="nav-drawer-close" type="button" aria-label="close navigation">×</button>
 
         </nav>
+
+        <button class="menu-button" id="nav-menu-button" type="button" aria-label="open navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
 
         <div class="navbar__actions">
 
@@ -128,12 +108,8 @@ function initNavigation(){
 
             <div class="user-menu hidden" id="nav-user-menu">
 
-                <span class="user-email" id="nav-user-email"></span>
-
-                <button class="btn btn-outline btn-sm plan-badge" id="nav-plan-badge" type="button">FREE</button>
-
-                <button class="btn btn-outline btn-sm" id="nav-logout">
-                    Logout
+                <button class="profile-icon-btn" id="nav-profile-btn" type="button" aria-label="Open profile">
+                    <span class="profile-avatar" id="nav-user-avatar"></span>
                 </button>
 
             </div>
@@ -142,13 +118,45 @@ function initNavigation(){
 
     </div>
 
+    <div class="nav-drawer-backdrop" id="nav-drawer-backdrop"></div>
+
     `;
 
     const logo = document.getElementById("nav-logo");
     const home = document.getElementById("nav-home");
+    const dashboard = document.getElementById("nav-dashboard");
+    const navlinks = document.querySelector("#navbar .navlinks");
+    const menuButton = document.getElementById("nav-menu-button");
+    const drawerClose = document.getElementById("nav-drawer-close");
+    const drawerBackdrop = document.getElementById("nav-drawer-backdrop");
+
+    const closeDrawer = () => {
+        navlinks?.classList.remove("open");
+        drawerBackdrop?.classList.remove("open");
+        menuButton?.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("nav-drawer-open");
+    };
+
+    const openDrawer = () => {
+        navlinks?.classList.add("open");
+        drawerBackdrop?.classList.add("open");
+        menuButton?.setAttribute("aria-expanded", "true");
+        document.body.classList.add("nav-drawer-open");
+    };
+
+    menuButton?.addEventListener("click", openDrawer);
+    drawerClose?.addEventListener("click", closeDrawer);
+    drawerBackdrop?.addEventListener("click", closeDrawer);
+    navlinks?.querySelectorAll("a, button").forEach(link => link.addEventListener("click", closeDrawer));
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") closeDrawer();
+    });
+    window.addEventListener("resize", () => {
+        if (window.innerWidth > 780) closeDrawer();
+    });
 
     document.getElementById("nav-plan-badge")?.addEventListener("click", ()=>{
-        if(getCurrentPlan() !== "pro"){
+        if(!isProPlan(getCurrentPlan())){
             openUpgradeModal();
         }
     });
@@ -163,31 +171,37 @@ function initNavigation(){
         }
     });
 
-    document.getElementById("pricing-pro-btn")?.addEventListener("click", () => {
+    const openPricing = () => {
         if (isLoggedIn()) {
             openUpgradeModal();
         } else {
             openAuthModal("signup");
         }
-    });
+    };
+
+    document.getElementById("pricing-pro-btn")?.addEventListener("click", openPricing);
+    document.getElementById("pricing-pro-annual-btn")?.addEventListener("click", openPricing);
 
     document.getElementById("pricing-enterprise-btn")?.addEventListener("click", () => {
         window.open("https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com", "_blank");
     });
 
-    home?.addEventListener(
+    home?.addEventListener("click", (e) => {
+        e.preventDefault();
+        showLanding();
+        switchToHomeMode();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    });
 
-        "click",
-
-        ()=>{
-
-            showLanding();
-
-            switchToHomeMode();
-
+    dashboard?.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (isLoggedIn()) {
+            showApp();
+            switchToAppMode();
+        } else {
+            openAuthModal("login");
         }
-
-    );
+    });
 
     logo?.addEventListener(
 
@@ -271,84 +285,18 @@ function initNavigation(){
 }
 
 function switchToAppMode(){
-
-    document
-    .getElementById(
-        "nav-home"
-    )
-    ?.classList.remove(
-        "hidden"
+    ["nav-faq", "nav-pricing", "nav-about", "nav-dashboard"].forEach(id =>
+        document.getElementById(id)?.classList.add("hidden")
     );
-
-    document
-    .getElementById(
-        "nav-faq"
-    )
-    ?.classList.add(
-        "hidden"
+    ["nav-home", "nav-contact"].forEach(id =>
+        document.getElementById(id)?.classList.remove("hidden")
     );
-
-    document
-    .getElementById(
-        "nav-pricing"
-    )
-    ?.classList.add(
-        "hidden"
-    );
-
-    document
-    .getElementById(
-        "nav-about"
-    )
-    ?.classList.add(
-        "hidden"
-    );
-
-    // Keep Contact visible in both modes
-    document
-    .getElementById(
-        "nav-contact"
-    )
-    ?.classList.remove(
-        "hidden"
-    );
-
 }
 
 function switchToHomeMode(){
-
-    document
-    .getElementById(
-        "nav-home"
-    )
-    ?.classList.add(
-        "hidden"
+    ["nav-faq", "nav-pricing", "nav-about", "nav-home", "nav-dashboard", "nav-contact"].forEach(id =>
+        document.getElementById(id)?.classList.remove("hidden")
     );
-
-    document
-    .getElementById(
-        "nav-faq"
-    )
-    ?.classList.remove(
-        "hidden"
-    );
-
-    document
-    .getElementById(
-        "nav-pricing"
-    )
-    ?.classList.remove(
-        "hidden"
-    );
-
-    document
-    .getElementById(
-        "nav-about"
-    )
-    ?.classList.remove(
-        "hidden"
-    );
-
 }
 
 export {

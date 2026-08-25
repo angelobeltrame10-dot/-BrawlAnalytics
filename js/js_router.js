@@ -12,7 +12,7 @@
 
 import {
     initDashboard
-} from "./js_dashboard.js";
+} from "./js_dashboard.js?v=20260825-profile-18";
 
 import {
     simulateChannelAnalysis

@@ -23,7 +23,7 @@ import { calculateViralityScore, calculateScoreBreakdown, getScoreQualitative, g
 import { calculateConfidence, getConfidenceQualitative, getConfidenceFactors } from "./js_confidence.js";
 import { predictViewRange, formatViewRange, getPredictionContext } from "./js_view_prediction.js";
 import { generateStrengths, generateWeaknesses, generateCriticalIssues, generateSummary, generateActionPlan } from "./js_report_generator.js";
-import { logPrediction } from "./js_learning_engine.js";
+import { logPrediction } from "./js_learning_engine.js?v=20260825-1";
 
 export async function analyzeVirality(proposal, trendsAnalysis = null, videoInsights = null) {
     const channelProfile = await loadChannelProfile();

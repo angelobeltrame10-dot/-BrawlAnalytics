@@ -57,7 +57,7 @@ function renderTrends(container, trends){
         return `
             <div class="trend-card">
                 <span class="trend-rank">#${index + 1}</span>
-                <div class="trend-query">${trend}</div>
+                <div class="trend-query">${escapeHtml(trend)}</div>
                 <span class="trend-fire">🔥</span>
             </div>`;
     }).join("");
@@ -456,8 +456,8 @@ function getStatusClass(status){
     return 'emerging';
 }
 
-function escapeHtml(text){
-    if(!text) return '';
+export function escapeHtml(text){
+    if(text === null || text === undefined) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;

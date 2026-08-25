@@ -1,0 +1,133 @@
+/* Focused Hook Analyzer report after INSIGHTS. */
+.hook-action-plan {
+    margin: 0 0 3.5rem;
+    padding: 1.35rem;
+    border: 1px solid rgba(114,211,179,.24);
+    border-radius: var(--ui-radius);
+    background: rgba(114,211,179,.045);
+}
+
+.hook-action-plan__heading {
+    margin-bottom: 1.15rem;
+}
+
+.hook-first-impression,
+.hook-decision,
+.hook-plan-list {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: .9rem;
+    align-items: start;
+    padding: 1rem;
+    border: 1px solid var(--ui-line);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface);
+}
+
+.hook-first-impression {
+    margin-bottom: .75rem;
+    border-color: rgba(242,184,75,.32);
+    background: rgba(242,184,75,.07);
+}
+
+.hook-plan-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: 50%;
+    color: #15130d;
+    background: var(--ui-amber);
+    font: 800 .65rem var(--font-mono);
+}
+
+.hook-first-impression p,
+.hook-decision ul,
+.hook-plan-list ul {
+    margin: .45rem 0 0;
+    color: var(--ui-text);
+    font-size: .82rem;
+    line-height: 1.55;
+}
+
+.hook-decision-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem;
+    margin-bottom: .75rem;
+}
+
+.hook-decision--keep { border-color: rgba(114,211,179,.28); }
+.hook-decision--keep .hook-plan-icon { background: var(--ui-mint); }
+.hook-decision--fix { border-color: rgba(239,146,118,.3); }
+.hook-decision--fix .hook-plan-icon { background: var(--ui-coral); }
+
+.hook-decision h4,
+.hook-plan-list h4 {
+    margin: .38rem 0 0;
+    color: var(--ui-text);
+    font-size: .96rem;
+}
+
+.hook-decision ul,
+.hook-plan-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.hook-decision li,
+.hook-plan-list li {
+    margin-bottom: .45rem;
+}
+
+.hook-decision li::before,
+.hook-plan-list li::before {
+    content: "•";
+    margin-right: .45rem;
+    color: var(--ui-mint);
+}
+
+.hook-decision--fix li::before { color: var(--ui-coral); }
+.hook-plan-list { margin-bottom: .75rem; }
+.hook-plan-list--accent { border-color: rgba(242,184,75,.32); }
+.hook-plan-list--accent .hook-plan-icon { background: var(--ui-amber); }
+
+.hook-versions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+    margin-bottom: 2rem;
+}
+
+.hook-version-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 190px;
+    padding: 1.1rem;
+    border: 1px solid var(--ui-line);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface-raised);
+}
+
+.hook-version-card p {
+    flex: 1;
+    margin: .8rem 0 1rem;
+    color: var(--ui-text);
+    font-size: .84rem;
+    line-height: 1.55;
+}
+
+.hook-version-card--featured {
+    border-color: rgba(114,211,179,.42);
+    background: rgba(114,211,179,.08);
+}
+
+.hook-version-card .btn { min-height: 40px; }
+
+@media (max-width: 760px) {
+    .hook-decision-grid,
+    .hook-versions-grid { grid-template-columns: 1fr; }
+    .hook-action-plan { padding: 1rem; }
+}

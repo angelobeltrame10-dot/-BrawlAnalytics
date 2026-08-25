@@ -25,8 +25,8 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/css_variables.css">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/css_variables.css?v=20260825-ui-2">
     <link rel="stylesheet" href="css/css_reset.css">
     <link rel="stylesheet" href="css/css_layout.css">
     <link rel="stylesheet" href="css/css_buttons.css">
@@ -38,10 +38,12 @@
     <link rel="stylesheet" href="css/css_animations.css">
     <link rel="stylesheet" href="css/css_responsive.css">
     <link rel="stylesheet" href="css/css_analysis.css">
-    <link rel="stylesheet" href="css/css_subscription.css">
-    <link rel="stylesheet" href="css/css_auth.css">
-    <link rel="stylesheet" href="css/css_video_analysis.css">
+    <link rel="stylesheet" href="css/css_subscription.css?v=20260825-coach-10">
+    <link rel="stylesheet" href="css/css_auth.css?v=20260825-curtain-11">
+    <link rel="stylesheet" href="css/css_video_analysis.css?v=20260825-ui-2">
     <link rel="stylesheet" href="css/css_premium.css">
+    <link rel="stylesheet" href="css/css_design_refresh.css?v=20260825-coach-10">
+    <link rel="stylesheet" href="css/css_hook_report_refresh.css?v=20260825-ui-3">
     <script type="module" src="js/js_premium.js"></script>
 
     <script type="application/ld+json">
@@ -110,20 +112,27 @@
             <section class="hero">
                 <div class="hero-burst" aria-hidden="true"></div>
                 <div class="hero-content">
-                    <p class="hero-eyebrow">For Brawl Stars creators on YouTube Shorts</p>
-                    <h1 class="hero-title">Every Short hides a pattern.<br>We find it before it goes viral.</h1>
-                    <p class="hero-description">Upload your YouTube Studio CSV export, discover what makes your Shorts perform, and predict which videos have the highest viral potential.</p>
+                    <h1 class="hero-title">find the pattern<br>before you publish.</h1>
+                    <p class="hero-eyebrow">for brawl stars creators on youtube shorts</p>
+                    <div class="hero-terminal" aria-label="brawl analytics command terminal">
+                        <div class="hero-terminal__bar" aria-hidden="true">
+                            <span class="hero-terminal__dot"></span>
+                            <span class="hero-terminal__dot"></span>
+                            <span class="hero-terminal__dot"></span>
+                            <span class="hero-terminal__label">brawl analytics / terminal</span>
+                        </div>
+                        <div class="terminal-prompt" aria-live="polite">
+                            <span class="terminal-prompt__symbol">&gt;</span>
+                            <span class="terminal-prompt__text" id="terminal-prompt-text"></span><span class="terminal-prompt__cursor" aria-hidden="true"></span>
+                        </div>
+                    </div>
+                    <p class="hero-description">upload your youtube studio csv, see what actually performs, and turn the next short into a better decision.</p>
 
                     <div class="hero-actions">
-                        <button class="btn btn-primary btn-lg" id="dashboard-or-login-btn">Login</button>
-                        <button class="btn btn-outline btn-lg" id="signup-or-logout-btn">Sign up</button>
+                        <button class="btn btn-primary btn-lg" id="dashboard-or-login-btn">login</button>
+                        <button class="btn btn-outline btn-lg" id="signup-or-logout-btn">sign up</button>
                     </div>
 
-                    <div class="hero-stats">
-                        <div class="stat-chip"><span class="stat-chip-label">Virality Score</span><span class="stat-chip-value">92</span></div>
-                        <div class="stat-chip accent"><span class="stat-chip-label">Hook Strength</span><span class="stat-chip-value">87%</span></div>
-                        <div class="stat-chip blue"><span class="stat-chip-label">Top Format</span><span class="stat-chip-value">Trickshot</span></div>
-                    </div>
                 </div>
             </section>
 
@@ -452,16 +461,40 @@
                 <div class="site-footer__brand">
                     <strong>Brawl Analytics</strong>
                     <p>Not a YouTube/Supercell product.</p>
+                    <div class="site-footer__social-block">
+                        <span class="site-footer__social-title">Follow us</span>
+                        <div class="site-footer__socials" aria-label="Social links">
+                            <a href="https://www.tiktok.com/@brawl_analytics?is_from_webapp=1&amp;sender_device=pc" target="_blank" rel="noopener" aria-label="TikTok">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.8 3c.3 1.8 1.3 3 3.2 3.2v2.4c-1.2 0-2.3-.4-3.2-1v6.2a5.2 5.2 0 1 1-4.5-5.1v2.5a2.7 2.7 0 1 0 2 2.6V3h2.5Z" fill="currentColor"/></svg>
+                            </a>
+                            <a href="https://www.instagram.com/shiftmindset2026?utm_source=ig_web_button_share_sheet&amp;igsi=ZDNlZDc0MzIxNw==" target="_blank" rel="noopener" aria-label="Instagram">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <nav class="site-footer__links" aria-label="Footer navigation">
-                    <a href="documentation.html">Documentation</a>
-                    <a href="features.html">Features</a>
-                    <a href="about.html">About</a>
-                    <a href="legal/terms.html" target="_blank" rel="noopener">Terms & Conditions</a>
-                    <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
-                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener">Contact</a>
-                </nav>
-                <p class="site-footer__legal">© 2026 Brawl Analytics</p>
+                <div class="site-footer__groups">
+                    <div class="site-footer__group">
+                        <h3>Product</h3>
+                        <a href="#" data-action="login">Dashboard</a>
+                        <a href="documentation.html">Documentation</a>
+                        <a href="features.html">Features</a>
+                        <a href="#pricing">Pricing</a>
+                    </div>
+                    <div class="site-footer__group">
+                        <h3>Company</h3>
+                        <a href="about.html">About</a>
+                        <a href="https://mail.google.com/mail/?view=cm&fs=1&to=angeskicollab10@gmail.com" target="_blank" rel="noopener">Contact</a>
+                    </div>
+                    <div class="site-footer__group">
+                        <h3>Legal</h3>
+                        <a href="legal/terms.html" target="_blank" rel="noopener">Terms & Conditions</a>
+                        <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+                    </div>
+                </div>
+                <div class="site-footer__meta">
+                    <p class="site-footer__legal">© 2026 Brawl Analytics</p>
+                </div>
             </footer>
 
         </section>
@@ -470,6 +503,6 @@
         <section id="analysis-screen" class="screen" hidden></section>
     </main>
     <div id="toast-container"></div>
-    <script type="module" src="js/js_app.js"></script>
+    <script type="module" src="js/js_app.js?v=20260825-profile-18"></script>
 </body>
 </html>

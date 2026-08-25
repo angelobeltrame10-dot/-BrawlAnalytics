@@ -1,8 +1,0 @@
-{
-  "name": "brawl-ai-backend",
-  "compatibility_date": "2026-07-16",
-  "main": "src/index.ts",
-  "observability": {
-    "enabled": true
-  }
-}

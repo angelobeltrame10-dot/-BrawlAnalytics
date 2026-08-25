@@ -519,7 +519,8 @@ function renderVideoAnalysis(flow){
         "Detecting on-screen text",
         "Comparing with previous Shorts",
         "Reading current trends",
-        "Estimating virality"
+        "Estimating virality",
+        "Writing report"
     ];
 
     flow.innerHTML = `
@@ -563,7 +564,7 @@ function renderVideoResults(flow){
 
     flow.innerHTML = `
         <div class="va-results">
-            <div class="va-results-hero"><div><span class="va-eyebrow">SIMULATED REPORT</span><h3>Your Short has <em>strong</em> viral potential.</h3><p>Every value below is demonstrative placeholder data, ready for a future analysis engine.</p></div><button class="va-outline" id="va-restart" type="button">Analyse another video →</button></div>
+            <div class="va-results-hero"><div><span class="va-eyebrow">SIMULATED REPORT</span><h3>Your Short has <span class="va-emphasis">strong</span> viral potential.</h3><p>Every value below is demonstrative placeholder data, ready for a future analysis engine.</p></div><button class="va-outline" id="va-restart" type="button">Analyse another video →</button></div>
             <div class="va-score-grid"><article class="va-metric va-score"><span>VIRALITY SCORE</span><strong><b id="va-score-value">0</b><small>/ 100</small></strong><i>↗ High potential</i><p>Strong early signals, format fit and audience relevance.</p></article><article class="va-metric"><span>CONFIDENCE</span><strong>94%</strong><i>High confidence</i><div class="va-progress"><i style="width:94%"></i></div><p>Based on available simulated signals.</p></article><article class="va-metric va-views"><span>ESTIMATED VIEWS</span><strong>120K <b>–</b> 350K</strong><p>This range is an estimate, not a guarantee.</p></article></div>
             <div class="va-section-title"><div><span class="va-step">SIGNAL MAP</span><h3>Score breakdown</h3></div><p>Where the simulated score comes from.</p></div>
             <div class="va-breakdown">${breakdown.map(([name,value])=> `<div><p><span>${name}</span><strong>${value}</strong></p><div class="va-progress"><i style="width:${value}%"></i></div></div>`).join("")}</div>

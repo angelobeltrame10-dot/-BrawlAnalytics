@@ -27,14 +27,36 @@ export default {
       );
     }
 
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !(await isValidSupabaseUser(authHeader, env))) {
+      return jsonResponse({ error: 'Unauthorized' }, 401, headers);
+    }
+
+    if (env.RATE_LIMITER?.limit) {
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const limited = await env.RATE_LIMITER.limit({ key: `video:${ip}` });
+      if (limited.success === false) {
+        return jsonResponse({ error: 'Too many requests. Please try again shortly.' }, 429, headers);
+      }
+    }
+
+    const contentLength = Number(request.headers.get('Content-Length') || 0);
+    const maxRequestBytes = (parseInt(env.MAX_VIDEO_SIZE_MB, 10) || 100) * 1024 * 1024 + 1024 * 1024;
+    if (contentLength > maxRequestBytes) {
+      return jsonResponse({ error: 'Uploaded video is too large.' }, 413, headers);
+    }
+
     const url = new URL(request.url);
 
     if (url.pathname === '/analyze-video') {
-      return await handleAnalyzeVideo(request, env, origin);
+      return await handleAnalyzeVideo(request, env, origin, authHeader);
     }
 
     if (url.pathname === '/analyze-hook-video') {
-      return await handleAnalyzeHookVideo(request, env, origin);
+      if (!(await isProSupabaseUser(authHeader, env))) {
+        return jsonResponse({ error: 'Pro plan required' }, 403, headers);
+      }
+      return await handleAnalyzeHookVideo(request, env, origin, authHeader);
     }
 
     return jsonResponse(
@@ -47,16 +69,15 @@ export default {
 
 // ==================== MAIN HANDLER ====================
 
-async function handleAnalyzeVideo(request, env, origin) {
+async function handleAnalyzeVideo(request, env, origin, authHeader) {
   const startTime = Date.now();
   const headers = corsHeaders(origin);
-
   if (!env.GEMINI_API_KEY) {
     return jsonResponse(
-      { error: 'Server configuration error: Missing GEMINI_API_KEY' },
-      500,
-      headers
-    );
+        { error: 'Server configuration error.' },
+        500,
+        headers
+      );
   }
 
   // FIX: il modello configurato ("gemini-3.5-Flash-Lite" nelle env vars)
@@ -79,6 +100,14 @@ async function handleAnalyzeVideo(request, env, origin) {
         400,
         headers
       );
+    }
+
+    const usage = await consumeUsage(authHeader, env, 'video_analysis');
+    if (usage.unavailable) {
+      return jsonResponse({ error: 'Unable to verify usage right now.' }, 503, headers);
+    }
+    if (!usage.allowed) {
+      return jsonResponse({ error: 'Daily usage limit reached.', code: 'usage_limit' }, 429, headers);
     }
 
     // Step 2: Upload video to Gemini
@@ -921,11 +950,11 @@ function parseAndValidateHookResponse(text) {
   };
 }
 
-async function handleAnalyzeHookVideo(request, env, origin) {
+async function handleAnalyzeHookVideo(request, env, origin, authHeader) {
   const headers = corsHeaders(origin);
 
   if (!env.GEMINI_API_KEY) {
-    return jsonResponse({ error: 'Server configuration error: Missing GEMINI_API_KEY' }, 500, headers);
+    return jsonResponse({ error: 'Server configuration error.' }, 500, headers);
   }
 
   const resolvedModel = String(env.GEMINI_MODEL || 'gemini-2.5-flash').trim().toLowerCase();
@@ -935,6 +964,14 @@ async function handleAnalyzeHookVideo(request, env, origin) {
     if (uploadError) {
       console.error('[Hook Upload Error]', uploadError);
       return jsonResponse(buildErrorResponse(uploadError), 400, headers);
+    }
+
+    const usage = await consumeUsage(authHeader, env, 'video_analysis');
+    if (usage.unavailable) {
+      return jsonResponse({ error: 'Unable to verify usage right now.' }, 503, headers);
+    }
+    if (!usage.allowed) {
+      return jsonResponse({ error: 'Daily usage limit reached.', code: 'usage_limit' }, 429, headers);
     }
 
     const { uri, error: geminiUploadError } = await uploadVideoToGemini(file, env.GEMINI_API_KEY);
@@ -1044,7 +1081,7 @@ function categorizeError(error) {
 function corsHeaders(origin) {
   const headers = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-File-Name',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
   };
@@ -1054,6 +1091,62 @@ function corsHeaders(origin) {
   }
 
   return headers;
+}
+
+async function isValidSupabaseUser(authHeader, env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !/^Bearer\s+\S+$/i.test(authHeader)) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/user`, {
+      headers: {
+        Authorization: authHeader,
+        apikey: env.SUPABASE_ANON_KEY
+      }
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function isProSupabaseUser(authHeader, env) {
+  try {
+    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/get_usage_status`, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        apikey: env.SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return Array.isArray(data) && ['pro', 'pro_m', 'pro_a'].includes(data[0]?.plan);
+  } catch {
+    return false;
+  }
+}
+
+async function consumeUsage(authHeader, env, kind) {
+  if (!['video_analysis'].includes(kind)) return { allowed: true };
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return { allowed: false, unavailable: true };
+
+  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/try_consume_usage`, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader,
+      apikey: env.SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ p_kind: kind })
+  });
+
+  if (!response.ok) return { allowed: false, unavailable: true };
+  const data = await response.json();
+  const row = Array.isArray(data) ? data[0] : data;
+  return { allowed: row?.allowed === true, plan: row?.plan || 'free', remaining: row?.remaining ?? 0 };
 }
 
 function jsonResponse(body, status, headers) {

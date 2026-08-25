@@ -512,11 +512,10 @@ function parseCSV(file){
     - i campi numerici (visualizzazioni, iscritti, ecc.) in Number
     - "Durata di visualizzazione media" in secondi
     - "Ora pubblicazione video" in un vero oggetto Date
-*/
-
-function cleanCSVData(
+*/function cleanCSVData(
     data
-){
+)
+{
 
     return data
 
@@ -545,6 +544,26 @@ function cleanCSVData(
     .filter(
 
         row=> !isTotaleRow(row)
+
+    )
+
+    .filter(
+
+        row=>{
+
+            const duration = toNumberOrNull(row["Durata"]);
+
+            if(duration !== null && duration > 180){
+
+                console.log(`CSV Parser: Excluding non-Short content "${row["Titolo video"] || row["Video title"] || row["Contenuti"]}" (duration: ${duration}s > 180s)`);
+
+                return false;
+
+            }
+
+            return true;
+
+        }
 
     )
 
@@ -604,15 +623,18 @@ function cleanCSVData(
 
             );
 
+            const publishDateRaw = cleanRow["Ora pubblicazione video"]
+                || cleanRow["Video publish time"]
+                || cleanRow["Date publie"]
+                || cleanRow["Fecha de publicación del video"]
+                || cleanRow["Veröffentlichungszeit des Videos"]
+                || cleanRow["Data di pubblicazione"];
+
             cleanRow[
 
                 "Data pubblicazione"
 
-            ] = parsePublishDate(
-
-                cleanRow["Ora pubblicazione video"]
-
-            );
+            ] = parsePublishDate(publishDateRaw);
 
             return cleanRow;
 

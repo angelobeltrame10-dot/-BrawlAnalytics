@@ -1,23 +1,23 @@
 .auth-modal{position:relative;max-width:420px;padding:2.5rem 2.25rem}
-.auth-close{position:absolute;top:1.25rem;right:1.25rem;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.06);color:var(--color-text-muted);font-size:1.3rem;line-height:1}
+.auth-close{position:absolute;top:1.25rem;right:1.25rem;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:rgba(13,18,23,.7);color:var(--color-text-muted);font-size:1.3rem;line-height:1;z-index:6}
 .auth-close:hover{background:rgba(255,255,255,.12);color:var(--color-text)}
 .auth-title{font-family:var(--font-display);font-size:1.9rem;margin-bottom:.6rem;padding-right:2rem}
 .auth-switch{color:var(--color-text-muted);font-size:.9rem;margin-bottom:1.75rem}
-.auth-switch a{color:#9B8CFF;font-weight:700}
+.auth-switch a{color:var(--ui-mint);font-weight:800}
 .auth-switch a:hover{text-decoration:underline}
 .auth-form{display:flex;flex-direction:column;gap:.9rem}
 .auth-input{width:100%;background:var(--color-surface-light);border:1.5px solid transparent;border-radius:12px;padding:.9rem 1rem;color:var(--color-text);font-size:.95rem;transition:border-color var(--transition-fast)}
-.auth-input:focus{outline:none;border-color:#9B8CFF}
+.auth-input:focus{outline:none;border-color:var(--ui-mint)}
 .auth-input::placeholder{color:var(--color-text-faded)}
 .auth-password-field{position:relative}
 .auth-password-field .auth-input{padding-right:2.75rem}
 .auth-eye-toggle{position:absolute;top:50%;right:.9rem;transform:translateY(-50%);color:var(--color-text-muted);font-size:1rem}
 .auth-eye-toggle:hover{color:var(--color-text)}
 .auth-checkbox{display:flex;align-items:flex-start;gap:.6rem;color:var(--color-text-muted);font-size:.85rem;margin-top:.2rem;cursor:pointer}
-.auth-checkbox input{width:18px;height:18px;flex-shrink:0;margin-top:.1rem;accent-color:#9B8CFF}
-.auth-checkbox a{color:#9B8CFF;font-weight:700}
-.auth-submit-btn{width:100%;margin-top:1.5rem;padding:.95rem;border-radius:12px;border:none;background:linear-gradient(180deg,#8E7BFF,#6E56FF);color:#fff;font-weight:800;font-size:.95rem;box-shadow:0 8px 20px rgba(110,86,255,.35);transition:transform var(--transition-fast),box-shadow var(--transition-fast)}
-.auth-submit-btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(110,86,255,.45)}
+.auth-checkbox input{width:18px;height:18px;flex-shrink:0;margin-top:.1rem;accent-color:var(--ui-mint)}
+.auth-checkbox a{color:var(--ui-mint);font-weight:800}
+.auth-submit-btn{width:100%;margin-top:1.5rem;padding:.95rem;border-radius:var(--ui-radius-sm);border:1px solid var(--ui-amber);background:var(--ui-amber);color:#15130d;font-weight:800;font-size:.95rem;box-shadow:none;transition:transform var(--transition-fast),box-shadow var(--transition-fast),background var(--transition-fast)}
+.auth-submit-btn:hover{transform:translateY(-2px);background:var(--ui-amber-soft);box-shadow:0 8px 20px rgba(242,184,75,.2)}
 .auth-submit-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .auth-error,.auth-success{border-radius:10px;padding:.7rem 1rem;font-size:.85rem;margin-bottom:1rem}
 .auth-error{background:rgba(255,84,112,.12);color:var(--color-danger);border:1px solid rgba(255,84,112,.25)}
@@ -47,14 +47,14 @@
 
 /* ---------- Buttons lift ---------- */
 .auth-submit-btn{transition:transform .18s cubic-bezier(.22,.61,.36,1),box-shadow .18s ease,filter .18s ease}
-.auth-submit-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 26px rgba(110,86,255,.5)}
+.auth-submit-btn:hover:not(:disabled){transform:translateY(-2px);background:var(--ui-amber-soft);box-shadow:0 8px 20px rgba(242,184,75,.2)}
 .auth-submit-btn:active:not(:disabled){transform:translateY(0) scale(.98)}
 
 .auth-switch-link,#auth-switch-link{transition:color .18s ease}
 
 /* ---------- Input focus polish ---------- */
 .auth-input{transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}
-.auth-input:focus{transform:scale(1.01);box-shadow:0 0 0 4px rgba(155,140,255,.15)}
+.auth-input:focus{transform:scale(1.01);box-shadow:0 0 0 4px rgba(114,211,179,.14)}
 
 /* ---------- Error / success message animation ---------- */
 .auth-error,.auth-success{
@@ -78,10 +78,293 @@
 .auth-success-overlay.active{opacity:1;transform:scale(1);pointer-events:all}
 .auth-success-spinner{
     width:34px;height:34px;border-radius:50%;
-    border:3px solid rgba(255,255,255,.15);border-top-color:#9B8CFF;
+    border:3px solid rgba(255,255,255,.15);border-top-color:var(--ui-mint);
     animation:authSpin .7s linear infinite;
 }
 @keyframes authSpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){
     .auth-success-spinner{animation-duration:1.4s}
+}
+
+/* Auth modal: fixed-height stage with a fully opaque mint curtain. */
+#auth-modal-overlay .auth-modal {
+    position: relative;
+    width: min(92vw, 760px);
+    max-width: 760px;
+    min-height: 640px;
+    padding: 0;
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-line-strong);
+    border-radius: var(--ui-radius);
+    box-shadow: var(--ui-shadow);
+}
+
+#auth-modal-overlay .auth-content {
+    position: absolute;
+    z-index: 1;
+    inset: 0 auto 0 0;
+    width: 50%;
+    min-height: 640px;
+    margin-left: 0;
+    padding: 4rem 2.75rem 2.25rem;
+    background: var(--ui-surface);
+    transform: translateX(0);
+    transition: transform .45s cubic-bezier(.22,.61,.36,1);
+    overflow-y: auto;
+}
+
+#auth-modal-overlay .auth-modal.is-signup .auth-content {
+    margin-left: 0;
+    transform: translateX(100%);
+}
+
+#auth-modal-overlay .auth-curtain {
+    position: absolute;
+    z-index: 3;
+    inset: 1rem auto 1rem 1rem;
+    width: calc(50% - 1.5rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.6rem 1.5rem;
+    background:
+        radial-gradient(130% 90% at 85% -12%, rgba(114,211,179,.18), transparent 55%),
+        linear-gradient(168deg, #10463a 0%, #0b3228 58%, #07211b 100%);
+    opacity: 1;
+    color: #edf3f0;
+    border-radius: var(--ui-radius-sm);
+    pointer-events: auto;
+    transform: translateX(0);
+    transition: transform .62s cubic-bezier(.77,0,.18,1);
+    box-shadow: 14px 0 30px rgba(0,0,0,.24);
+    overflow: hidden;
+}
+
+.auth-curtain-brand {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font: 800 .68rem var(--font-mono);
+    letter-spacing: .14em;
+    text-transform: lowercase;
+    color: rgba(237,242,239,.94);
+}
+.auth-curtain-brand i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ui-mint);
+    box-shadow: 0 0 10px rgba(114,211,179,.85);
+}
+
+/* Signal radar: the analysis metaphor of the product. */
+.auth-curtain-radar {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    margin: auto;
+    border-radius: 50%;
+    overflow: hidden;
+}
+.auth-radar-ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(114,211,179,.22);
+    border-radius: 50%;
+}
+.auth-radar-ring--2 { inset: 19%; }
+.auth-radar-ring--3 { inset: 38%; }
+.auth-radar-sweep {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(114,211,179,.55), rgba(114,211,179,.1) 60deg, transparent 95deg);
+    animation: authRadarSpin 4.2s linear infinite;
+}
+.auth-radar-core {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--ui-mint);
+    box-shadow: 0 0 14px rgba(114,211,179,.95);
+}
+.auth-radar-blip {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ui-amber);
+    box-shadow: 0 0 8px rgba(242,184,75,.7);
+    animation: authBlip 3.4s ease-in-out infinite;
+}
+.auth-radar-blip--1 { top: 24%; left: 60%; }
+.auth-radar-blip--2 { top: 62%; left: 28%; animation-delay: 1.7s; }
+
+.auth-curtain-foot {
+    display: flex;
+    flex-direction: column;
+    gap: .95rem;
+    width: 100%;
+}
+.auth-curtain-caption {
+    color: rgba(237,242,239,.52);
+    font: 600 .58rem var(--font-mono);
+    letter-spacing: .14em;
+    text-transform: lowercase;
+}
+.auth-curtain-socials {
+    display: flex;
+    gap: .5rem;
+}
+.auth-curtain-socials a {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    color: rgba(237,242,239,.88);
+    border: 1px solid rgba(237,242,239,.26);
+    border-radius: 50%;
+    background: rgba(237,242,239,.06);
+    transition: background .18s ease, transform .18s ease, border-color .18s ease;
+}
+.auth-curtain-socials a:hover {
+    background: rgba(114,211,179,.18);
+    border-color: rgba(114,211,179,.5);
+    transform: translateY(-2px);
+}
+.auth-curtain-socials svg { width: 15px; height: 15px; }
+
+@keyframes authRadarSpin { to { transform: rotate(360deg); } }
+@keyframes authBlip {
+    0%, 100% { opacity: .15; transform: scale(.7); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+#auth-modal-overlay .auth-modal.curtain-to-right .auth-curtain {
+    transform: translateX(calc(100% + 1rem));
+}
+
+#auth-modal-overlay .auth-modal.is-signup .auth-curtain {
+    transform: translateX(0);
+}
+
+#auth-modal-overlay .auth-modal.curtain-to-left .auth-curtain {
+    transform: translateX(0);
+}
+
+#auth-modal-overlay .auth-input {
+    background: var(--ui-surface-raised);
+    border-color: var(--ui-line);
+}
+
+#auth-modal-overlay .auth-input::placeholder { color: var(--ui-faded); }
+
+#auth-modal-overlay .auth-title {
+    color: var(--ui-text);
+    font-size: clamp(1.55rem, 3vw, 2.05rem);
+    letter-spacing: -.04em;
+}
+
+#auth-modal-overlay .auth-switch,
+#auth-modal-overlay .auth-error,
+#auth-modal-overlay .auth-success {
+    position: relative;
+    z-index: 2;
+}
+
+#auth-modal-overlay .auth-panels {
+    min-height: 300px;
+}
+
+#auth-modal-overlay .auth-form {
+    gap: .8rem;
+}
+
+#auth-modal-overlay .auth-login-form,
+#auth-modal-overlay #auth-signup-panel {
+    min-height: 300px;
+}
+
+#auth-modal-overlay .auth-login-form {
+    justify-content: center;
+}
+
+#auth-modal-overlay .auth-content {
+    padding-top: 4.75rem;
+}
+
+#auth-modal-overlay .auth-modal.is-signup .auth-content {
+    padding-top: 4.75rem;
+}
+
+#auth-modal-overlay .auth-success-overlay {
+    z-index: 5;
+}
+
+@media (max-width: 680px) {
+    #auth-modal-overlay .auth-modal {
+        width: min(94vw, 430px);
+        min-height: 680px;
+    }
+    #auth-modal-overlay .auth-content,
+    #auth-modal-overlay .auth-modal.is-signup .auth-content {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 68%;
+        min-height: 680px;
+        margin: 0;
+        padding: 4.5rem 1.2rem 2rem;
+        transform: none;
+    }
+    #auth-modal-overlay .auth-modal.is-signup .auth-content {
+        left: auto;
+        right: 0;
+    }
+    #auth-modal-overlay .auth-curtain {
+        inset: .75rem .75rem .75rem auto;
+        width: 29%;
+        height: auto;
+        align-items: flex-start;
+        padding: .9rem;
+        transform: none !important;
+    }
+    #auth-modal-overlay .auth-modal.is-signup .auth-curtain,
+    #auth-modal-overlay .auth-modal.curtain-to-left .auth-curtain {
+        left: .75rem;
+        right: auto;
+        transform: none !important;
+    }
+    #auth-modal-overlay .auth-curtain-brand {
+        gap: .35rem;
+        font-size: .56rem;
+        letter-spacing: .1em;
+    }
+    #auth-modal-overlay .auth-curtain-brand i { width: 6px; height: 6px; }
+    #auth-modal-overlay .auth-curtain-radar {
+        width: 76px;
+        height: 76px;
+    }
+    #auth-modal-overlay .auth-radar-blip--1 { top: 22%; left: 58%; }
+    #auth-modal-overlay .auth-curtain-socials {
+        gap: .3rem;
+    }
+    #auth-modal-overlay .auth-curtain-socials a {
+        width: 26px;
+        height: 26px;
+    }
+    #auth-modal-overlay .auth-curtain-socials svg { width: 12px; height: 12px; }
+    #auth-modal-overlay .auth-curtain-caption { display: none; }
+    #auth-modal-overlay .auth-panels { min-height: 300px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #auth-modal-overlay .auth-curtain { transition: none; }
+    .auth-radar-sweep,
+    .auth-radar-blip { animation: none; }
 }

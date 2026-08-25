@@ -15,7 +15,10 @@ alter table public.profiles
     add column if not exists stripe_customer_id text,
     add column if not exists stripe_subscription_id text,
     add column if not exists subscription_status text,
-    add column if not exists current_period_end timestamptz;
+    add column if not exists current_period_end timestamptz,
+    add column if not exists pro_started_at timestamptz,
+    add column if not exists total_ideas_generated int not null default 0,
+    add column if not exists total_videos_analyzed int not null default 0;
 
 -- ----------------------------------------------------------
 -- 2. Creazione automatica del profilo alla registrazione.
@@ -30,8 +33,8 @@ security definer
 set search_path = public
 as $$
 begin
-    insert into public.profiles(id, email, plan, created_at)
-    values (new.id, new.email, 'free', now())
+    insert into public.profiles(id, email, plan, pro_started_at, created_at)
+    values (new.id, new.email, 'free', null, now())
     on conflict (id) do nothing;
 
     return new;

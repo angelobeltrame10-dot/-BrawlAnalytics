@@ -22,14 +22,24 @@
 import { getSupabaseClient } from "./js_supabase_client.js";
 
 import { resetStorageCache } from "./js_storage.js";
-import { switchToAppMode, switchToHomeMode } from "./js_navigation.js";
-import { showApp } from "./js_router.js";
+import { switchToAppMode, switchToHomeMode } from "./js_navigation.js?v=20260825-profile-18";
+import { showApp } from "./js_router.js?v=20260825-profile-18";
 
 
 let currentUser = null;
 let currentSession = null;
 let authInitialized = false;
 let modalMode = "login"; // "login" | "signup"
+
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
+let failedLoginAttempts = Number(sessionStorage.getItem("brawl-login-failed-attempts") || 0);
+let loginLockedUntil = Number(sessionStorage.getItem("brawl-login-locked-until") || 0);
+
+function persistLoginGuard(){
+    sessionStorage.setItem("brawl-login-failed-attempts", String(failedLoginAttempts));
+    sessionStorage.setItem("brawl-login-locked-until", String(loginLockedUntil));
+}
 
 /* ==========================================================
    GETTERS PUBBLICI
@@ -145,7 +155,29 @@ function mapAuthError(error){
    LOGIN
 ========================================================== */
 
+function getLoginLockMessage(){
+    const minutes = Math.max(1, Math.ceil((loginLockedUntil - Date.now()) / 60000));
+    return `Too many incorrect attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+}
+
+function isInvalidLoginError(error){
+    const message = String(error?.message || "").toLowerCase();
+    return message.includes("invalid login credentials")
+        || message.includes("invalid credentials")
+        || message.includes("user not found");
+}
+
 async function login(email, password){
+
+    if(loginLockedUntil > Date.now()){
+        return { success:false, error:getLoginLockMessage(), locked:true };
+    }
+
+    if(loginLockedUntil && loginLockedUntil <= Date.now()){
+        failedLoginAttempts = 0;
+        loginLockedUntil = 0;
+        persistLoginGuard();
+    }
 
     if(!navigator.onLine){
         return { success:false, error:"No internet connection. Please try again." };
@@ -166,9 +198,26 @@ async function login(email, password){
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
         if(error){
+            if(isInvalidLoginError(error)){
+                failedLoginAttempts += 1;
+                if(failedLoginAttempts >= MAX_LOGIN_ATTEMPTS){
+                    loginLockedUntil = Date.now() + LOGIN_LOCKOUT_MS;
+                    persistLoginGuard();
+                    return { success:false, error:getLoginLockMessage(), locked:true };
+                }
+                persistLoginGuard();
+                const remaining = MAX_LOGIN_ATTEMPTS - failedLoginAttempts;
+                return {
+                    success:false,
+                    error:`${mapAuthError(error)} ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`
+                };
+            }
             return { success:false, error: mapAuthError(error) };
         }
 
+        failedLoginAttempts = 0;
+        loginLockedUntil = 0;
+        persistLoginGuard();
         currentSession = data.session;
         currentUser = data.user;
 
@@ -305,12 +354,10 @@ function setupNavAuthButtons(){
 
     });
 
-    document.getElementById("nav-logout")?.addEventListener("click", async ()=>{
+    document.getElementById("nav-profile-btn")?.addEventListener("click", ()=>{
 
-        const result = await logout();
-
-        if(!result.success){
-            console.error("Logout error:", result.error);
+        if(isLoggedIn()){
+            openProfileModal();
         }
 
     });
@@ -320,7 +367,7 @@ function setupNavAuthButtons(){
         if(isLoggedIn()){
             // User is logged in, navigate to dashboard
             try {
-                const { showApp } = await import("./js_router.js");
+                const { showApp } = await import("./js_router.js?v=20260825-profile-18");
                 showApp();
                 switchToAppMode(); // Update navbar to show Home instead of FAQ/About
             } catch (error) {
@@ -332,19 +379,11 @@ function setupNavAuthButtons(){
         }
     });
 
-    // Setup signup/logout button on homepage
+    // Setup signup/profile button on homepage
     document.getElementById("signup-or-logout-btn")?.addEventListener("click", async ()=>{
         if(isLoggedIn()){
-            // User is logged in, handle logout
-            const result = await logout();
-            if(!result.success){
-                console.error("Logout error:", result.error);
-            } else {
-                // Update navbar to show FAQ/About instead of Home after logout
-                switchToHomeMode();
-            }
+            openProfileModal();
         } else {
-            // User is not logged in, show signup modal
             openAuthModal("signup");
         }
     });
@@ -358,6 +397,14 @@ function updateAuthUI(){
     document.getElementById("nav-login")?.classList.toggle("hidden", loggedIn);
     document.getElementById("nav-signup")?.classList.toggle("hidden", loggedIn);
     document.getElementById("nav-user-menu")?.classList.toggle("hidden", !loggedIn);
+
+    // Update profile avatar
+    if(loggedIn && currentUser){
+        const email = currentUser.email || "";
+        const initial = email.charAt(0).toUpperCase() || "U";
+        const avatar = document.getElementById("nav-user-avatar");
+        if(avatar) avatar.textContent = initial;
+    }
 
     // Update context-aware dashboard button on homepage
     const dashboardBtn = document.getElementById("dashboard-or-login-btn");
@@ -373,11 +420,11 @@ function updateAuthUI(){
         }
     }
 
-    // Update signup/logout button on homepage
+    // Update signup/profile button on homepage
     const signupLogoutBtn = document.getElementById("signup-or-logout-btn");
     if(signupLogoutBtn){
         if(loggedIn){
-            signupLogoutBtn.textContent = "Logout";
+            signupLogoutBtn.textContent = "Profile";
             signupLogoutBtn.classList.remove("btn-outline");
             signupLogoutBtn.classList.add("btn-primary");
         } else {
@@ -385,19 +432,6 @@ function updateAuthUI(){
             signupLogoutBtn.classList.remove("btn-primary");
             signupLogoutBtn.classList.add("btn-outline");
         }
-    }
-
-    if(loggedIn && currentUser){
-
-        const email = currentUser.email || "";
-        const initial = email.charAt(0).toUpperCase() || "U";
-
-        const avatar = document.getElementById("nav-user-avatar");
-        const emailLabel = document.getElementById("nav-user-email");
-
-        if(avatar) avatar.textContent = initial;
-        if(emailLabel) emailLabel.textContent = email;
-
     }
 
 }
@@ -420,7 +454,30 @@ function injectAuthModal(){
     overlay.innerHTML = `
         <div class="modal auth-modal">
             <button type="button" class="auth-close" id="auth-modal-close" aria-label="Close">×</button>
-
+            <div class="auth-curtain">
+                <span class="auth-curtain-brand"><i></i>brawl analytics</span>
+                <div class="auth-curtain-radar" aria-hidden="true">
+                    <span class="auth-radar-ring auth-radar-ring--1"></span>
+                    <span class="auth-radar-ring auth-radar-ring--2"></span>
+                    <span class="auth-radar-ring auth-radar-ring--3"></span>
+                    <span class="auth-radar-sweep"></span>
+                    <span class="auth-radar-blip auth-radar-blip--1"></span>
+                    <span class="auth-radar-blip auth-radar-blip--2"></span>
+                    <span class="auth-radar-core"></span>
+                </div>
+                <div class="auth-curtain-foot">
+                    <p class="auth-curtain-caption">analyze · predict · publish</p>
+                    <div class="auth-curtain-socials">
+                    <a href="https://www.tiktok.com/@brawl_analytics?is_from_webapp=1&amp;sender_device=pc" target="_blank" rel="noopener" tabindex="-1" aria-label="TikTok">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.8 3c.3 1.8 1.3 3 3.2 3.2v2.4c-1.2 0-2.3-.4-3.2-1v6.2a5.2 5.2 0 1 1-4.5-5.1v2.5a2.7 2.7 0 1 0 2 2.6V3h2.5Z" fill="currentColor"/></svg>
+                    </a>
+                    <a href="https://www.instagram.com/shiftmindset2026?utm_source=ig_web_button_share_sheet&amp;igsi=ZDNlZDc0MzIxNw==" target="_blank" rel="noopener" tabindex="-1" aria-label="Instagram">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+                    </a>
+                    </div>
+                </div>
+            </div>
+            <div class="auth-content">
             <h2 class="auth-title" id="auth-modal-title">Create an account</h2>
             <p class="auth-switch">
                 <span id="auth-switch-text">Already have an account?</span>
@@ -431,7 +488,7 @@ function injectAuthModal(){
 
             <div class="auth-panels">
 
-                <form class="auth-form" id="auth-login-panel" hidden>
+                <form class="auth-form auth-login-form" id="auth-login-panel" hidden>
                     <input type="email" class="auth-input" id="login-email" placeholder="Email" required autocomplete="email">
                     <div class="auth-password-field">
                         <input type="password" class="auth-input" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
@@ -461,6 +518,7 @@ function injectAuthModal(){
                     <div class="auth-success-spinner"></div>
                 </div>
 
+            </div>
             </div>
         </div>
     `;
@@ -516,23 +574,28 @@ function setAuthMode(mode){
     const loginPanel = document.getElementById("auth-login-panel");
     const signupPanel = document.getElementById("auth-signup-panel");
 
+    const authModal = document.querySelector("#auth-modal-overlay .auth-modal");
+
     document.getElementById("auth-modal-title").textContent = mode === "login" ? "Welcome back" : "Create an account";
     document.getElementById("auth-switch-text").textContent = mode === "login" ? "Don't have an account?" : "Already have an account?";
     document.getElementById("auth-switch-link").textContent = mode === "login" ? "Sign up" : "Log in";
 
     hideAuthMessage();
 
-    if(!loginPanel || !signupPanel){
+    if(!loginPanel || !signupPanel || !authModal){
         return;
     }
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const outgoing = mode === "login" ? signupPanel : loginPanel;
     const incoming = mode === "login" ? loginPanel : signupPanel;
+    const isFirstRender = previousMode === mode || (loginPanel.hidden && signupPanel.hidden);
 
-    // Primo render (nessun form ancora visibile) o reduced-motion:
-    // swap istantaneo, nessuna animazione.
-    if(previousMode === mode || outgoing.hidden || reduceMotion){
+    // First render or reduced motion: place the curtain and form directly.
+    if(isFirstRender || reduceMotion){
+        authModal.classList.toggle("is-signup", mode === "signup");
+        authModal.classList.toggle("curtain-to-right", mode === "login");
+        authModal.classList.toggle("curtain-to-left", mode === "signup");
         loginPanel.hidden = mode !== "login";
         signupPanel.hidden = mode !== "signup";
         return;
@@ -542,22 +605,24 @@ function setAuthMode(mode){
     const exitClass = goingToSignup ? "auth-form-exit-left" : "auth-form-exit-right";
     const enterClass = goingToSignup ? "auth-form-enter-from-right" : "auth-form-enter-from-left";
 
+    // Keep the previous layout for one frame. Then the mint curtain crosses
+    // the old form while the next form slides in underneath it.
     incoming.hidden = false;
     incoming.classList.add(enterClass);
     outgoing.classList.add(exitClass);
-
-    // Forza un reflow prima di rimuovere la classe di ingresso, così
-    // il browser applica davvero lo stato iniziale prima di animare.
     void incoming.offsetHeight;
 
     requestAnimationFrame(()=>{
+        authModal.classList.toggle("is-signup", goingToSignup);
+        authModal.classList.toggle("curtain-to-right", !goingToSignup);
+        authModal.classList.toggle("curtain-to-left", goingToSignup);
         incoming.classList.remove(enterClass);
     });
 
     setTimeout(()=>{
         outgoing.hidden = true;
         outgoing.classList.remove(exitClass);
-    }, 300);
+    }, 620);
 
 }
 
@@ -642,7 +707,7 @@ async function handleAuthSubmit(){
                 // If user was trying to access dashboard, redirect there after login
                 if(wasDashboardIntent){
                     try {
-                        const { showApp } = await import("./js_router.js");
+                        const { showApp } = await import("./js_router.js?v=20260825-profile-18");
                         showApp();
                     } catch (error) {
                         console.error("Failed to navigate to dashboard after login:", error);
@@ -710,8 +775,371 @@ function closeAuthModal(){
 
 }
 
-export {
+/* ==========================================================
+   PROFILE MODAL — multi-screen
+   Screen 1: main (avatar, plan, credits, stats, buttons)
+   Screen 2: password change
+   Each button navigates to its own screen.
+========================================================== */
 
+let profileScreen = "main"; // "main" | "password"
+
+function injectProfileModal(){
+
+    if(document.getElementById("profile-modal-overlay")){
+        return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.id = "profile-modal-overlay";
+    overlay.className = "modal-overlay";
+
+    overlay.innerHTML = `
+        <div class="modal profile-modal">
+            <button type="button" class="profile-close" id="profile-modal-close" aria-label="Close">×</button>
+
+            <!-- MAIN SCREEN -->
+            <div id="profile-screen-main" class="profile-screen">
+                <div class="profile-modal-header">
+                    <div class="profile-modal-avatar" id="profile-avatar-large"></div>
+                    <div class="profile-modal-info">
+                        <div class="profile-modal-email" id="profile-email-display"></div>
+                        <div class="profile-modal-plan" id="profile-plan-display">FREE PLAN</div>
+                    </div>
+                </div>
+
+                <!-- Plan expiration (PRO only) -->
+                <div id="profile-pro-info" class="profile-pro-info" hidden>
+                    <div class="profile-pro-row">
+                        <span class="profile-pro-label">Plan started</span>
+                        <span class="profile-pro-value" id="profile-plan-started">—</span>
+                    </div>
+                    <div class="profile-pro-row">
+                        <span class="profile-pro-label">Renews / expires</span>
+                        <span class="profile-pro-value" id="profile-plan-expires">—</span>
+                    </div>
+                </div>
+
+                <!-- Daily credits -->
+                <div class="profile-section-title">Daily Credits</div>
+                <div class="profile-credits">
+                    <div class="profile-credit-item">
+                        <span class="profile-credit-icon">🎬</span>
+                        <div class="profile-credit-info">
+                            <span class="profile-credit-label">Video analyses</span>
+                            <span class="profile-credit-value" id="profile-video-credits">—</span>
+                        </div>
+                    </div>
+                    <div class="profile-credit-item">
+                        <span class="profile-credit-icon">💡</span>
+                        <div class="profile-credit-info">
+                            <span class="profile-credit-label">Idea generations</span>
+                            <span class="profile-credit-value" id="profile-idea-credits">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total stats -->
+                <div class="profile-section-title">Your Stats</div>
+                <div class="profile-stats">
+                    <div class="profile-stat-item">
+                        <span class="profile-stat-value" id="profile-total-ideas">0</span>
+                        <span class="profile-stat-label">Ideas generated</span>
+                    </div>
+                    <div class="profile-stat-item">
+                        <span class="profile-stat-value" id="profile-total-videos">0</span>
+                        <span class="profile-stat-label">Videos analyzed</span>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="profile-actions">
+                    <button type="button" class="btn btn-primary" id="profile-upgrade-btn">⬆ Upgrade to Pro</button>
+                    <button type="button" class="btn btn-outline profile-menu-btn" id="profile-goto-password">🔑 Change Password</button>
+                    <button type="button" class="btn btn-outline profile-menu-btn profile-logout-btn" id="profile-logout-btn">Logout</button>
+                </div>
+            </div>
+
+            <!-- PASSWORD SCREEN -->
+            <div id="profile-screen-password" class="profile-screen" hidden>
+                <button type="button" class="profile-back-btn" id="profile-back-btn">← Back</button>
+                <h3 class="profile-screen-title">Change Password</h3>
+                <div id="profile-message" class="profile-message" hidden></div>
+                <form id="profile-password-form">
+                    <div class="profile-field">
+                        <label for="profile-current-password">Current password</label>
+                        <input type="password" id="profile-current-password" placeholder="Enter current password" autocomplete="current-password">
+                    </div>
+                    <div class="profile-field">
+                        <label for="profile-new-password">New password</label>
+                        <input type="password" id="profile-new-password" placeholder="Min 6 characters" autocomplete="new-password">
+                    </div>
+                    <div class="profile-field">
+                        <label for="profile-confirm-new-password">Confirm new password</label>
+                        <input type="password" id="profile-confirm-new-password" placeholder="Confirm new password" autocomplete="new-password">
+                    </div>
+                    <div class="profile-actions">
+                        <button type="submit" class="btn btn-primary" id="profile-save-btn">Update Password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById("profile-modal-close").addEventListener("click", closeProfileModal);
+    overlay.addEventListener("click", event => {
+        if(event.target === overlay) closeProfileModal();
+    });
+
+    // Navigation between screens
+    document.getElementById("profile-goto-password").addEventListener("click", () => showProfileScreen("password"));
+    document.getElementById("profile-back-btn").addEventListener("click", () => showProfileScreen("main"));
+
+    // Upgrade button → opens existing upgrade modal
+    document.getElementById("profile-upgrade-btn").addEventListener("click", async () => {
+        closeProfileModal();
+        try {
+            const { openUpgradeModal } = await import("./js_subscription.js?v=20260825-profile-18");
+            openUpgradeModal();
+        } catch(e) { console.error("Failed to open upgrade modal:", e); }
+    });
+
+    // Password form
+    document.getElementById("profile-password-form").addEventListener("submit", event => {
+        event.preventDefault();
+        handlePasswordChange();
+    });
+
+    // Logout
+    document.getElementById("profile-logout-btn").addEventListener("click", async () => {
+        const result = await logout();
+        if(!result.success) console.error("Logout error:", result.error);
+        closeProfileModal();
+    });
+
+}
+
+function showProfileScreen(screen){
+    profileScreen = screen;
+    document.getElementById("profile-screen-main").hidden = screen !== "main";
+    document.getElementById("profile-screen-password").hidden = screen !== "password";
+    // Clear message when switching
+    const msg = document.getElementById("profile-message");
+    if(msg) msg.hidden = true;
+}
+
+async function openProfileModal(){
+
+    injectProfileModal();
+    showProfileScreen("main");
+    const user = getCurrentUser();
+    if(!user) return;
+
+    const email = user.email || "";
+    const initial = email.charAt(0).toUpperCase() || "U";
+
+    document.getElementById("profile-avatar-large").textContent = initial;
+    document.getElementById("profile-email-display").textContent = email;
+
+    // Ricarica lo stato da Supabase: il profilo deve riflettere sempre il
+    // piano corrente del DB (anche aprendolo dalla landing prima che la
+    // dashboard abbia inizializzato lo stato, o dopo modifiche manuali).
+    try {
+        const { refreshUsageStatus } = await import("./js_subscription.js?v=20260825-profile-18");
+        await refreshUsageStatus();
+    } catch(e) {
+        console.warn("Profile: unable to refresh subscription status", e);
+    }
+
+    // Populate plan info
+    populateProfilePlanInfo();
+
+    // Populate credits
+    populateProfileCredits();
+
+    // Populate total stats
+    populateProfileStats();
+
+    // Clear password form
+    ["profile-current-password", "profile-new-password", "profile-confirm-new-password"].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.value = "";
+    });
+
+    document.getElementById("profile-modal-overlay")?.classList.add("active");
+
+}
+
+function closeProfileModal(){
+    document.getElementById("profile-modal-overlay")?.classList.remove("active");
+}
+
+async function populateProfilePlanInfo(){
+
+    try {
+        const { getCurrentPlan, isProPlan, getSubscriptionStatus } = await import("./js_subscription.js?v=20260825-profile-18");
+        const plan = getCurrentPlan();
+        const { currentPeriodEnd, proStartedAt } = getSubscriptionStatus();
+
+        const planLabel = document.getElementById("profile-plan-display");
+        const proInfo = document.getElementById("profile-pro-info");
+        const upgradeBtn = document.getElementById("profile-upgrade-btn");
+
+        if(isProPlan(plan)){
+            if(planLabel) planLabel.textContent = "PRO PLAN";
+            if(proInfo) proInfo.hidden = false;
+
+            const endDate = currentPeriodEnd ? new Date(currentPeriodEnd) : null;
+            const startDate = proStartedAt ? new Date(proStartedAt) : null;
+            const fmt = { year: 'numeric', month: 'short', day: 'numeric' };
+            const startedEl = document.getElementById("profile-plan-started");
+            const expiresEl = document.getElementById("profile-plan-expires");
+            if(startedEl) startedEl.textContent = startDate ? startDate.toLocaleDateString('en-US', fmt) : "not available yet";
+            // Prefer the real Stripe period end; otherwise derive it as
+            // pro_started_at + 30 days (monthly) / 365 days (annual).
+            let end = currentPeriodEnd;
+            if(!end && startDate) end = new Date(startDate.getTime() + (plan === "pro_a" ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString();
+            if(expiresEl) expiresEl.textContent = end ? new Date(end).toLocaleDateString('en-US', fmt) : "not available yet";
+
+            if(upgradeBtn) upgradeBtn.hidden = true; // already pro
+
+        } else {
+            if(planLabel) planLabel.textContent = "FREE PLAN";
+            if(proInfo) proInfo.hidden = true;
+            if(upgradeBtn) upgradeBtn.hidden = false;
+        }
+
+    } catch(e) {
+        console.warn("Profile: unable to load plan info", e);
+    }
+
+}
+
+async function populateProfileCredits(){
+
+    try {
+        const { getRemainingVideoAnalyses, getRemainingIdeaGenerations, getCurrentPlan, isProPlan } = await import("./js_subscription.js?v=20260825-profile-18");
+        const plan = getCurrentPlan();
+        const videoEl = document.getElementById("profile-video-credits");
+        const ideaEl = document.getElementById("profile-idea-credits");
+
+        if(isProPlan(plan)){
+            if(videoEl) videoEl.textContent = "∞ Unlimited";
+            if(ideaEl) ideaEl.textContent = "∞ Unlimited";
+        } else {
+            const v = getRemainingVideoAnalyses();
+            const i = getRemainingIdeaGenerations();
+            if(videoEl) videoEl.textContent = `${v} / 1 remaining today`;
+            if(ideaEl) ideaEl.textContent = `${i} / 3 remaining today`;
+        }
+
+    } catch(e) {
+        console.warn("Profile: unable to load credits", e);
+    }
+
+}
+
+async function populateProfileStats(){
+
+    try {
+        const supabase = await getSupabaseClient();
+        if(!supabase) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user) return;
+
+        const { data: stats } = await supabase
+            .from("profiles")
+            .select("total_ideas_generated, total_videos_analyzed")
+            .eq("id", user.id)
+            .maybeSingle();
+
+        const ideasEl = document.getElementById("profile-total-ideas");
+        const videosEl = document.getElementById("profile-total-videos");
+
+        if(ideasEl) ideasEl.textContent = stats?.total_ideas_generated || 0;
+        if(videosEl) videosEl.textContent = stats?.total_videos_analyzed || 0;
+
+    } catch(e) {
+        console.warn("Profile: unable to load stats", e);
+    }
+
+}
+
+async function handlePasswordChange(){
+
+    const currentPassword = document.getElementById("profile-current-password").value;
+    const newPassword = document.getElementById("profile-new-password").value;
+    const confirmPassword = document.getElementById("profile-confirm-new-password").value;
+    const msg = document.getElementById("profile-message");
+    const saveBtn = document.getElementById("profile-save-btn");
+
+    if(!currentPassword || !newPassword || !confirmPassword){
+        if(msg){ msg.textContent = "Please fill in all fields."; msg.className = "profile-message error"; msg.hidden = false; }
+        return;
+    }
+
+    if(newPassword.length < 6){
+        if(msg){ msg.textContent = "New password must be at least 6 characters."; msg.className = "profile-message error"; msg.hidden = false; }
+        return;
+    }
+
+    if(newPassword !== confirmPassword){
+        if(msg){ msg.textContent = "New passwords do not match."; msg.className = "profile-message error"; msg.hidden = false; }
+        return;
+    }
+
+    if(currentPassword === newPassword){
+        if(msg){ msg.textContent = "New password must be different from current password."; msg.className = "profile-message error"; msg.hidden = false; }
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Updating...";
+
+    try{
+        const supabase = await getSupabaseClient();
+        if(!supabase){
+            if(msg){ msg.textContent = "Auth service unavailable."; msg.className = "profile-message error"; msg.hidden = false; }
+            return;
+        }
+
+        // Verify current password
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: currentUser.email,
+            password: currentPassword
+        });
+
+        if(signInError){
+            if(msg){ msg.textContent = "Current password is incorrect."; msg.className = "profile-message error"; msg.hidden = false; }
+            return;
+        }
+
+        // Update password
+        const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+
+        if(updateError){
+            if(msg){ msg.textContent = mapAuthError(updateError); msg.className = "profile-message error"; msg.hidden = false; }
+        } else {
+            if(msg){ msg.textContent = "Password updated successfully!"; msg.className = "profile-message success"; msg.hidden = false; }
+            ["profile-current-password", "profile-new-password", "profile-confirm-new-password"].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.value = "";
+            });
+        }
+
+    } catch(error){
+        if(msg){ msg.textContent = "Something went wrong. Please try again."; msg.className = "profile-message error"; msg.hidden = false; }
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Update Password";
+    }
+
+}
+
+export {
     initializeAuth,
     login,
     signup,
@@ -720,6 +1148,7 @@ export {
     isLoggedIn,
     updateAuthUI,
     openAuthModal,
-    closeAuthModal
-
+    closeAuthModal,
+    openProfileModal,
+    closeProfileModal
 };

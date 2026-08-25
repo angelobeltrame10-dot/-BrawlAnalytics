@@ -19,6 +19,7 @@ import { showMessage } from "./js_ui.js";
 
 const FREE_VIDEO_LIMIT = 1;
 const FREE_IDEA_LIMIT = 3;
+const BILLING_ENDPOINT = "https://billing.angeskicollab10.workers.dev/checkout";
 
 // Cache in memoria: popolata da loadUsageStatus() e aggiornata
 // dopo ogni consumo riuscito, per evitare una query Supabase ad
@@ -27,6 +28,8 @@ let state = {
 
     loaded: false,
     plan: "free",
+    currentPeriodEnd: null,
+    proStartedAt: null,
     videoRemaining: FREE_VIDEO_LIMIT,
     ideaRemaining: FREE_IDEA_LIMIT
 
@@ -83,6 +86,22 @@ async function loadUsageStatus(){
         }
 
         applyStatusRow(data[0]);
+
+        const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("plan, current_period_end, pro_started_at")
+            .eq("id", user.id)
+            .maybeSingle();
+
+        if (!profileError && profile) {
+            // The RPC already downgrades expired plans to free; never let a
+            // stale stored plan from the profile row re-upgrade the UI.
+            const expired = profile.current_period_end && new Date(profile.current_period_end) <= new Date();
+            state.plan = expired ? "free" : (profile.plan || state.plan);
+            state.currentPeriodEnd = profile.current_period_end || null;
+            state.proStartedAt = profile.pro_started_at || null;
+        }
+
         state.loaded = true;
 
     }
@@ -103,21 +122,53 @@ function applyStatusRow(row){
 
 }
 
+/*
+    Forza un ricaricamento fresco dello stato (piano/utilizzi) dal DB.
+    Chiamata all'apertura del profilo: così il piano mostrato riflette
+    sempre Supabase, anche se il profilo viene aperto prima che la
+    dashboard inizializzi lo stato, o dopo modifiche fatte sul DB.
+*/
+export async function refreshUsageStatus(){
+
+    await loadUsageStatus();
+
+}
+
 export function getCurrentPlan(){
 
     return state.plan;
 
 }
 
+/*
+    True for any paid plan. Accepts both the new Supabase values
+    (pro_m / pro_a) and the legacy "pro" for backward compatibility.
+*/
+export function isProPlan(plan){
+
+    return plan === "pro" || plan === "pro_m" || plan === "pro_a";
+
+}
+
+export function getSubscriptionStatus(){
+
+    return {
+        plan: state.plan,
+        currentPeriodEnd: state.currentPeriodEnd,
+        proStartedAt: state.proStartedAt
+    };
+
+}
+
 export function getRemainingVideoAnalyses(){
 
-    return state.plan === "pro" ? Infinity : Math.max(0, state.videoRemaining);
+    return isProPlan(state.plan) ? Infinity : Math.max(0, state.videoRemaining);
 
 }
 
 export function getRemainingIdeaGenerations(){
 
-    return state.plan === "pro" ? Infinity : Math.max(0, state.ideaRemaining);
+    return isProPlan(state.plan) ? Infinity : Math.max(0, state.ideaRemaining);
 
 }
 
@@ -129,13 +180,13 @@ export function getRemainingIdeaGenerations(){
 */
 export function canAnalyzeVideo(){
 
-    return state.plan === "pro" || state.videoRemaining > 0;
+    return isProPlan(state.plan) || state.videoRemaining > 0;
 
 }
 
 export function canGenerateIdea(){
 
-    return state.plan === "pro" || state.ideaRemaining > 0;
+    return isProPlan(state.plan) || state.ideaRemaining > 0;
 
 }
 
@@ -170,7 +221,7 @@ async function consumeUsage(kind){
 
         state.plan = row.plan;
 
-        const remaining = row.plan === "pro" ? Infinity : row.remaining;
+        const remaining = isProPlan(row.plan) ? Infinity : row.remaining;
 
         if(kind === "video_analysis"){
             state.videoRemaining = remaining;
@@ -213,18 +264,32 @@ export function consumeIdeaGeneration(){
 
 }
 
+// Derived expiry when Stripe has not synced a period end yet (e.g. legacy /
+// manually-granted Pro). Returns an ISO string or null if it cannot be derived.
+function derivePeriodEnd(periodEnd, proStartedAt, plan){
+    if(periodEnd) return periodEnd;
+    if(!proStartedAt || !isProPlan(plan)) return null;
+    const days = plan === "pro_a" ? 365 : 30;
+    return new Date(new Date(proStartedAt).getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function formatExpiryDate(dateISO){
+    return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(dateISO));
+}
+
 /*
     Aggiorna i badge "⚡ N" in UI senza ricaricare la pagina.
     Pro → simbolo infinito, Free → utilizzi rimanenti oggi.
 */
 export function refreshUsageIndicators(){
 
-    const videoLabel = state.plan === "pro" ? "∞" : `⚡ ${Math.max(0, state.videoRemaining)}`;
-    const ideaLabel = state.plan === "pro" ? "∞" : `⚡ ${Math.max(0, state.ideaRemaining)}`;
-    const planLabel = state.plan === "pro" ? "PRO" : "FREE";
+    const isPro = isProPlan(state.plan);
+    const videoLabel = isPro ? "∞" : `⚡ ${Math.max(0, state.videoRemaining)}`;
+    const ideaLabel = isPro ? "∞" : `⚡ ${Math.max(0, state.ideaRemaining)}`;
+    const planLabel = isPro ? "PRO" : "FREE";
     document.querySelectorAll("#nav-plan-badge").forEach(el=>{
         el.textContent = planLabel;
-        el.classList.toggle("plan-badge-pro", state.plan === "pro");
+        el.classList.toggle("plan-badge-pro", isPro);
     });
 
     document.querySelectorAll("#video-usage-badge").forEach(el => { el.textContent = videoLabel; });
@@ -253,8 +318,8 @@ function injectUpgradeModal(){
     overlay.innerHTML = `
     <div class="modal upgrade-modal">
         <div class="upgrade-header">
-            <h3 class="upgrade-title">🚀 Unlock Brawl Analytics Pro</h3>
-            <p class="upgrade-subtitle">Predict viral Shorts before publishing.</p>
+            <h3 class="upgrade-title">brawl analytics pro</h3>
+            <div class="upgrade-current-status" id="upgrade-current-status"></div>
         </div>
 
         <div class="pricing-grid">
@@ -283,7 +348,7 @@ function injectUpgradeModal(){
                     <li>Title Optimizer</li>
                     <li>Future updates</li>
                 </ul>
-                <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta">Pro is coming soon</button>
+                <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta">choose monthly</button>
             </div>
 
             <div class="pricing-card pricing-card-pro">
@@ -291,11 +356,12 @@ function injectUpgradeModal(){
                 <h4 class="pricing-plan-name">PRO ANNUAL</h4>
                 <div class="pricing-price">€75<small>/ year</small></div>
                 <ul class="pricing-features">
-                    <li><strong>Everything in Pro monthly</strong></li>
+                    <li><strong>Everything in pro monthly</strong></li>
                     <li><strong>Save 11%</strong> compared to monthly</li>
-                    <li><strong>Priority support</strong> — faster response times</li>
+                    <li>priority support</li>
+                    <li>faster response times</li>
                 </ul>
-                <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta-annual">Pro Annual is coming soon</button>
+                <button class="pricing-btn pricing-btn-pro" id="upgrade-modal-cta-annual">choose annual</button>
             </div>
         </div>
 
@@ -316,12 +382,35 @@ function injectUpgradeModal(){
     });
 
     document.getElementById("upgrade-modal-later").addEventListener("click", closeUpgradeModal);
-    document.getElementById("upgrade-modal-cta").addEventListener("click", startCheckout);
-    document.getElementById("upgrade-modal-cta-annual").addEventListener("click", startCheckout);
+    document.getElementById("upgrade-modal-cta").addEventListener("click", () => startCheckout("monthly"));
+    document.getElementById("upgrade-modal-cta-annual").addEventListener("click", () => startCheckout("annual"));
 
 }
 
-export function openUpgradeModal(){
+export async function openUpgradeModal(){
+
+    if(!state.loaded){
+        await loadUsageStatus();
+    }
+
+    if(!document.getElementById("upgrade-modal-overlay")){
+        injectUpgradeModal();
+    }
+
+    const status = document.getElementById("upgrade-current-status");
+    if(status){
+        const isPro = isProPlan(state.plan);
+        // Period end = real Stripe date when available, otherwise derived as
+        // pro_started_at + 30 days (monthly) / 365 days (annual). A Pro account
+        // always has a meaningful expiry to display; keep it nullable only in
+        // the unlikely case that neither Stripe nor a start date exists.
+        const expiryDate = derivePeriodEnd(state.currentPeriodEnd, state.proStartedAt, state.plan);
+        const expiry = expiryDate ? formatExpiryDate(expiryDate) : "not available yet";
+        status.textContent = isPro
+            ? `current plan: pro · renews/expires: ${expiry}`
+            : "current plan: free · no active pro subscription";
+        status.classList.toggle("is-pro", isPro);
+    }
 
     document.getElementById("upgrade-modal-overlay")?.classList.add("active");
 
@@ -334,14 +423,33 @@ export function closeUpgradeModal(){
 }
 
 /*
-    Placeholder pronto per Stripe: nessuna dipendenza da Stripe
-    oggi, ma un unico punto da collegare in futuro (es. chiamata
-    a un endpoint server che crea una Checkout Session e fa
-    redirect). Fino ad allora mostra solo un messaggio.
+    Stripe is called only through the server-side billing Worker. The browser
+    never receives STRIPE_SECRET_KEY and never decides the price ID.
 */
-function startCheckout(){
+async function startCheckout(interval = "monthly") {
+    try {
+        const supabase = await getSupabaseClient();
+        const { data: { session } } = await supabase?.auth.getSession() || { data: {} };
+        if (!session?.access_token) {
+            showMessage("Please log in before choosing a plan");
+            return;
+        }
 
-    console.log("Stripe checkout non ancora configurato.");
-    showMessage("Upgrade coming soon");
-
+        const response = await fetch(BILLING_ENDPOINT, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ interval: interval === "annual" ? "annual" : "monthly" })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.url) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        window.location.assign(data.url);
+    } catch (error) {
+        console.error("Billing checkout failed:", error);
+        showMessage("Unable to start checkout. Please try again later.");
+    }
 }

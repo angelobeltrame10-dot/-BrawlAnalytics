@@ -9,31 +9,31 @@
       COLORS
     -------------------------------------------------------*/
 
-    --color-background:#150B2E;
+    --color-background:#0D1217;
 
-    --color-surface:#1F1240;
+    --color-surface:#151D24;
 
-    --color-surface-light:#2A1856;
+    --color-surface-light:#202D36;
 
     --color-primary:#FFC93C;
 
     --color-primary-hover:#FFD668;
 
-    --color-secondary:#3DDCFF;
+    --color-secondary:#72D3B3;
 
-    --color-accent:#FF3D7F;
+    --color-accent:#EF9276;
 
     --color-success:#3EDC9A;
 
     --color-danger:#FF5470;
 
-    --color-text:#F4F0FF;
+    --color-text:#EDF2EF;
 
-    --color-text-muted:#A79BC9;
+    --color-text-muted:#A4B0B8;
 
-    --color-text-faded:rgba(167,155,201,.55);
+    --color-text-faded:rgba(164,176,184,.55);
 
-    --color-border:rgba(244,240,255,.12);
+    --color-border:rgba(237,242,239,.12);
 
 
 

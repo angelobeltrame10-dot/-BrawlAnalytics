@@ -1,31 +1,33 @@
-const ALLOWED_ORIGIN = [
-    "https://brawl-analystic-official.vercel.app",
-    "https://www.brawl-analystic-official.vercel.app",
+const ALLOWED_ORIGINS = [
+    "https://brawl-analytics-official.vercel.app",
     "http://localhost:5500",
     "http://127.0.0.1:5500"
 ];
 
 function corsHeaders(origin) {
-
-    const allowed =
-        origin === ALLOWED_ORIGIN;
-
-    return {
-
-        "Access-Control-Allow-Origin":
-            allowed ? origin : ALLOWED_ORIGIN,
-
-        "Access-Control-Allow-Methods":
-            "POST, OPTIONS",
-
-        "Access-Control-Allow-Headers":
-            "Content-Type"
-
+    const headers = {
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin"
     };
-
+    if (ALLOWED_ORIGINS.includes(origin)) headers["Access-Control-Allow-Origin"] = origin;
+    return headers;
 }
 
-function json(body, status = 200, origin = ALLOWED_ORIGIN) {
+async function isValidSupabaseUser(authHeader, env) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !/^Bearer\s+\S+$/i.test(authHeader || "")) return false;
+    try {
+        const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
+            headers: { Authorization: authHeader, apikey: env.SUPABASE_ANON_KEY }
+        });
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
+
+function json(body, status = 200, origin = ALLOWED_ORIGINS) {
 
     return new Response(
 
@@ -264,6 +266,12 @@ async function callGroq(
 
 ) {
 
+    if (!env.GROQ_API_KEY || !env.GROQ_MODEL) {
+
+        throw new Error("Missing GROQ_API_KEY or GROQ_MODEL");
+
+    }
+
     const response =
 
         await fetch(
@@ -280,7 +288,7 @@ async function callGroq(
 
                     Authorization:
 
-                        `Bearer ${env.CHIAVE_API_AI}`,
+                        `Bearer ${env.GROQ_API_KEY}`,
 
                     "Content-Type":
 
@@ -294,7 +302,7 @@ async function callGroq(
 
                         model:
 
-                            "llama-3.3-70b-versatile",
+                            env.GROQ_MODEL,
 
                         temperature:
 
@@ -410,11 +418,12 @@ export default {
 
         }
 
-        if (
+        const authHeader = request.headers.get("Authorization");
+        if (!authHeader || !(await isValidSupabaseUser(authHeader, env))) {
+            return json({ success: false, error: "Unauthorized" }, 401, origin);
+        }
 
-            origin !== ALLOWED_ORIGIN
-
-        ) {
+        if (!ALLOWED_ORIGINS.includes(origin)) {
 
             return json(
 
@@ -504,11 +513,16 @@ export default {
 
         try {
 
+            const contentLength = Number(request.headers.get("Content-Length") || 0);
+            if (contentLength > 64 * 1024) {
+                return json({ success: false, error: "Request payload is too large" }, 413, origin);
+            }
+
             const body =
 
                 await request.json();
 
-            if (!body.proposal) {
+            if (!body.proposal || typeof body.proposal !== "object") {
 
                 return json(
 
@@ -576,7 +590,7 @@ export default {
 
                         model:
 
-                            "llama-3.3-70b-versatile",
+                            env.GROQ_MODEL,
 
                         timestamp:
 
@@ -597,27 +611,12 @@ export default {
         }
 
         catch (err) {
-
+            console.error("Virality worker request failed:", err);
             return json(
-
-                {
-
-                    success:
-
-                        false,
-
-                    error:
-
-                        err.message
-
-                },
-
-                500,
-
+                { success: false, error: "AI service temporarily unavailable" },
+                502,
                 origin
-
             );
-
         }
 
     }

@@ -21,9 +21,56 @@
 
 create table if not exists public.profiles (
     id uuid primary key references auth.users(id) on delete cascade,
-    plan text not null default 'free' check (plan in ('free', 'pro')),
+    plan text not null default 'free' check (plan in ('free', 'pro_m', 'pro_a')),
     created_at timestamptz not null default now()
 );
+
+-- The legacy check on existing databases only allows ('free','pro'), so the
+-- migration below MUST drop it before writing 'pro_m'. Order matters: drop →
+-- migrate → re-add with the new values, otherwise the UPDATE fails with 23514
+-- (violates profiles_plan_check).
+alter table public.profiles drop constraint if exists profiles_plan_check;
+
+update public.profiles set plan = 'pro_m' where plan = 'pro';
+
+alter table public.profiles add constraint profiles_plan_check
+    check (plan in ('free', 'pro_m', 'pro_a'));
+
+-- Billing fields are kept server-managed; clients only receive read access.
+alter table public.profiles
+    add column if not exists stripe_customer_id text,
+    add column if not exists stripe_subscription_id text,
+    add column if not exists subscription_status text,
+    add column if not exists current_period_end timestamptz,
+    add column if not exists pro_started_at timestamptz,
+    add column if not exists total_ideas_generated int not null default 0,
+    add column if not exists total_videos_analyzed int not null default 0;
+
+-- Stamp the first moment a profile becomes Pro. Existing Pro users are
+-- backfilled below with the requested launch date.
+create or replace function public.set_pro_started_at()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if new.plan in ('pro_m', 'pro_a') and (old.plan is distinct from new.plan) and new.pro_started_at is null then
+        new.pro_started_at := now();
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists profiles_set_pro_started_at on public.profiles;
+create trigger profiles_set_pro_started_at
+    before update on public.profiles
+    for each row execute function public.set_pro_started_at();
+
+-- Existing Pro profiles did not have a start date in the old schema.
+update public.profiles
+set pro_started_at = timestamptz '2026-08-25 00:00:00+00'
+where plan in ('pro', 'pro_m', 'pro_a') and pro_started_at is null;
 
 create table if not exists public.daily_usage (
     user_id uuid not null references auth.users(id) on delete cascade,
@@ -32,6 +79,19 @@ create table if not exists public.daily_usage (
     idea_generation_used int not null default 0,
     primary key (user_id, usage_date)
 );
+
+-- Backfill personal counters from the authoritative usage history.
+update public.profiles p
+set total_ideas_generated = coalesce(u.idea_total, 0),
+    total_videos_analyzed = coalesce(u.video_total, 0)
+from (
+    select user_id,
+           sum(idea_generation_used)::int as idea_total,
+           sum(video_analysis_used)::int as video_total
+    from public.daily_usage
+    group by user_id
+) u
+where p.id = u.user_id;
 
 alter table public.profiles enable row level security;
 alter table public.daily_usage enable row level security;
@@ -72,14 +132,33 @@ begin
     insert into profiles(id, plan) values (v_uid, 'free')
     on conflict (id) do nothing;
 
-    select p.plan into v_plan from profiles p where p.id = v_uid;
+    -- Hard-expire: as soon as the paid period ends, flip the stored plan to
+    -- 'free' so the database itself (not just this read) drops Pro access.
+    -- NB: "plan" is an output column of RETURNS TABLE, i.e. a PL/pgSQL
+    -- variable: every reference must be qualified or Postgres raises 42702
+    -- (column reference "plan" is ambiguous).
+    update profiles p
+       set plan = 'free'
+     where p.id = v_uid
+       and p.plan in ('pro_m', 'pro_a')
+       and p.current_period_end is not null
+       and p.current_period_end <= now();
+
+    select case
+        when p.plan in ('pro_m', 'pro_a')
+             and p.current_period_end is not null
+             and p.current_period_end <= now()
+        then 'free'
+        else p.plan
+    end into v_plan
+    from profiles p where p.id = v_uid;
 
     select d.video_analysis_used, d.idea_generation_used
         into v_video_used, v_idea_used
         from daily_usage d
         where d.user_id = v_uid and d.usage_date = v_today;
 
-    if v_plan = 'pro' then
+    if v_plan in ('pro_m', 'pro_a') then
         return query select v_plan, -1, -1;
         return;
     end if;
@@ -91,6 +170,7 @@ begin
 end;
 $$;
 
+revoke all on function public.get_usage_status() from public;
 grant execute on function public.get_usage_status() to authenticated;
 
 -- ==========================================================
@@ -128,17 +208,39 @@ begin
     insert into profiles(id, plan) values (v_uid, 'free')
     on conflict (id) do nothing;
 
-    select p.plan into v_plan from profiles p where p.id = v_uid;
+    -- Hard-expire: as soon as the paid period ends, flip the stored plan to
+    -- 'free' so the database itself (not just this read) drops Pro access.
+    -- NB: "plan" is an output column of RETURNS TABLE, i.e. a PL/pgSQL
+    -- variable: every reference must be qualified or Postgres raises 42702
+    -- (column reference "plan" is ambiguous).
+    update profiles p
+       set plan = 'free'
+     where p.id = v_uid
+       and p.plan in ('pro_m', 'pro_a')
+       and p.current_period_end is not null
+       and p.current_period_end <= now();
+
+    select case
+        when p.plan in ('pro_m', 'pro_a')
+             and p.current_period_end is not null
+             and p.current_period_end <= now()
+        then 'free'
+        else p.plan
+    end into v_plan
+    from profiles p where p.id = v_uid;
 
     insert into daily_usage(user_id, usage_date) values (v_uid, v_today)
     on conflict (user_id, usage_date) do nothing;
 
     -- Piano Pro: nessun limite, incrementa solo per statistiche.
-    if v_plan = 'pro' then
+    if v_plan in ('pro_m', 'pro_a') then
 
         if p_kind = 'video_analysis' then
             update daily_usage set video_analysis_used = video_analysis_used + 1
                 where user_id = v_uid and usage_date = v_today;
+            update public.profiles
+                set total_videos_analyzed = total_videos_analyzed + 1
+                where id = v_uid;
 
             update public.public_stats
                 set total_videos_analyzed = total_videos_analyzed + 1,
@@ -147,6 +249,9 @@ begin
         else
             update daily_usage set idea_generation_used = idea_generation_used + 1
                 where user_id = v_uid and usage_date = v_today;
+            update public.profiles
+                set total_ideas_generated = total_ideas_generated + 1
+                where id = v_uid;
 
             update public.public_stats
                 set total_ideas_generated = total_ideas_generated + 1,
@@ -161,39 +266,56 @@ begin
 
     v_limit := case when p_kind = 'video_analysis' then 1 else 3 end;
 
+    -- L'UPDATE condizionale acquisisce il lock della riga e decide la
+    -- concessione in modo atomico: due richieste concorrenti non possono
+    -- entrambe passare leggendo lo stesso contatore.
     if p_kind = 'video_analysis' then
-        select d.video_analysis_used into v_used
-            from daily_usage d where d.user_id = v_uid and d.usage_date = v_today;
-    else
-        select d.idea_generation_used into v_used
-            from daily_usage d where d.user_id = v_uid and d.usage_date = v_today;
-    end if;
+        update daily_usage
+           set video_analysis_used = video_analysis_used + 1
+         where user_id = v_uid
+           and usage_date = v_today
+           and video_analysis_used < v_limit
+        returning video_analysis_used into v_used;
 
-    if coalesce(v_used, 0) >= v_limit then
-        return query select false, 0, v_plan;
-        return;
-    end if;
+        if not found then
+            return query select false, 0, v_plan;
+            return;
+        end if;
 
-    if p_kind = 'video_analysis' then
-        update daily_usage set video_analysis_used = video_analysis_used + 1
-            where user_id = v_uid and usage_date = v_today;
+        update public.profiles
+           set total_videos_analyzed = total_videos_analyzed + 1
+         where id = v_uid;
 
         update public.public_stats
-            set total_videos_analyzed = total_videos_analyzed + 1,
-                updated_at = now()
-            where id = 1;
+           set total_videos_analyzed = total_videos_analyzed + 1,
+               updated_at = now()
+         where id = 1;
     else
-        update daily_usage set idea_generation_used = idea_generation_used + 1
-            where user_id = v_uid and usage_date = v_today;
+        update daily_usage
+           set idea_generation_used = idea_generation_used + 1
+         where user_id = v_uid
+           and usage_date = v_today
+           and idea_generation_used < v_limit
+        returning idea_generation_used into v_used;
+
+        if not found then
+            return query select false, 0, v_plan;
+            return;
+        end if;
+
+        update public.profiles
+           set total_ideas_generated = total_ideas_generated + 1
+         where id = v_uid;
 
         update public.public_stats
-            set total_ideas_generated = total_ideas_generated + 1,
-                updated_at = now()
-            where id = 1;
+           set total_ideas_generated = total_ideas_generated + 1,
+               updated_at = now()
+         where id = 1;
     end if;
 
-    return query select true, (v_limit - coalesce(v_used, 0) - 1), v_plan;
+    return query select true, (v_limit - v_used), v_plan;
 end;
 $$;
 
+revoke all on function public.try_consume_usage(text) from public;
 grant execute on function public.try_consume_usage(text) to authenticated;

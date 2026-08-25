@@ -6,8 +6,10 @@
    The LLM provides qualitative reasoning, not numerical scores.
 ========================================================== */
 
+import { getAuthHeaders } from "./js_auth_fetch.js";
+
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
-const AI_MODEL = "llama-3.3-70b-versatile";
+const AI_MODEL = "openai/gpt-oss-120b";
 
 /**
  * Calls the AI worker with a structured request.
@@ -15,10 +17,10 @@ const AI_MODEL = "llama-3.3-70b-versatile";
 async function callAIWorker(messages, options = {}) {
     const response = await fetch(AI_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
             messages,
-            model: AI_MODEL,
+            // The Worker owns the model choice.
             temperature: options.temperature || 0.7,
             max_tokens: options.maxTokens || 2048
         })

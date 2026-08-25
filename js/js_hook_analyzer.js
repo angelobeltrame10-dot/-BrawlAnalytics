@@ -2,12 +2,14 @@
    BRAWL ANALYTICS
    HOOK & CONCEPT ANALYZER — Pro only
    Due modalità, stesso schema di risposta:
-   - "Write it"     → testo, Groq (Worker AI generico)
+   - "Write it"     → testo, Groq openai/gpt-oss-120b (Worker AI generico)
    - "Upload video" → video reale, Gemini (Worker video-analysis)
 ========================================================== */
 
-import { getCurrentPlan, openUpgradeModal } from "./js_subscription.js";
+import { getCurrentPlan, isProPlan, openUpgradeModal } from "./js_subscription.js?v=20260825-profile-18";
 import { loadChannelProfile } from "./js_storage.js";
+import { getAuthHeaders } from "./js_auth_fetch.js";
+import { escapeHtml } from "./js_trends.js";
 
 const AI_ENDPOINT = "https://brawl-analytics-backend.angeskicollab10.workers.dev";
 const HOOK_VIDEO_ENDPOINT = "https://video-analysis.angeskicollab10.workers.dev/analyze-hook-video";
@@ -178,7 +180,7 @@ async function handleTextAnalyzeClick(){
         return;
     }
 
-    if(getCurrentPlan() !== "pro"){
+    if(!isProPlan(getCurrentPlan())){
         openUpgradeModal();
         return;
     }
@@ -190,7 +192,7 @@ async function handleTextAnalyzeClick(){
 
         const response = await fetch(AI_ENDPOINT, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: await getAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
                 type: "hook_analysis",
                 concept: text,
@@ -227,7 +229,7 @@ async function handleVideoAnalyzeClick(){
         return;
     }
 
-    if(getCurrentPlan() !== "pro"){
+    if(!isProPlan(getCurrentPlan())){
         openUpgradeModal();
         return;
     }
@@ -240,6 +242,7 @@ async function handleVideoAnalyzeClick(){
 
         const response = await fetch(HOOK_VIDEO_ENDPOINT, {
             method: "POST",
+            headers: await getAuthHeaders(),
             body: formData
         });
 
@@ -359,8 +362,8 @@ function renderResults(result, source = "text"){
             <div class="va-results-hero">
                 <div>
                     <span class="va-eyebrow">HOOK & CONCEPT ANALYSIS — ${sourceLabel}</span>
-                    <h3>Your opening concept is <em>${getQualitative(hookScore).toLowerCase()}</em>.</h3>
-                    <p>${result.finalSummary || ""}</p>
+                    <h3>Your opening concept is <span class="va-emphasis">${getQualitative(hookScore).toLowerCase()}</span>.</h3>
+                    <p>${escapeHtml(result.finalSummary || "")}</p>
                 </div>
                 <button class="va-outline" id="hook-restart" type="button">Analyze another concept →</button>
             </div>
@@ -373,62 +376,41 @@ function renderResults(result, source = "text"){
                 </article>
                 <article class="va-metric">
                     <span>EMOTIONAL TRIGGER</span>
-                    <strong style="font-size:1.2rem;margin-top:1.4rem">${result.emotionalTrigger || "Not detected"}</strong>
+                    <strong style="font-size:1.2rem;margin-top:1.4rem">${escapeHtml(result.emotionalTrigger || "Not detected")}</strong>
                 </article>
                 <article class="va-metric">
                     <span>VIEWER CURIOSITY</span>
-                    <strong style="font-size:1.5rem;margin-top:1.4rem;text-transform:capitalize">${result.viewerCuriosity || "—"}</strong>
+                    <strong style="font-size:1.5rem;margin-top:1.4rem;text-transform:capitalize">${escapeHtml(result.viewerCuriosity || "—")}</strong>
                 </article>
                 <article class="va-metric">
                     <span>EXPECTED RETENTION</span>
-                    <strong style="font-size:1.5rem;margin-top:1.4rem;text-transform:capitalize">${result.expectedRetention || "—"}</strong>
+                    <strong style="font-size:1.5rem;margin-top:1.4rem;text-transform:capitalize">${escapeHtml(result.expectedRetention || "—")}</strong>
                 </article>
             </div>
 
             <div class="va-section-title"><div><span class="va-step">SIGNAL MAP</span><h3>Score breakdown</h3></div></div>
             <div class="va-breakdown">${breakdown.map(([name, value]) => scoreRow(name, value)).join("")}</div>
 
-            <div class="va-section-title"><div><span class="va-step">INSIGHTS</span><h3>Predicted First Impression</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <p style="color:var(--color-text)">${result.predictedFirstImpression || "No prediction available"}</p>
+            <section class="hook-action-plan">
+                <div class="va-section-title hook-action-plan__heading"><div><span class="va-step">INSIGHTS</span><h3>What to change before publishing</h3></div><p>Turn the score into one clear edit.</p></div>
+                <section class="hook-first-impression">
+                    <span class="hook-plan-icon">01</span>
+                    <div><span class="va-step">FIRST IMPRESSION</span><p>${escapeHtml(result.predictedFirstImpression || "No prediction available")}</p></div>
+                </section>
+                <div class="hook-decision-grid">
+                    <article class="hook-decision hook-decision--keep"><span class="hook-plan-icon">02</span><div><span class="va-step">KEEP</span><h4>What already works</h4><ul>${(result.strengths || []).map(s => `<li>${escapeHtml(s)}</li>`).join("") || "<li>No specific strengths detected.</li>"}</ul></div></article>
+                    <article class="hook-decision hook-decision--fix"><span class="hook-plan-icon">03</span><div><span class="va-step">FIX</span><h4>What costs attention</h4><ul>${(result.weaknesses || []).map(w => `<li>${escapeHtml(w)}</li>`).join("") || "<li>No specific weaknesses detected.</li>"}</ul></div></article>
+                </div>
+                ${(result.missedOpportunities || []).length > 0 ? `<article class="hook-plan-list"><span class="hook-plan-icon">04</span><div><span class="va-step">OPPORTUNITIES</span><h4>One more angle to test</h4><ul>${result.missedOpportunities.map(o => `<li>${escapeHtml(o)}</li>`).join("")}</ul></div></article>` : ""}
+                ${(result.recommendedImprovements || []).length > 0 ? `<article class="hook-plan-list hook-plan-list--accent"><span class="hook-plan-icon">05</span><div><span class="va-step">NEXT EDIT</span><h4>Recommended improvements</h4><ul>${result.recommendedImprovements.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul></div></article>` : ""}
             </section>
 
-            <div class="va-insights">
-                <article class="va-insight good"><span>✦</span><h4>Strengths</h4><ul>${(result.strengths || []).map(s => `<li>${s}</li>`).join("") || "<p>No specific strengths detected.</p>"}</ul></article>
-                <article class="va-insight weak"><span>↗</span><h4>Weaknesses</h4><ul>${(result.weaknesses || []).map(w => `<li>${w}</li>`).join("") || "<p>No specific weaknesses detected.</p>"}</ul></article>
+            <div class="va-section-title"><div><span class="va-step">IMPROVED HOOKS</span><h3>Choose a stronger opening</h3></div><p>Three directions, ready to test.</p></div>
+            <div class="hook-versions-grid">
+                <section class="hook-version-card"><span class="va-step">A · SAFE IMPROVEMENT</span><p>${escapeHtml(result.improvedHookVersionA || "")}</p><button class="btn btn-outline btn-sm" id="hook-copy-a" type="button">Copy</button></section>
+                <section class="hook-version-card"><span class="va-step">B · AGGRESSIVE</span><p>${escapeHtml(result.improvedHookVersionB || "")}</p><button class="btn btn-outline btn-sm" id="hook-copy-b" type="button">Copy</button></section>
+                <section class="hook-version-card hook-version-card--featured"><span class="va-step">C · HIGHEST POTENTIAL</span><p>${escapeHtml(result.improvedHookVersionC || "")}</p><button class="btn btn-primary btn-sm" id="hook-copy-c" type="button">Copy</button></section>
             </div>
-
-            ${(result.missedOpportunities || []).length > 0 ? `
-            <div class="va-section-title"><div><span class="va-step">OPPORTUNITIES</span><h3>Missed Opportunities</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <ul style="margin-top:.5rem">${result.missedOpportunities.map(o => `<li>${o}</li>`).join("")}</ul>
-            </section>` : ""}
-
-            ${(result.recommendedImprovements || []).length > 0 ? `
-            <div class="va-section-title"><div><span class="va-step">IMPROVEMENTS</span><h3>Recommended Improvements</h3></div></div>
-            <section class="banner" style="margin-bottom:1.5rem">
-                <ul style="margin-top:.5rem">${result.recommendedImprovements.map(i => `<li>${i}</li>`).join("")}</ul>
-            </section>` : ""}
-
-            <div class="va-section-title"><div><span class="va-step">IMPROVED HOOKS</span><h3>3 Enhanced Versions</h3></div></div>
-
-            <section class="banner" style="margin-bottom:1rem">
-                <strong>Version A — Safe Improvement</strong>
-                <p style="color:var(--color-text);margin-top:.5rem">${result.improvedHookVersionA || ""}</p>
-                <button class="btn btn-outline btn-sm" id="hook-copy-a" type="button" style="margin-top:.75rem">Copy</button>
-            </section>
-
-            <section class="banner" style="margin-bottom:1rem">
-                <strong>Version B — Aggressive</strong>
-                <p style="color:var(--color-text);margin-top:.5rem">${result.improvedHookVersionB || ""}</p>
-                <button class="btn btn-outline btn-sm" id="hook-copy-b" type="button" style="margin-top:.75rem">Copy</button>
-            </section>
-
-            <section class="banner" style="margin-bottom:1.5rem">
-                <strong>Version C — Highest Viral Potential</strong>
-                <p style="color:var(--color-text);margin-top:.5rem">${result.improvedHookVersionC || ""}</p>
-                <button class="btn btn-outline btn-sm" id="hook-copy-c" type="button" style="margin-top:.75rem">Copy</button>
-            </section>
         </div>`;
 
     document.getElementById("hook-restart").addEventListener("click", () => {

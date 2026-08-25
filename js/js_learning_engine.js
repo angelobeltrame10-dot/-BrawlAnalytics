@@ -97,6 +97,29 @@ function calculateTitleMatchScore(candidateTitle, predictionTitle) {
  * reali del CSV appena caricato; se trova un match, risolve la
  * predizione con le views reali e aggiorna le statistiche aggregate.
  */
+export async function loadPredictionHistory(limit = 8) {
+    try {
+        const supabase = await getSupabaseClient();
+        if (!supabase) return [];
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+        const { data, error } = await supabase
+            .from("prediction_log")
+            .select("id, video_title, format, virality_score, confidence, predicted_baseline, predicted_min, predicted_max, actual_views, resolved, created_at, resolved_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(Math.max(1, Math.min(Number(limit) || 8, 30)));
+        if (error) {
+            console.error("Learning engine: impossibile caricare lo storico.", error);
+            return [];
+        }
+        return data || [];
+    } catch (error) {
+        console.error("Learning engine: impossibile caricare lo storico.", error);
+        return [];
+    }
+}
+
 export async function reconcilePredictions(videos) {
     try {
         const supabase = await getSupabaseClient();
@@ -137,28 +160,15 @@ export async function reconcilePredictions(videos) {
 
             if (!match || match.score < 0.3 || match.views <= 0) continue;
 
-            const errorRatio = (match.views - prediction.predicted_baseline) / prediction.predicted_baseline;
-
-            await supabase.from("prediction_log")
-                .update({
-                    actual_views: match.views,
-                    resolved: true,
-                    error_ratio: errorRatio,
-                    resolved_at: new Date().toISOString()
-                })
-                .eq("id", prediction.id);
+            const { error: resolveError } = await supabase.rpc("resolve_prediction", {
+                p_id: prediction.id,
+                p_actual_views: match.views
+            });
+            if (resolveError) continue;
 
             resolvedCount++;
-            globalErrors.push(errorRatio);
-            (errorsByFormat[prediction.format] ||= []).push(errorRatio);
-        }
-
-        if (resolvedCount > 0) {
-            await updateCalibrationStats(supabase, user.id, "global", "global", globalErrors);
-
-            for (const [format, errors] of Object.entries(errorsByFormat)) {
-                await updateCalibrationStats(supabase, user.id, "format", format, errors);
-            }
+            // Calibration is updated atomically inside resolve_prediction().
+            // The browser never computes or writes error ratios.
         }
 
         return { resolved: resolvedCount };
@@ -200,13 +210,11 @@ async function updateCalibrationStats(supabase, userId, dimensionType, dimension
         mergedSampleCount = totalCount;
     }
 
-    await supabase.from("calibration_stats").upsert({
-        user_id: userId,
-        dimension_type: dimensionType,
-        dimension_key: dimensionKey,
-        sample_count: mergedSampleCount,
-        mean_error: mergedMean,
-        mean_abs_error: mergedAbsMean,
-        updated_at: new Date().toISOString()
+    await supabase.rpc("upsert_calibration_stat", {
+        p_dimension_type: dimensionType,
+        p_dimension_key: dimensionKey,
+        p_sample_count: mergedSampleCount,
+        p_mean_error: mergedMean,
+        p_mean_abs_error: mergedAbsMean
     });
 }

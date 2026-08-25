@@ -22,7 +22,7 @@ import {
     switchToAppMode
 
 }
-from "./js_navigation.js";
+from "./js_navigation.js?v=20260825-profile-18";
 
 
 
@@ -32,7 +32,7 @@ import {
     showApp
 
 }
-from "./js_router.js";
+from "./js_router.js?v=20260825-profile-18";
 
 
 
@@ -42,12 +42,13 @@ import {
     isLoggedIn
 
 }
-from "./js_auth.js";
+from "./js_auth.js?v=20260825-profile-18";
 
 import { loadPublicStats } from "./js_public_stats.js";
 import { initScrollReveal } from "./js_scroll_reveal.js";
 import { initHeroChartLine } from "./js_hero_chart.js";
 import { initLayout417 } from "./js_layout417.js";
+import { initTerminalPrompt } from "./js_terminal.js";
 
 
 
@@ -101,6 +102,7 @@ async function startApp(){
     initScrollReveal();
     initHeroChartLine();
     initLayout417();
+    initTerminalPrompt();
     loadPublicStats();
 
     // Prevent default browser behavior for file drops globally

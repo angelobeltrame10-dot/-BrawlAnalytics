@@ -1,4 +1,7 @@
-node_modules/  
-node_modules/  echo .env  echo .dev.vars  echo .wrangler/ 
-.vercel
-.env*
+node_modules/
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler/
+.vercel/

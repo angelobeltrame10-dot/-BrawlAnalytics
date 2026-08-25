@@ -20,7 +20,7 @@
 
     height:var(--navbar-height);
 
-    background:rgba(21,11,46,.92);
+    background:rgba(13,18,23,.92);
 
     backdrop-filter:blur(20px) saturate(180%);
 
@@ -35,7 +35,7 @@
 
 .navbar.scrolled{
 
-    background:rgba(21,11,46,.96);
+    background:rgba(13,18,23,.96);
 
     border-bottom-color:rgba(244,240,255,.18);
 
@@ -265,34 +265,6 @@
     font-weight:700;
 
     transition:color var(--transition-fast);
-
-    position:relative;
-
-}
-
-#nav-home::after{
-
-    content:"";
-
-    position:absolute;
-
-    bottom:-4px;
-
-    left:0;
-
-    width:0;
-
-    height:2px;
-
-    background:linear-gradient(90deg,var(--color-primary),var(--color-secondary));
-
-    transition:width var(--transition);
-
-}
-
-#nav-home:hover::after{
-
-    width:100%;
 
 }
 
