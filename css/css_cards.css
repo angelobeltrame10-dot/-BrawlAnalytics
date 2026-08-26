@@ -29,7 +29,7 @@
 
     transform:translateY(-4px);
 
-    border-color:rgba(255,201,60,.2);
+    border-color:rgba(114,211,179,.2);
 
     box-shadow:var(--shadow-elevation);
 
@@ -66,7 +66,7 @@
 
     transform:translateY(-2px);
 
-    border-color:rgba(255,201,60,.15);
+    border-color:rgba(114,211,179,.15);
 
     box-shadow: 
         var(--shadow-elevation),
@@ -147,7 +147,7 @@
 
     transform:translateY(-3px);
 
-    border-color:rgba(255,201,60,.2);
+    border-color:rgba(114,211,179,.2);
 
     box-shadow:var(--shadow-elevation);
 
@@ -265,7 +265,7 @@
 
 .badge-primary{
 
-    background:rgba(255,201,60,.15);
+    background:rgba(114,211,179,.15);
 
     color:var(--color-primary);
 
@@ -366,7 +366,7 @@
     linear-gradient(
         135deg,
         rgba(61,220,255,.12),
-        rgba(255,201,60,.08)
+        rgba(114,211,179,.08)
     );
 
     border:1px solid rgba(61,220,255,.3);

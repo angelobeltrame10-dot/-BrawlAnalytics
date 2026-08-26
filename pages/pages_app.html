@@ -205,6 +205,41 @@
 
     </section>
 
+    <section id="onboarding-checklist" class="panel onboarding-checklist" hidden aria-labelledby="onboarding-checklist-title">
+        <div class="onboarding-checklist-header">
+            <div>
+                <span class="onboarding-eyebrow">NEW CHANNEL PLAYBOOK</span>
+                <h2 class="panel-title" id="onboarding-checklist-title">Build a stronger channel baseline</h2>
+                <p class="panel-subtitle">A few focused steps help Brawl Analytics learn what works for you. Prediction confidence grows as you add more historical uploads.</p>
+            </div>
+            <button type="button" class="onboarding-dismiss" id="onboarding-dismiss" aria-label="Dismiss onboarding checklist">×</button>
+        </div>
+        <ol class="onboarding-checklist-list">
+            <li>
+                <span class="onboarding-step-number">01</span>
+                <div><strong>Upload a Lifetime CSV from YouTube Studio</strong><p>Use the Lifetime range so your Channel Profile starts with the fullest history available.</p><button type="button" class="onboarding-link" data-go-upload data-onboarding-target="upload-panel">Open CSV upload →</button></div>
+            </li>
+            <li>
+                <span class="onboarding-step-number">02</span>
+                <div><strong>Review your detected formats</strong><p>Check the automatic grouping and correct any format manually if needed.</p><button type="button" class="onboarding-link" data-go-upload data-onboarding-tab="formats" data-onboarding-target="formats-section">Review formats →</button></div>
+            </li>
+            <li>
+                <span class="onboarding-step-number">03</span>
+                <div><strong>Generate your first ideas</strong><p>Use your channel history to turn the strongest patterns into original next-upload concepts.</p><button type="button" class="onboarding-link" data-go-upload data-onboarding-tab="ideas" data-onboarding-target="ideas-section">Open Idea Generator →</button></div>
+            </li>
+            <li>
+                <span class="onboarding-step-number">04</span>
+                <div><strong>Run a Video Analysis test</strong><p>Try a published Short or a draft to see how the report combines video signals with your history.</p><button type="button" class="onboarding-link" data-go-upload data-onboarding-tab="videos" data-onboarding-target="videos-section">Open Video Analysis →</button></div>
+            </li>
+            <li>
+                <span class="onboarding-step-number">05</span>
+                <div><strong>Refresh your CSV after a few more uploads</strong><p>New history makes format comparisons and prediction confidence more useful over time.</p><button type="button" class="onboarding-link" data-go-upload data-onboarding-target="upload-panel">Upload an updated CSV →</button></div>
+            </li>
+        </ol>
+        <p class="onboarding-footnote">Your confidence will become more meaningful as the channel profile grows. <a href="../documentation.html#channel-profile" target="_blank" rel="noopener">Read how historical data improves predictions →</a></p>
+        <p class="onboarding-dismiss-note">Dismissed checklists are saved to your account and may return after 30 days while your channel is still below 10 videos.</p>
+    </section>
+
 
 
 
@@ -490,9 +525,10 @@
             <div class="idea-list"></div>
             <section id="ideas-blocked" class="ideas-blocked" hidden>
                 <div class="blocked-content">
-                    <div class="blocked-icon">🔒</div>
-                    <h3>Upload your CSV first</h3>
-                    <p>You need to upload your YouTube Studio CSV to generate AI-powered content ideas.</p>
+                    <div class="blocked-icon">💡</div>
+                    <h3>Your next ideas need your channel context</h3>
+                    <p>Upload a Lifetime YouTube Studio CSV first so the Idea Generator can build original suggestions around the formats and performance patterns that are yours.</p>
+                    <button type="button" class="blocked-cta" data-go-upload>Upload CSV to unlock ideas →</button>
                 </div>
             </section>
         </section>
@@ -624,9 +660,10 @@
         </section>
         <section id="video-analysis-blocked" class="video-analysis-blocked" hidden>
             <div class="blocked-content">
-                <div class="blocked-icon">🔒</div>
-                <h3>Upload your CSV first</h3>
-                <p>You need to upload your YouTube Studio CSV to analyze individual videos.</p>
+                <div class="blocked-icon">🎬</div>
+                <h3>Video Analysis starts with your channel history</h3>
+                <p>Upload a Lifetime YouTube Studio CSV first so this report can compare your video with your own formats, retention and past Shorts.</p>
+                <button type="button" class="blocked-cta" data-go-upload>Upload CSV to unlock Video Analysis →</button>
             </div>
         </section>
     </section>

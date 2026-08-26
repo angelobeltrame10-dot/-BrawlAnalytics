@@ -27,7 +27,7 @@ from "./js_csv-parser.js";
 
 import { generaIdeeConAI, generaIdeeSuFormatSingolo } from "./js_api.js?v=20260825-profile-18";
 
-import { showAnalysis } from "./js_router.js?v=20260825-profile-18";
+import { showAnalysis } from "./js_router.js?v=20260826-router-fix";
 
 import { initFormatsManager, renderFormatCards, getEffectiveAssociatedVideos } from "./js_formats_manager.js?v=20260825-profile-18";
 
@@ -99,6 +99,7 @@ from "./js_storage.js";
 
 import { getVideoTitle, getVideoViews, getVideoRetention } from "./js_csv_fields.js";
 import { buildChannelProfile } from "./js_channel_profile.js";
+import { getSupabaseClient } from "./js_supabase_client.js";
 
 
 /*
@@ -191,12 +192,199 @@ async function refreshChannelProfileIfNeeded(){
 
 let dashboardInitialized = false;
 
+const CSV_EMPTY_STATES = {
+    formats: {
+        icon: "📊",
+        title: "Your format map starts with your CSV",
+        body: "Upload a Lifetime YouTube Studio CSV first so we can detect your formats and compare them with real channel performance.",
+        cta: "Upload CSV to unlock Formats"
+    },
+    ideas: {
+        icon: "💡",
+        title: "Your next ideas need your channel context",
+        body: "Upload a Lifetime YouTube Studio CSV first so the Idea Generator can build original suggestions around the formats and performance patterns that are yours.",
+        cta: "Upload CSV to unlock ideas"
+    },
+    videos: {
+        icon: "🎬",
+        title: "Video Analysis starts with your channel history",
+        body: "Upload a Lifetime YouTube Studio CSV first so this report can compare your video with your own formats, retention and past Shorts.",
+        cta: "Upload CSV to unlock Video Analysis"
+    },
+    hook: {
+        icon: "🪝",
+        title: "Give your hook a channel baseline",
+        body: "Upload a Lifetime YouTube Studio CSV first so hook feedback can be grounded in the audience and formats that already work for you. Pro access is still required for this tool.",
+        cta: "Upload CSV to continue"
+    },
+    coach: {
+        icon: "🧭",
+        title: "Your coach needs your channel history",
+        body: "Upload a Lifetime YouTube Studio CSV first so the Personal AI Coach can give advice based on your real publishing patterns. Pro access is still required for this tool.",
+        cta: "Upload CSV to continue"
+    },
+    title: {
+        icon: "✍️",
+        title: "Title advice starts with your history",
+        body: "Upload a Lifetime YouTube Studio CSV first so title recommendations can use your formats, audience response and historical performance. Pro access is still required for this tool.",
+        cta: "Upload CSV to continue"
+    }
+};
+
+let csvEmptyStateNavigationInitialized = false;
+let onboardingChecklistInitialized = false;
+let onboardingDismissalLoaded = false;
+let onboardingDismissedAt = null;
+let onboardingUserId = null;
+const ONBOARDING_VIDEO_THRESHOLD = 10;
+const ONBOARDING_REAPPEAR_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
+const ONBOARDING_STORAGE_PREFIX = "brawl-onboarding-dismissed:";
+
+function renderCsvRequiredState(target, stateKey) {
+    if (!target) return;
+    const state = CSV_EMPTY_STATES[stateKey];
+    if (!state) return;
+
+    target.innerHTML = `
+        <div class="csv-empty-state">
+            <div class="csv-empty-icon" aria-hidden="true">${state.icon}</div>
+            <span class="csv-empty-eyebrow">CHANNEL CONTEXT REQUIRED</span>
+            <h3>${escapeHtml(state.title)}</h3>
+            <p>${escapeHtml(state.body)}</p>
+            <button type="button" class="csv-empty-cta" data-go-upload>${escapeHtml(state.cta)} →</button>
+        </div>`;
+}
+
+function setupCsvEmptyStateNavigation() {
+    if (csvEmptyStateNavigationInitialized) return;
+    csvEmptyStateNavigationInitialized = true;
+
+    document.addEventListener("click", event => {
+        const button = event.target.closest("[data-go-upload]");
+        if (!button) return;
+
+        event.preventDefault();
+        setActiveTab(button.dataset.onboardingTab || "overview");
+        const targetId = button.dataset.onboardingTarget || "upload-panel";
+        window.requestAnimationFrame(() => {
+            document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+    });
+}
+
+function getOnboardingStorageKey(userId = onboardingUserId) {
+    return `${ONBOARDING_STORAGE_PREFIX}${userId || "anonymous"}`;
+}
+
+async function loadOnboardingDismissal() {
+    if (onboardingDismissalLoaded) return onboardingDismissedAt;
+
+    try {
+        const supabase = await getSupabaseClient();
+        // getSession() legge la sessione da localStorage senza chiamate di
+        // rete (getUser() fallisce offline con ERR_INTERNET_DISCONNECTED).
+        let user = null;
+        if (supabase) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            user = sessionData?.session?.user || null;
+        }
+        onboardingUserId = user?.id || null;
+
+        if (supabase && onboardingUserId) {
+            const { data, error } = await supabase
+                .from("profiles")
+                .select("onboarding_checklist_dismissed_at")
+                .eq("id", onboardingUserId)
+                .maybeSingle();
+
+            if (!error) {
+                onboardingDismissedAt = data?.onboarding_checklist_dismissed_at || null;
+                onboardingDismissalLoaded = true;
+                if (onboardingDismissedAt) {
+                    localStorage.setItem(getOnboardingStorageKey(), onboardingDismissedAt);
+                } else {
+                    localStorage.removeItem(getOnboardingStorageKey());
+                }
+                return onboardingDismissedAt;
+            }
+        }
+    } catch (error) {
+        console.warn("Dashboard: onboarding dismissal could not be loaded from the account.", error);
+    }
+
+    onboardingDismissedAt = localStorage.getItem(getOnboardingStorageKey());
+    onboardingDismissalLoaded = true;
+    return onboardingDismissedAt;
+}
+
+async function persistOnboardingDismissal() {
+    const timestamp = new Date().toISOString();
+    onboardingDismissedAt = timestamp;
+    localStorage.setItem(getOnboardingStorageKey(), timestamp);
+
+    try {
+        const supabase = await getSupabaseClient();
+        if (!supabase || !onboardingUserId) return false;
+
+        const { error } = await supabase
+            .from("profiles")
+            .update({ onboarding_checklist_dismissed_at: timestamp })
+            .eq("id", onboardingUserId);
+
+        if (error) {
+            console.warn("Dashboard: account onboarding dismissal was not saved.", error);
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.warn("Dashboard: onboarding dismissal could not be persisted.", error);
+        return false;
+    }
+}
+
+async function renderOnboardingChecklist() {
+    const panel = document.getElementById("onboarding-checklist");
+    if (!panel) return;
+
+    const channelProfile = await loadChannelProfile();
+    const profileCount = Number(channelProfile?.totalVideos);
+    const totalVideos = Number.isFinite(profileCount) ? profileCount : dashboardData.length;
+
+    if (totalVideos >= ONBOARDING_VIDEO_THRESHOLD) {
+        panel.hidden = true;
+        return;
+    }
+
+    const dismissedAt = await loadOnboardingDismissal();
+    const dismissedTime = dismissedAt ? new Date(dismissedAt).getTime() : NaN;
+    const recentlyDismissed = Number.isFinite(dismissedTime)
+        && Date.now() - dismissedTime < ONBOARDING_REAPPEAR_AFTER_MS;
+
+    panel.hidden = recentlyDismissed;
+}
+
+function setupOnboardingChecklist() {
+    if (onboardingChecklistInitialized) return;
+    const panel = document.getElementById("onboarding-checklist");
+    if (!panel) return;
+
+    onboardingChecklistInitialized = true;
+    panel.addEventListener("click", event => {
+        const dismissButton = event.target.closest("#onboarding-dismiss");
+        if (!dismissButton) return;
+        panel.hidden = true;
+        persistOnboardingDismissal();
+    });
+}
+
 async function initDashboard(){
 
     if (!dashboardInitialized) {
         dashboardInitialized = true;
         setupUpload();
         setupTabs();
+        setupCsvEmptyStateNavigation();
+        setupOnboardingChecklist();
         setupCustomFormats();
         setupIdeaGeneration();
         initFormatsManager();
@@ -367,21 +555,18 @@ function setActiveTab(tab){
 
     if(tab === "videos"){
 
-        initVideoAnalysis(
-            dashboardData.length > 0
-        );
-
-        // Toggle blocked state for video analysis
         const videoAnalysis = document.getElementById("video-analysis");
         const videoAnalysisBlocked = document.getElementById("video-analysis-blocked");
         
-        if (videoAnalysis && videoAnalysisBlocked) {
-            if (dashboardData.length > 0) {
-                videoAnalysis.hidden = false;
-                videoAnalysisBlocked.hidden = true;
-            } else {
-                videoAnalysis.hidden = true;
+        if (dashboardData.length > 0) {
+            initVideoAnalysis(true);
+            if (videoAnalysis) videoAnalysis.hidden = false;
+            if (videoAnalysisBlocked) videoAnalysisBlocked.hidden = true;
+        } else {
+            if (videoAnalysis) videoAnalysis.hidden = true;
+            if (videoAnalysisBlocked) {
                 videoAnalysisBlocked.hidden = false;
+                renderCsvRequiredState(videoAnalysisBlocked, "videos");
             }
         }
 
@@ -389,13 +574,17 @@ function setActiveTab(tab){
 
     if(tab === "formats"){
 
-        renderFormatCards();
+        const formatsContainer = document.getElementById("formats-container");
+        if (dashboardData.length > 0) {
+            renderFormatCards();
+        } else {
+            renderCsvRequiredState(formatsContainer, "formats");
+        }
 
     }
 
     if(tab === "ideas"){
 
-        // Toggle blocked state for ideas section
         const ideaList = document.querySelector(".idea-list");
         const ideasBlocked = document.getElementById("ideas-blocked");
         const generateIdeasBtn = document.getElementById("generate-ideas-btn");
@@ -405,12 +594,12 @@ function setActiveTab(tab){
                 ideaList.style.display = "flex";
                 ideasBlocked.hidden = true;
                 if (generateIdeasBtn) generateIdeasBtn.disabled = false;
-                // Populate format filter dropdown
                 populateFormatFilter();
             } else {
                 ideaList.style.display = "none";
                 ideasBlocked.hidden = false;
                 if (generateIdeasBtn) generateIdeasBtn.disabled = true;
+                renderCsvRequiredState(ideasBlocked, "ideas");
             }
         }
 
@@ -421,15 +610,27 @@ function setActiveTab(tab){
     }
 
     if(tab === "hook"){
-        initHookAnalyzer();
+        if (dashboardData.length > 0) {
+            initHookAnalyzer();
+        } else {
+            renderCsvRequiredState(document.getElementById("hook-flow"), "hook");
+        }
     }
 
     if(tab === "coach"){
-        initAICoach();
+        if (dashboardData.length > 0) {
+            initAICoach();
+        } else {
+            renderCsvRequiredState(document.getElementById("coach-flow"), "coach");
+        }
     }
 
     if(tab === "title"){
-        initTitleOptimizer();
+        if (dashboardData.length > 0) {
+            initTitleOptimizer();
+        } else {
+            renderCsvRequiredState(document.getElementById("title-optimizer-flow"), "title");
+        }
     }
 
 }
@@ -1350,13 +1551,8 @@ async function refreshDashboard(){
     renderFormatRows();
     await renderPredictionHistory();
     await renderIdeasFromCache();
+    await renderOnboardingChecklist();
     setActiveTab(activeTab);
-
-    if (dashboardData.length > 0) {
-        initVideoAnalysis(true);
-    } else {
-        initVideoAnalysis(false);
-    }
 
 }
 

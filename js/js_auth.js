@@ -23,7 +23,7 @@ import { getSupabaseClient } from "./js_supabase_client.js";
 
 import { resetStorageCache } from "./js_storage.js";
 import { switchToAppMode, switchToHomeMode } from "./js_navigation.js?v=20260825-profile-18";
-import { showApp } from "./js_router.js?v=20260825-profile-18";
+import { showApp } from "./js_router.js?v=20260826-router-fix";
 
 
 let currentUser = null;
@@ -367,7 +367,7 @@ function setupNavAuthButtons(){
         if(isLoggedIn()){
             // User is logged in, navigate to dashboard
             try {
-                const { showApp } = await import("./js_router.js?v=20260825-profile-18");
+                const { showApp } = await import("./js_router.js?v=20260826-router-fix");
                 showApp();
                 switchToAppMode(); // Update navbar to show Home instead of FAQ/About
             } catch (error) {
@@ -707,7 +707,7 @@ async function handleAuthSubmit(){
                 // If user was trying to access dashboard, redirect there after login
                 if(wasDashboardIntent){
                     try {
-                        const { showApp } = await import("./js_router.js?v=20260825-profile-18");
+                        const { showApp } = await import("./js_router.js?v=20260826-router-fix");
                         showApp();
                     } catch (error) {
                         console.error("Failed to navigate to dashboard after login:", error);

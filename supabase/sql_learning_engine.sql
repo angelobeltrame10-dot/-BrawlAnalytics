@@ -31,7 +31,7 @@ create index if not exists idx_prediction_log_user_unresolved
 
 create table if not exists public.calibration_stats (
     user_id uuid not null references auth.users(id) on delete cascade,
-    dimension_type text not null,   -- 'format' | 'global' | 'duration_bucket'
+    dimension_type text not null,   -- 'format' | 'global' | 'duration_bucket' | 'feature'
     dimension_key text not null,    -- es. 'Trickshot', 'global', 'short_15s'
     sample_count int not null default 0,
     mean_error numeric not null default 0,
@@ -81,14 +81,18 @@ declare
     v_uid uuid := auth.uid();
     v_baseline numeric;
     v_format text;
+    v_features jsonb;
+    v_feature_name text;
+    v_feature_value numeric;
+    v_feature_bucket text;
     v_actual numeric := greatest(0, coalesce(p_actual_views, 0));
     v_error numeric;
     v_resolved boolean := false;
 begin
     if v_uid is null then raise exception 'Not authenticated'; end if;
 
-    select predicted_baseline, format
-      into v_baseline, v_format
+    select predicted_baseline, format, features
+      into v_baseline, v_format, v_features
       from public.prediction_log
      where id = p_id and user_id = v_uid and resolved = false
      for update;
@@ -137,6 +141,40 @@ begin
         sample_count = public.calibration_stats.sample_count + 1,
         updated_at = now();
 
+    -- Keep outcome error by feature bucket as well. The buckets are
+    -- deliberately coarse (high/low) and are consumed with sample
+    -- shrinkage by js_dynamic_weights.js, preventing one outcome from
+    -- rewriting contextual weights.
+    foreach v_feature_name in array array[
+        'trendAlignment',
+        'semanticTrendSimilarity',
+        'formatStrength',
+        'retentionSignal',
+        'videoOriginality',
+        'competition',
+        'creatorTrendsOverlap'
+    ] loop
+        if jsonb_typeof(v_features -> v_feature_name) = 'number' then
+            v_feature_value := (v_features ->> v_feature_name)::numeric;
+            v_feature_bucket := case when v_feature_value >= 0.67 then 'high' else 'low' end;
+
+            insert into public.calibration_stats(
+                user_id, dimension_type, dimension_key, sample_count,
+                mean_error, mean_abs_error, updated_at
+            ) values (
+                v_uid, 'feature', left(v_feature_name || ':' || v_feature_bucket, 120),
+                1, v_error, abs(v_error), now()
+            ) on conflict (user_id, dimension_type, dimension_key)
+            do update set
+                mean_error = (public.calibration_stats.mean_error * public.calibration_stats.sample_count + excluded.mean_error)
+                    / (public.calibration_stats.sample_count + 1),
+                mean_abs_error = (public.calibration_stats.mean_abs_error * public.calibration_stats.sample_count + excluded.mean_abs_error)
+                    / (public.calibration_stats.sample_count + 1),
+                sample_count = public.calibration_stats.sample_count + 1,
+                updated_at = now();
+        end if;
+    end loop;
+
     return true;
 end;
 $$;
@@ -155,7 +193,7 @@ set search_path = public
 as $$
 begin
     if auth.uid() is null then raise exception 'Not authenticated'; end if;
-    if p_dimension_type not in ('global', 'format', 'duration_bucket') then
+    if p_dimension_type not in ('global', 'format', 'duration_bucket', 'feature') then
         raise exception 'Invalid dimension type';
     end if;
     insert into public.calibration_stats(

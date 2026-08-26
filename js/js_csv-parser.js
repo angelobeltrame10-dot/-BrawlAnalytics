@@ -205,15 +205,17 @@ function parsePublishDate(value){
             if (match) {
                 try {
                     if (pattern === datePatterns[0] || pattern === datePatterns[1]) {
-                        // Numeric formats
-                        const [, part1, part2, year] = match;
-                        let month, day;
+                        // Numeric formats. The two patterns have different
+                        // group order, so keep the third capture explicitly.
+                        const [, part1, part2, part3] = match;
+                        let year, month, day;
                         
                         // Try to determine if DD/MM or MM/DD based on values
                         if (pattern === datePatterns[0]) {
                             // DD/MM/YYYY format (European/YouTube Studio default)
                             day = parseInt(part1, 10);
                             month = parseInt(part2, 10);
+                            year = parseInt(part3, 10);
                         } else {
                             // YYYY/MM/DD format
                             year = parseInt(part1, 10);

@@ -44,7 +44,8 @@ alter table public.profiles
     add column if not exists current_period_end timestamptz,
     add column if not exists pro_started_at timestamptz,
     add column if not exists total_ideas_generated int not null default 0,
-    add column if not exists total_videos_analyzed int not null default 0;
+    add column if not exists total_videos_analyzed int not null default 0,
+    add column if not exists onboarding_checklist_dismissed_at timestamptz;
 
 -- Stamp the first moment a profile becomes Pro. Existing Pro users are
 -- backfilled below with the requested launch date.

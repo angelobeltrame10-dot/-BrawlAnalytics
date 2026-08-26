@@ -18,7 +18,8 @@ alter table public.profiles
     add column if not exists current_period_end timestamptz,
     add column if not exists pro_started_at timestamptz,
     add column if not exists total_ideas_generated int not null default 0,
-    add column if not exists total_videos_analyzed int not null default 0;
+    add column if not exists total_videos_analyzed int not null default 0,
+    add column if not exists onboarding_checklist_dismissed_at timestamptz;
 
 -- ----------------------------------------------------------
 -- 2. Creazione automatica del profilo alla registrazione.
@@ -92,6 +93,6 @@ create policy "profiles_update_own" on public.profiles
     for update using (auth.uid() = id) with check (auth.uid() = id);
 
 revoke update on public.profiles from authenticated;
-grant update (email) on public.profiles to authenticated;
+grant update (email, onboarding_checklist_dismissed_at) on public.profiles to authenticated;
 
 grant select on public.profiles to authenticated;

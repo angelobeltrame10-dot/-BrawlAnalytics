@@ -13,8 +13,12 @@ let cache = {
 };
 
 async function getUserId(supabase) {
-    const { data } = await supabase.auth.getUser();
-    return data?.user?.id || null;
+    // getSession() legge la sessione da localStorage (nessuna chiamata di
+    // rete), a differenza di getUser() che valida il token su /auth/v1/user:
+    // offline/reti instabili fanno fallire getUser() con ERR_INTERNET_DISCONNECTED
+    // ad ogni init della dashboard, mentre getSession() funziona sempre.
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.user?.id || null;
 }
 
 async function loadChannelData() {

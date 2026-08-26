@@ -79,27 +79,32 @@ function calculateBaseline(scoredSimilarVideos, channelProfile) {
         return channelProfile.averageViews > 0 ? channelProfile.averageViews : 100;
     }
 
-    const views = scoredSimilarVideos
-        .map(item => Number(item.video?.views || 0))
+    const channelViews = (channelProfile?.historicalVideos || [])
+        .map(video => Number(video?.views || 0))
         .filter(value => value > 0);
+    const p90 = getPercentile(channelViews, 90);
+    const winsorCap = p90 > 0 ? p90 : Number.POSITIVE_INFINITY;
+    const observations = scoredSimilarVideos
+        .map(item => ({
+            value: Number(item.video?.views || 0),
+            winsorizedValue: Math.min(Number(item.video?.views || 0), winsorCap),
+            similarity: Math.max(0.1, item.similarity || 0.1)
+        }))
+        .filter(item => item.value > 0);
 
-    if (views.length === 0) {
+    if (observations.length === 0) {
         return channelProfile.averageViews > 0 ? channelProfile.averageViews : 100;
     }
 
-    const sorted = [...views].sort((a, b) => a - b);
+    // Clamp each similar video's contribution before calculating the
+    // weighted mean. The later cap remains as a second line of defence.
+    const sorted = observations.map(item => item.winsorizedValue).sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
     const p75 = getPercentile(sorted, 75);
-
-    const totalWeight = scoredSimilarVideos.reduce((sum, item) => sum + Math.max(0.1, item.similarity || 0.1), 0);
-    const weightedViews = scoredSimilarVideos.reduce((sum, item) => {
-        const weight = Math.max(0.1, item.similarity || 0.1);
-        return sum + (Number(item.video?.views || 0) * weight);
-    }, 0);
-
+    const totalWeight = observations.reduce((sum, item) => sum + item.similarity, 0);
+    const weightedViews = observations.reduce((sum, item) => sum + item.winsorizedValue * item.similarity, 0);
     const weightedAverage = totalWeight > 0 ? weightedViews / totalWeight : median;
-    // Reduced cap multipliers for more conservative predictions
     const cap = Math.max(1000, Math.round(Math.max(median * 1.8, p75 * 1.15, (channelProfile?.averageViews || 1000) * 1.15)));
 
     return Math.min(weightedAverage, cap);

@@ -26,8 +26,8 @@
 
 .hook-first-impression {
     margin-bottom: .75rem;
-    border-color: rgba(242,184,75,.32);
-    background: rgba(242,184,75,.07);
+    border-color: rgba(114,211,179,.32);
+    background: rgba(114,211,179,.07);
 }
 
 .hook-plan-icon {
@@ -90,7 +90,7 @@
 
 .hook-decision--fix li::before { color: var(--ui-coral); }
 .hook-plan-list { margin-bottom: .75rem; }
-.hook-plan-list--accent { border-color: rgba(242,184,75,.32); }
+.hook-plan-list--accent { border-color: rgba(114,211,179,.32); }
 .hook-plan-list--accent .hook-plan-icon { background: var(--ui-amber); }
 
 .hook-versions-grid {

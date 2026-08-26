@@ -20,7 +20,7 @@ import {
     showApp
 
 }
-from "./js_router.js";
+from "./js_router.js?v=20260826-router-fix";
 
 import {
 
@@ -58,7 +58,7 @@ function initNavigation(){
             id="nav-logo"
         >
 
-                <img src="assets/favicon.ico" alt="Brawl Analytics logo" width="32" height="32">
+                <img src="assets/favicon.svg" alt="Brawl Analytics logo" width="32" height="32">
 
             <span class="logo__text">
                 Brawl<strong>Analytics</strong>
@@ -148,6 +148,14 @@ function initNavigation(){
     drawerClose?.addEventListener("click", closeDrawer);
     drawerBackdrop?.addEventListener("click", closeDrawer);
     navlinks?.querySelectorAll("a, button").forEach(link => link.addEventListener("click", closeDrawer));
+    document.addEventListener("click", event => {
+        // Close the drawer when tapping anywhere outside it (backdrop included),
+        // regardless of z-index/pointer-events of the overlay.
+        if (!document.body.classList.contains("nav-drawer-open")) return;
+        if (navlinks?.contains(event.target)) return;
+        if (menuButton?.contains(event.target)) return;
+        closeDrawer();
+    });
     document.addEventListener("keydown", event => {
         if (event.key === "Escape") closeDrawer();
     });

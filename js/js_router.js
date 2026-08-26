@@ -30,6 +30,13 @@ let homeLoaded = true;
 let appLoaded = false;
 let analysisLoaded = false;
 
+// Guard contro chiamate concorrenti a showApp() (es. dopo il login
+// arrivano sia l'evento "brawl:login-success" sia il callback della
+// transizione di successo): senza questo guard il fetch di pages_app.html
+// veniva eseguito due volte, il secondo loadHtml() sostituiva il DOM già
+// inizializzato e le tab della dashboard restavano senza listener.
+let appLoadingPromise = null;
+
 
 /* ==========================================================
    Helpers
@@ -147,30 +154,30 @@ export async function showApp() {
 
     if (!appLoaded) {
 
-        try {
+        if (!appLoadingPromise) {
 
-            await loadHtml(
+            appLoadingPromise = loadHtml(
                 app,
                 "../pages/pages_app.html"
-            );
-
-            appLoaded = true;
-
-        }
-
-        catch (error) {
-
-            console.error("Router error:", error);
-
-            app.innerHTML = `
-                <div class="panel">
-                    Unable to load application.
-                </div>
-            `;
-
-            return;
+            )
+            .then(() => {
+                appLoaded = true;
+            })
+            .catch((error) => {
+                console.error("Router error:", error);
+                app.innerHTML = `
+                    <div class="panel">
+                        Unable to load application.
+                    </div>
+                `;
+            })
+            .finally(() => {
+                appLoadingPromise = null;
+            });
 
         }
+
+        await appLoadingPromise;
 
     }
 

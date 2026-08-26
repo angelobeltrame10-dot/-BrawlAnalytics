@@ -11,6 +11,8 @@ import { getVideoTitle, getVideoViews, getVideoRetention } from "./js_csv_fields
 import { classifyVideosEffective, getFormatRanking } from "./js_fomats.js";
 import { loadCustomFormats } from "./js_storage.js";
 
+const warnedNormalizedFormatMatches = new Set();
+
 /**
  * Builds a Channel Profile from video data and custom formats.
  * This profile represents the historical behavior of the channel.
@@ -243,7 +245,11 @@ export function getFormatStatistics(channelProfile, formatName) {
             .find(key => normalizeFormatKey(key) === normalizedTarget);
 
         if (fallbackKey) {
-            console.warn(`getFormatStatistics: match esatto fallito per "${formatName}", usato match normalizzato su "${fallbackKey}".`);
+            const warningKey = `${formatName}=>${fallbackKey}`;
+            if (!warnedNormalizedFormatMatches.has(warningKey)) {
+                warnedNormalizedFormatMatches.add(warningKey);
+                console.warn(`getFormatStatistics: match esatto fallito per "${formatName}", usato match normalizzato su "${fallbackKey}".`);
+            }
             return channelProfile.formatPerformance[fallbackKey];
         }
     }

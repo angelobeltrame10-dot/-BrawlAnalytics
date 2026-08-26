@@ -11,7 +11,16 @@
 
 import { getSupabaseClient } from "./js_supabase_client.js";
 
-const MIN_SAMPLES_TO_TRUST_FORMAT = 2;
+export const SAMPLE_SHRINKAGE_K = 9;
+
+function sampleTrust(sampleCount) {
+    const n = Math.max(0, Number(sampleCount) || 0);
+    return n / (n + SAMPLE_SHRINKAGE_K);
+}
+
+function clampError(value, min = -0.35, max = 0.5) {
+    return Math.max(min, Math.min(max, Number(value) || 0));
+}
 
 /**
  * Carica tutte le righe di calibration_stats dell'utente corrente e le
@@ -20,7 +29,12 @@ const MIN_SAMPLES_TO_TRUST_FORMAT = 2;
  * così il chiamante non deve gestire null ovunque.
  */
 export async function loadCalibrationStats() {
-    const empty = { ready: false, global: { meanError: 0, sampleCount: 0 }, byFormat: {} };
+    const empty = {
+        ready: false,
+        global: { meanError: 0, meanAbsError: 0, sampleCount: 0 },
+        byFormat: {},
+        byFeature: {}
+    };
 
     try {
         const supabase = await getSupabaseClient();
@@ -36,17 +50,26 @@ export async function loadCalibrationStats() {
 
         if (error || !data || data.length === 0) return empty;
 
-        const result = { ready: false, global: { meanError: 0, sampleCount: 0 }, byFormat: {} };
+        const result = {
+            ready: false,
+            global: { meanError: 0, meanAbsError: 0, sampleCount: 0 },
+            byFormat: {},
+            byFeature: {}
+        };
 
         data.forEach(row => {
+            const entry = {
+                meanError: Number(row.mean_error) || 0,
+                meanAbsError: Number(row.mean_abs_error) || 0,
+                sampleCount: Math.max(0, Number(row.sample_count) || 0)
+            };
+
             if (row.dimension_type === "global") {
-                result.global = { meanError: row.mean_error, meanAbsError: row.mean_abs_error, sampleCount: row.sample_count };
+                result.global = entry;
             } else if (row.dimension_type === "format") {
-                result.byFormat[row.dimension_key] = {
-                    meanError: row.mean_error,
-                    meanAbsError: row.mean_abs_error,
-                    sampleCount: row.sample_count
-                };
+                result.byFormat[row.dimension_key] = entry;
+            } else if (row.dimension_type === "feature") {
+                result.byFeature[row.dimension_key] = entry;
             }
         });
 
@@ -70,29 +93,27 @@ export async function loadCalibrationStats() {
  */
 export function getCorrectionFactor(calibrationStats, format) {
     if (!calibrationStats?.ready) {
-        return { factor: 1.0, trust: 0, source: "none" };
+        return { factor: 1.0, trust: 0, source: "none", sampleCount: 0 };
     }
 
-    const formatStats = calibrationStats.byFormat[format];
-
-    if (formatStats && formatStats.sampleCount >= MIN_SAMPLES_TO_TRUST_FORMAT) {
-        const clampedError = Math.max(-0.35, Math.min(0.5, formatStats.meanError));
+    const formatStats = calibrationStats.byFormat?.[format];
+    if (formatStats && formatStats.sampleCount > 0) {
+        const clampedError = clampError(formatStats.meanError);
         return {
             factor: 1 + clampedError * 0.6,
-            trust: Math.min(0.55, formatStats.sampleCount / 5), // Ridotto da 25 a 5 per formati con pochi video
+            trust: sampleTrust(formatStats.sampleCount) * 0.65,
             source: "format",
             sampleCount: formatStats.sampleCount
         };
     }
 
-    // Fallback: correzione globale, più prudente (peso ridotto) perché
-    // meno specifica del formato richiesto.
-    const clampedGlobal = Math.max(-0.25, Math.min(0.4, calibrationStats.global.meanError));
+    const globalStats = calibrationStats.global || {};
+    const clampedGlobal = clampError(globalStats.meanError, -0.25, 0.4);
     return {
         factor: 1 + clampedGlobal * 0.4,
-        trust: Math.min(0.35, calibrationStats.global.sampleCount / 10), // Ridotto da 45 a 10
+        trust: sampleTrust(globalStats.sampleCount) * 0.45,
         source: "global",
-        sampleCount: calibrationStats.global.sampleCount
+        sampleCount: globalStats.sampleCount || 0
     };
 }
 
@@ -102,12 +123,25 @@ export function getCorrectionFactor(calibrationStats, format) {
  * senza bootstrap: solo una media già calcolata.
  */
 export function getTypicalErrorSpread(calibrationStats, format) {
-    if (!calibrationStats?.ready) return 0.4; // default prudente
+    if (!calibrationStats?.ready) return 0.4;
 
-    const formatStats = calibrationStats.byFormat[format];
-    if (formatStats && formatStats.sampleCount >= MIN_SAMPLES_TO_TRUST_FORMAT) {
-        return Math.max(0.2, Math.min(0.7, formatStats.meanAbsError));
-    }
+    const globalSpread = Math.max(
+        0.2,
+        Math.min(0.7, Number(calibrationStats.global?.meanAbsError) || 0.3)
+    );
+    const formatStats = calibrationStats.byFormat?.[format];
+    if (!formatStats || formatStats.sampleCount <= 0) return globalSpread;
 
-    return Math.max(0.2, Math.min(0.7, calibrationStats.global.meanAbsError || 0.3));
+    const formatSpread = Math.max(0.2, Math.min(0.7, Number(formatStats.meanAbsError) || 0.3));
+    const trust = sampleTrust(formatStats.sampleCount);
+    return formatSpread * trust + globalSpread * (1 - trust);
+}
+
+export function getFeatureCalibration(calibrationStats, featureName) {
+    if (!calibrationStats?.ready) return null;
+    const byFeature = calibrationStats.byFeature || {};
+    return {
+        high: byFeature[`${featureName}:high`] || null,
+        low: byFeature[`${featureName}:low`] || null
+    };
 }

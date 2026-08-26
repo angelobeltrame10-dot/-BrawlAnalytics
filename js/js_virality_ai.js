@@ -191,17 +191,35 @@ function buildTrendsContext(trends) {
  */
 function validateAnalysis(analysis) {
     const defaults = getDefaultAnalysis();
-    
-    // Ensure all required fields exist
+    if (!analysis || typeof analysis !== "object") return defaults;
+    const validTrendAlignment = isValidEnum(analysis.trendAlignment, ["strong", "moderate", "weak", "none"]);
+    const validSemanticSimilarity = typeof analysis.semanticTrendSimilarity === "number"
+        && Number.isFinite(analysis.semanticTrendSimilarity);
+    const validFormatSuitability = isValidEnum(analysis.formatSuitability, ["excellent", "good", "fair", "poor"]);
+    const validHistoricalFit = isValidEnum(analysis.historicalFit, ["strong", "moderate", "weak"]);
+    const validInnovation = isValidEnum(analysis.innovation, ["high", "medium", "low"]);
+    const validCompetition = isValidEnum(analysis.competition, ["low", "medium", "high"]);
+    const validTopicFreshness = isValidEnum(analysis.topicFreshness, ["high", "medium", "low"]);
+    const validFormatNovelty = isValidEnum(analysis.formatNovelty, ["high", "medium", "low"]);
+
     return {
-        trendAlignment: isValidEnum(analysis.trendAlignment, ["strong", "moderate", "weak", "none"]) ? analysis.trendAlignment : defaults.trendAlignment,
-        semanticTrendSimilarity: typeof analysis.semanticTrendSimilarity === "number" ? Math.max(0, Math.min(1, analysis.semanticTrendSimilarity)) : defaults.semanticTrendSimilarity,
-        formatSuitability: isValidEnum(analysis.formatSuitability, ["excellent", "good", "fair", "poor"]) ? analysis.formatSuitability : defaults.formatSuitability,
-        historicalFit: isValidEnum(analysis.historicalFit, ["strong", "moderate", "weak"]) ? analysis.historicalFit : defaults.historicalFit,
-        innovation: isValidEnum(analysis.innovation, ["high", "medium", "low"]) ? analysis.innovation : defaults.innovation,
-        competition: isValidEnum(analysis.competition, ["low", "medium", "high"]) ? analysis.competition : defaults.competition,
-        topicFreshness: isValidEnum(analysis.topicFreshness, ["high", "medium", "low"]) ? analysis.topicFreshness : defaults.topicFreshness,
-        formatNovelty: isValidEnum(analysis.formatNovelty, ["high", "medium", "low"]) ? analysis.formatNovelty : defaults.formatNovelty
+        trendAlignment: validTrendAlignment ? analysis.trendAlignment : defaults.trendAlignment,
+        semanticTrendSimilarity: validSemanticSimilarity
+            ? Math.max(0, Math.min(1, analysis.semanticTrendSimilarity))
+            : defaults.semanticTrendSimilarity,
+        formatSuitability: validFormatSuitability ? analysis.formatSuitability : defaults.formatSuitability,
+        historicalFit: validHistoricalFit ? analysis.historicalFit : defaults.historicalFit,
+        innovation: validInnovation ? analysis.innovation : defaults.innovation,
+        competition: validCompetition ? analysis.competition : defaults.competition,
+        topicFreshness: validTopicFreshness ? analysis.topicFreshness : defaults.topicFreshness,
+        formatNovelty: validFormatNovelty ? analysis.formatNovelty : defaults.formatNovelty,
+        // A partially invalid response is still degraded: one or more
+        // fields came from the neutral fallback rather than the model.
+        aiDegraded: !(
+            validTrendAlignment && validSemanticSimilarity && validFormatSuitability
+            && validHistoricalFit && validInnovation && validCompetition
+            && validTopicFreshness && validFormatNovelty
+        )
     };
 }
 
@@ -224,6 +242,7 @@ function getDefaultAnalysis() {
         innovation: "medium",
         competition: "medium",
         topicFreshness: "medium",
-        formatNovelty: "medium"
+        formatNovelty: "medium",
+        aiDegraded: true
     };
 }

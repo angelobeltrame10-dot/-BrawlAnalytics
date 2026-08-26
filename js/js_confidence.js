@@ -1,38 +1,35 @@
 /* ==========================================================
    BRAWL ANALYTICS
-   CONFIDENCE MODULE — v3
+   CONFIDENCE MODULE — v4
 
-   Calcola la confidence (0-100) indipendentemente dallo score.
-   Novità: include un fattore "learnedAccuracy" basato sulle
-   statistiche reali di errore accumulate (js_calibration.js) —
-   più il motore ha predizioni risolte per quel formato, più la
-   confidence dichiarata è "guadagnata" sui dati reali invece che
-   stimata a priori.
+   Confidence is earned from historical sample size, format history,
+   channel consistency, calibration accuracy, and the reliability of
+   the qualitative AI input.
 ========================================================== */
 
 import { getFormatStatistics } from "./js_channel_profile.js";
 import { getTypicalErrorSpread } from "./js_calibration.js";
 
+const SAMPLE_SHRINKAGE_K = 9;
+const AI_DEGRADED_PENALTY_POINTS = 18;
+
+function sampleTrust(sampleCount) {
+    const n = Math.max(0, Number(sampleCount) || 0);
+    return n / (n + SAMPLE_SHRINKAGE_K);
+}
+
 function dataVolumeConfidence(profile) {
-    const n = profile?.totalVideos || 0;
-    // Ridotti i threshold per permettere canali con meno video di avere alta confidence
-    if (n >= 10) return 1.0;
-    if (n >= 5) return 0.75;
-    if (n >= 3) return 0.55;
-    if (n >= 2) return 0.4;
-    return 0.25;
+    return sampleTrust(profile?.totalVideos || 0);
 }
 
 function formatHistoryConfidence(format, profile) {
     const stats = getFormatStatistics(profile, format);
-    if (!stats || stats.videoCount === 0) return 0.35;
-    // Rimosso il blocco minimo: basta 2+ video per avere alta confidence
-    if (stats.videoCount >= 2) return 1.0;
-    return 0.55;
+    if (!stats || stats.videoCount <= 0) return 0;
+    return sampleTrust(stats.videoCount);
 }
 
 function historicalSimilarityConfidence(features, channelProfile, proposal) {
-    if (!channelProfile?.historicalVideos?.length) return 0.3;
+    if (!channelProfile?.historicalVideos?.length) return 0;
 
     const formatMatches = channelProfile.historicalVideos.filter(v => v.format === proposal.format);
     const formatRatio = formatMatches.length / channelProfile.historicalVideos.length;
@@ -46,24 +43,24 @@ function historicalSimilarityConfidence(features, channelProfile, proposal) {
 }
 
 /**
- * Quanto possiamo fidarci delle statistiche di calibrazione per questo
- * formato: cresce con il numero di predizioni risolte, e diminuisce se
- * lo spread tipico dell'errore è alto (formato storicamente imprevedibile).
+ * Confidence in learned calibration follows the same n/(n+k) curve as
+ * the historical feature calculations. A small sample never saturates.
  */
 function learnedAccuracyConfidence(calibrationStats, format) {
-    if (!calibrationStats?.ready) return 0.3;
+    if (!calibrationStats?.ready) return 0;
 
-    const formatStats = calibrationStats.byFormat[format];
-    const sampleCount = formatStats?.sampleCount ?? calibrationStats.global.sampleCount;
+    const formatStats = calibrationStats.byFormat?.[format];
+    const sampleCount = formatStats?.sampleCount ?? calibrationStats.global?.sampleCount ?? 0;
     const spread = getTypicalErrorSpread(calibrationStats, format);
+    const spreadPenalty = Math.max(0, 1 - spread);
 
-    const sampleTrust = Math.min(1, sampleCount / 5); // Ridotto da 15 a 5 per formati con pochi video
-    const spreadPenalty = Math.max(0, 1 - spread); // spread alto → penalità
-
-    return Math.max(0.2, Math.min(1, sampleTrust * 0.7 + spreadPenalty * 0.3));
+    return Math.max(0.05, Math.min(1,
+        sampleTrust(sampleCount) * 0.7 + spreadPenalty * 0.3
+    ));
 }
 
-export function calculateConfidence(features, channelProfile, proposal, calibrationStats = null) {
+export function calculateConfidence(features, channelProfile, proposal, calibrationStats = null, aiDegraded = features?.aiDegraded) {
+    const qualitativeAiDegraded = Boolean(aiDegraded);
     const factors = {
         dataVolume: dataVolumeConfidence(channelProfile),
         formatHistory: formatHistoryConfidence(proposal.format, channelProfile),
@@ -73,15 +70,17 @@ export function calculateConfidence(features, channelProfile, proposal, calibrat
     };
 
     const weights = {
-        dataVolume: 0.18,
-        formatHistory: 0.20,
-        channelConsistency: 0.14,
+        dataVolume: 0.22,
+        formatHistory: 0.22,
+        channelConsistency: 0.16,
         historicalSimilarity: 0.20,
-        learnedAccuracy: 0.28
+        learnedAccuracy: 0.20
     };
 
     const weighted = Object.keys(factors).reduce((sum, key) => sum + factors[key] * weights[key], 0);
-    return Math.round(Math.max(0, Math.min(1, weighted)) * 100);
+    const aiPenalty = qualitativeAiDegraded ? AI_DEGRADED_PENALTY_POINTS / 100 : 0;
+
+    return Math.round(Math.max(0, Math.min(1, weighted - aiPenalty)) * 100);
 }
 
 export function getConfidenceQualitative(confidence) {
@@ -94,20 +93,32 @@ export function getConfidenceQualitative(confidence) {
 
 export function getConfidenceFactors(features, channelProfile, proposal, calibrationStats = null) {
     const formatStats = calibrationStats?.byFormat?.[proposal.format];
+    const historicalSampleCount = Math.max(0, Number(channelProfile?.totalVideos) || 0);
+    const formatSampleCount = Math.max(0, Number(getFormatStatistics(channelProfile, proposal.format)?.videoCount) || 0);
+    const calibrationSampleCount = Math.max(
+        0,
+        Number(formatStats?.sampleCount ?? calibrationStats?.global?.sampleCount) || 0
+    );
 
     return {
         dataVolume: {
             score: Math.round(dataVolumeConfidence(channelProfile) * 100),
+            sampleCount: historicalSampleCount,
             label: "Historical Data",
-            description: channelProfile.totalVideos >= 30 ? "Strong historical data available" : "Limited historical data"
+            description: historicalSampleCount > 0
+                ? `Based on ${historicalSampleCount} historical video${historicalSampleCount === 1 ? "" : "s"}`
+                : "No historical videos loaded yet"
         },
         formatHistory: {
             score: Math.round(formatHistoryConfidence(proposal.format, channelProfile) * 100),
+            sampleCount: formatSampleCount,
             label: "Format History",
-            description: `Based on videos classified under "${proposal.format}"`
+            description: formatSampleCount > 0
+                ? `Based on ${formatSampleCount} video${formatSampleCount === 1 ? "" : "s"} classified under \"${proposal.format}\"`
+                : `No historical videos classified under \"${proposal.format}\"`
         },
         channelConsistency: {
-            score: Math.round(features.channelConsistency * 100),
+            score: Math.round((features.channelConsistency ?? 0) * 100),
             label: "Channel Consistency"
         },
         historicalSimilarity: {
@@ -116,10 +127,27 @@ export function getConfidenceFactors(features, channelProfile, proposal, calibra
         },
         learnedAccuracy: {
             score: Math.round(learnedAccuracyConfidence(calibrationStats, proposal.format) * 100),
+            sampleCount: calibrationSampleCount,
             label: "Learned Accuracy",
-            description: formatStats
-                ? `Calibrated on ${formatStats.sampleCount} resolved predictions for this format`
-                : "Not enough resolved predictions yet for this format — using channel-wide defaults"
+            description: calibrationSampleCount > 0
+                ? `Calibrated on ${calibrationSampleCount} resolved prediction${calibrationSampleCount === 1 ? "" : "s"}`
+                : "No resolved predictions yet — using conservative defaults"
+        },
+        aiReliability: {
+            score: features.aiDegraded ? 20 : 100,
+            label: "Qualitative AI Reliability",
+            description: features.aiDegraded
+                ? `AI analysis used fallback values; confidence reduced by ${AI_DEGRADED_PENALTY_POINTS} points`
+                : "All qualitative AI fields were returned and validated"
         }
     };
+}
+
+export function getConfidenceSampleSummary(features, channelProfile, calibrationStats = null, aiDegraded = features?.aiDegraded) {
+    const videoCount = Math.max(0, Number(channelProfile?.totalVideos) || 0);
+    const resolvedCount = Math.max(0, Number(calibrationStats?.global?.sampleCount) || 0);
+    const aiNote = aiDegraded ? " Qualitative AI fallback reduced confidence." : "";
+    return `Based on ${videoCount} historical video${videoCount === 1 ? "" : "s"}`
+        + (resolvedCount > 0 ? ` and ${resolvedCount} resolved prediction${resolvedCount === 1 ? "" : "s"}.` : ".")
+        + aiNote;
 }

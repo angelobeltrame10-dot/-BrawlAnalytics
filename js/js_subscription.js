@@ -65,7 +65,10 @@ async function loadUsageStatus(){
 
         }
 
-        const { data: { user } } = await supabase.auth.getUser();
+        // getSession() legge la sessione da localStorage senza chiamate di
+        // rete (getUser() fallirebbe offline con ERR_INTERNET_DISCONNECTED).
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData?.session?.user || null;
 
         if(!user){
 

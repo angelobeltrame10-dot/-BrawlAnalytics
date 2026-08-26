@@ -65,12 +65,15 @@ function jaccardOverlap(tokensA, tokensB) {
 }
 
 export function extractFeatures(proposal, aiAnalysis, channelProfile, currentTrends = [], videoInsights = null) {
+    const proposalTokens = tokenize(proposal.description);
     const baseFeatures = {
         videoOriginality: normalizeOriginality(proposal.videoOriginality),
         ideaOriginality: normalizeOriginality(proposal.ideaOriginality),
 
         trendAlignment: normalizeTrendAlignment(aiAnalysis.trendAlignment),
         semanticTrendSimilarity: aiAnalysis.semanticTrendSimilarity ?? 0.5,
+        semanticTrendReliability: aiAnalysis?.aiDegraded ? 0.2 : 1.0,
+        aiDegraded: Boolean(aiAnalysis?.aiDegraded),
 
         formatStrength: calculateFormatStrength(proposal.format, channelProfile),
         formatSuitability: normalizeSuitability(aiAnalysis.formatSuitability),
@@ -90,6 +93,8 @@ export function extractFeatures(proposal, aiAnalysis, channelProfile, currentTre
         creatorTrendsOverlap: calculateCreatorTrendsOverlap(proposal, channelProfile),
         googleTrendsOverlap: calculateGoogleTrendsOverlap(proposal, currentTrends),
         formatStability: calculateFormatStability(proposal.format, channelProfile),
+        descriptionTokenCount: proposalTokens.length,
+        textSignalReliability: Math.min(1, proposalTokens.length / 10),
 
         multimediaFeatures: null
     };
@@ -241,13 +246,26 @@ function calculateHistoricalPerformance(format, channelProfile) {
     // Usiamo il riferimento più favorevole al formato tra i due (il
     // canale può essere "falsato" da un outlier, la mediana dei
     // formati è più stabile in quel caso specifico).
-    const rawRatio = Math.max(ratioVsChannelTotal, ratioVsFormatMedian);
+    const channelViews = (channelProfile.historicalVideos || [])
+        .map(video => Number(video.views || 0))
+        .filter(value => value > 0);
+    const channelMean = channelViews.length > 0
+        ? channelViews.reduce((sum, value) => sum + value, 0) / channelViews.length
+        : 0;
+    const channelVariance = channelViews.length > 0
+        ? channelViews.reduce((sum, value) => sum + (value - channelMean) ** 2, 0) / channelViews.length
+        : 0;
+    const channelCv = channelMean > 0 ? Math.sqrt(channelVariance) / channelMean : 0;
+    // High channel volatility makes the per-format median a safer anchor.
+    const medianWeight = Math.max(0.25, Math.min(0.8, channelCv / (channelCv + 1)));
+    const rawRatio = ratioVsChannelTotal * (1 - medianWeight) + ratioVsFormatMedian * medianWeight;
 
     // Shrinkage verso 1.0 in base alla numerosità campionaria: con
     // pochi video il ratio grezzo è rumoroso, quindi lo tiriamo verso
     // il centro; con molti video ci fidiamo quasi del tutto del dato.
-    // Rimosso il blocco minimo di 8 video: basta 2+ video per avere fiducia.
-    const sampleTrust = Math.min(1, stats.videoCount / 4); // pieno affidamento da 4+ video
+    // Statistical trust follows n/(n+k), so four videos cannot look like
+    // a fully reliable history.
+    const sampleTrust = stats.videoCount / (stats.videoCount + 9);
     const shrunkRatio = 1 + (rawRatio - 1) * (0.35 + sampleTrust * 0.65);
 
     // Bonus di dominanza (comportamento precedente, mantenuto ma reso
@@ -339,7 +357,9 @@ function calculateGoogleTrendsOverlap(proposal, currentTrends) {
     const trendTokens = currentTrends.flatMap(t => tokenize(t));
     if (proposalTokens.length === 0 || trendTokens.length === 0) return 0.3;
 
-    return Math.min(1, jaccardOverlap(proposalTokens, trendTokens) * 3); // scala l'overlap (tipicamente basso)
+    // Keep the lexical signal as a small bonus; semantic similarity from
+    // the model is the primary trend signal when it is available.
+    return Math.min(1, jaccardOverlap(proposalTokens, trendTokens) * 1.25);
 }
 
 /**

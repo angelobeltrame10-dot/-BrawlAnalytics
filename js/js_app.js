@@ -32,7 +32,7 @@ import {
     showApp
 
 }
-from "./js_router.js?v=20260825-profile-18";
+from "./js_router.js?v=20260826-router-fix";
 
 
 

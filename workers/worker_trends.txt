@@ -1,6 +1,33 @@
+const ALLOWED_ORIGINS = [
+    "https://brawl-analytics-official.vercel.app",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+];
+
+function corsHeaders(origin = "") {
+    const headers = {
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin"
+    };
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+        headers["Access-Control-Allow-Origin"] = origin;
+    }
+
+    return headers;
+}
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+        const origin = request.headers.get("Origin") || "";
+        const respond = (data, status = 200) => json(data, status, origin);
+
+        if (request.method === "OPTIONS") {
+            return new Response(null, { status: 204, headers: corsHeaders(origin) });
+        }
 
         try {
             /* ============================================
@@ -10,7 +37,7 @@ export default {
                 request.method === "GET" &&
                 url.pathname === "/health"
             ) {
-                return json({
+                return respond({
                     success: true,
                     service: "Brawl Analytics Trends Worker",
                     status: "online",
@@ -30,7 +57,7 @@ export default {
                 );
 
                 if (!cached) {
-                    return json({
+                    return respond({
                         success: false,
                         error: "No trends available."
                     }, 404);
@@ -40,7 +67,7 @@ export default {
                     status: 200,
                     headers: {
                         "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*"
+                        ...corsHeaders(origin)
                     }
                 });
             }
@@ -57,7 +84,7 @@ export default {
                 if (
                     auth !== `Bearer ${env.MAKE_SECRET}`
                 ) {
-                    return json({
+                    return respond({
                         success: false,
                         error: "Unauthorized."
                     }, 401);
@@ -69,7 +96,7 @@ export default {
                     !body.date ||
                     !Array.isArray(body.trends)
                 ) {
-                    return json({
+                    return respond({
                         success: false,
                         error: "Invalid payload."
                     }, 400);
@@ -90,7 +117,7 @@ export default {
                     JSON.stringify(payload)
                 );
 
-                return json({
+                return respond({
                     success: true,
                     message: "Daily trends updated.",
                     count: payload.trends.length,
@@ -105,19 +132,19 @@ export default {
                 request.method === "POST" &&
                 url.pathname === "/virality"
             ) {
-                return json({
+                return respond({
                     success: false,
                     message: "Virality Engine not implemented yet."
                 }, 501);
             }
 
-            return json({
+            return respond({
                 success: false,
                 error: "Route not found."
             }, 404);
 
         } catch (error) {
-            return json({
+            return respond({
                 success: false,
                 error: error.message
             }, 500);
@@ -160,14 +187,14 @@ function sanitizeTrends(rawTrends) {
     return formattedTrends;
 }
 
-function json(data, status = 200) {
+function json(data, status = 200, origin = "") {
     return new Response(
         JSON.stringify(data, null, 2),
         {
             status,
             headers: {
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
+                ...corsHeaders(origin)
             }
         }
     );

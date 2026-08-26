@@ -26,6 +26,9 @@ let userAnswers = {
 // Store uploaded video file for insights analysis
 let uploadedVideoFile = null;
 
+// Optional title supplied by the upload flow; kept separate from analysis inputs.
+
+
 // Track video analysis error state.
 // FIX: this used to stay null forever because extractVideoInsights()
 // swallowed every failure internally and just returned null, so
@@ -189,8 +192,8 @@ async function startUpload(file, flow){
         return;
     }
 
-    // Store the uploaded video file for insights analysis
-    uploadedVideoFile = file;
+    // Store the uploaded video file for insights analysis        uploadedVideoFile = file;
+        userAnswers.title = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim();
 
     if (activeUploadTimer) {
         clearInterval(activeUploadTimer);
@@ -253,7 +256,8 @@ function resetVideoAnalysisState(){
         videoOriginality: null,
         ideaOriginality: null,
         format: null,
-        description: null
+        description: null,
+        title: null
     };
 
 }
@@ -728,6 +732,169 @@ function buildBreakdown(result, videoInsights = null, useRealData = false) {
     ];
 }
 
+function pdfSafeText(value) {
+    return String(value ?? "")
+        .normalize("NFKD")
+        .replace(/[^\x20-\x7E]/g, "?");
+}
+
+function wrapPdfText(value, maxChars = 92) {
+    const text = pdfSafeText(value).replace(/\s+/g, " ").trim();
+    if (!text) return [""];
+
+    const lines = [];
+    let current = "";
+    text.split(" ").forEach(word => {
+        if (word.length > maxChars) {
+            if (current) {
+                lines.push(current);
+                current = "";
+            }
+            for (let index = 0; index < word.length; index += maxChars) {
+                lines.push(word.slice(index, index + maxChars));
+            }
+            return;
+        }
+
+        const candidate = current ? `${current} ${word}` : word;
+        if (candidate.length > maxChars) {
+            lines.push(current);
+            current = word;
+        } else {
+            current = candidate;
+        }
+    });
+
+    if (current) lines.push(current);
+    return lines;
+}
+
+function buildPdfReportLines(report = {}) {
+    const lines = [];
+    const add = value => wrapPdfText(value).forEach(line => lines.push(line));
+    const addSection = (title, values) => {
+        lines.push("");
+        lines.push(title.toUpperCase());
+        const items = Array.isArray(values) ? values.filter(Boolean) : [];
+        if (items.length === 0) {
+            lines.push("- None reported.");
+            return;
+        }
+        items.forEach(item => add(`- ${item}`));
+    };
+    const addAnswer = (label, value) => add(`${label}: ${value || "Not specified"}`);
+
+    lines.push("BRAWL ANALYTICS | VIDEO ANALYSIS REPORT");
+    lines.push(`Generated: ${new Date().toLocaleDateString("en-US")}`);
+    lines.push("");
+    lines.push("VIDEO CONTEXT");
+    add(`Video title: ${report.videoTitle || "Untitled video"}`);
+    add("Description provided before analysis:");
+    add(report.description || "No description provided.");
+    addAnswer("Video originality", report.answers?.videoOriginality);
+    addAnswer("Idea originality", report.answers?.ideaOriginality);
+    addAnswer("Format", report.answers?.format);
+    lines.push("");
+    lines.push("ANALYSIS SNAPSHOT");
+    add(`Virality score: ${report.score ?? "-"}/100`);
+    add(`Confidence: ${report.confidence ?? "-"}%`);
+    add(`Estimated view range: ${report.viewRange || "-"}`);
+    if (report.aiDegraded) add("Note: qualitative AI fallback values were used; interpret this report cautiously.");
+
+    lines.push("");
+    lines.push("SCORE BREAKDOWN");
+    const breakdown = Array.isArray(report.breakdown) ? report.breakdown : [];
+    ["Originality", "Trend", "Format", "Competition", "Retention"].forEach(category => {
+        const item = breakdown.find(entry => String(entry?.[0]).toLowerCase() === category.toLowerCase());
+        add(`${category}: ${item ? item[1] : "-"}/100`);
+    });
+
+    addSection("Strengths", report.strengths);
+    addSection("Weaknesses", report.weaknesses);
+    addSection("Critical issues", report.criticalIssues);
+    addSection("Action plan", report.actionPlan);
+
+    lines.push("");
+    lines.push("DISCLAIMER");
+    add("AI-generated, not a guarantee of future performance.");
+    return lines;
+}
+
+function escapePdfLiteral(value) {
+    return pdfSafeText(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function createPdfDocument(lines) {
+    const pageLines = [];
+    for (let index = 0; index < lines.length; index += 48) {
+        pageLines.push(lines.slice(index, index + 48));
+    }
+    if (pageLines.length === 0) pageLines.push([""]);
+
+    const pageObjectNumbers = pageLines.map((_, index) => 3 + index * 2);
+    const contentObjectNumbers = pageLines.map((_, index) => 4 + index * 2);
+    const fontObjectNumber = 3 + pageLines.length * 2;
+    const objects = [];
+
+    objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+    objects.push(`<< /Type /Pages /Kids [${pageObjectNumbers.map(number => `${number} 0 R`).join(" ")}] /Count ${pageLines.length} >>`);
+
+    pageLines.forEach((page, index) => {
+        const stream = [
+            "q",
+            "0.95 0.99 0.98 rg",
+            "0 0 612 792 re f",
+            "0.16 0.42 0.34 rg",
+            "50 758 512 24 re f",
+            "Q",
+            "BT",
+            "/F1 11 Tf",
+            "0.10 0.16 0.14 rg",
+            "50 748 Td",
+            "14 TL",
+            ...page.map((line, lineIndex) => {
+                const isHeader = lineIndex === 0 && page[0].includes("BRAWL ANALYTICS");
+                return `${isHeader ? "/F1 16 Tf" : "/F1 11 Tf"}\n(${escapePdfLiteral(line)}) Tj\nT*`;
+            }),
+            "ET"
+        ].join("\n");
+
+        objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> /Contents ${contentObjectNumbers[index]} 0 R >>`);
+        objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    });
+
+    objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+    let pdf = "%PDF-1.4\n";
+    const offsets = [0];
+    objects.forEach((object, index) => {
+        offsets[index + 1] = pdf.length;
+        pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    });
+
+    const xrefOffset = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    for (let index = 1; index <= objects.length; index++) {
+        pdf += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
+    }
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return pdf;
+}
+
+function downloadReportAsPdf(report) {
+    const pdf = createPdfDocument(buildPdfReportLines(report));
+    const blob = new Blob([pdf], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `brawl-analytics-report-${date}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 async function renderResults(flow, videoInsights = null, runId = analysisRunId, trendsAnalysis = null, reportResultOverride = null){
 
     if (runId !== analysisRunId) return;
@@ -759,6 +926,7 @@ async function renderResults(flow, videoInsights = null, runId = analysisRunId, 
     const usedVideoInsights = !!videoInsights;
     
     const score = useRealData ? result.viralityScore : 72;
+    const reportVideoTitle = userAnswers.title || uploadedVideoFile?.name?.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim() || "Untitled video";
     const confidence = useRealData ? result.confidence : 75;
     const viewRange = useRealData ? result.viewRange.formatted : "50K – 200K";
     const scoreCategory = useRealData ? result.scoreCategory.label : "Strong potential";
@@ -808,7 +976,7 @@ async function renderResults(flow, videoInsights = null, runId = analysisRunId, 
     flow.innerHTML = `
         <div class="va-results">
             ${errorBannerHtml}
-            <div class="va-results-hero"><div><span class="va-eyebrow">${useRealData ? "VIRALITY ANALYSIS" : "SIMULATED REPORT"} · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}</span><h3>Your Short has <span class="va-emphasis">${escapeHtml(String(scoreCategory).toLowerCase())}</span> viral potential.</h3><p>${escapeHtml(useRealData ? summary : "All values below are demonstrative placeholders, ready to be connected to a real analysis engine later.")}</p></div><button class="va-outline" id="va-restart" type="button">Analyse another video →</button></div>
+            <div class="va-results-hero"><div><span class="va-eyebrow">${useRealData ? "VIRALITY ANALYSIS" : "SIMULATED REPORT"} · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}</span><h3>Your Short has <span class="va-emphasis">${escapeHtml(String(scoreCategory).toLowerCase())}</span> viral potential.</h3><p>${escapeHtml(useRealData ? summary : "All values below are demonstrative placeholders, ready to be connected to a real analysis engine later.")}</p></div><div class="va-result-actions"><button class="va-primary" id="va-download-pdf" type="button">Download report as PDF</button><button class="va-outline" id="va-restart" type="button">Analyse another video →</button></div></div>
             <div class="va-score-grid"><article class="va-metric va-score"><span>VIRALITY SCORE</span><strong><b id="va-score-value">0</b><small>/ 100</small></strong><i>${escapeHtml(`${scoreIcon} ${scoreCategory}`)}</i><p>${useRealData ? "Based on originality, trend alignment, format performance, and historical context." : "Strong early signals, format fit and audience relevance."}</p></article><article class="va-metric"><span>CONFIDENCE</span><strong>${escapeHtml(`${confidence}%`)}</strong><i>${useRealData ? (confidence >= 70 ? "High confidence" : confidence >= 40 ? "Moderate confidence" : "Low confidence") : "High confidence"}</i><div class="va-progress"><i style="width:${confidence}%"></i></div><p>${useRealData ? "Based on historical data volume and consistency." : "Based on available simulated signals."}</p></article><article class="va-metric va-views"><span>ESTIMATED VIEWS</span><strong>${escapeHtml(String(viewRange))}</strong><p>This range is an estimate, not a guarantee.</p><div class="va-spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article></div>
             <div class="va-section-title"><div><span class="va-step">SIGNAL MAP</span><h3>Score breakdown</h3></div><p>${useRealData ? "How each factor contributed to your score." : "Where the simulated score comes from."}</p></div>
             <div class="va-breakdown">${breakdown.map(([name,value])=> `<div><p><span>${escapeHtml(String(name))}</span><strong>${value}</strong></p><div class="va-progress"><i style="width:${value}%"></i></div></div>`).join("")}</div>
@@ -819,7 +987,20 @@ async function renderResults(flow, videoInsights = null, runId = analysisRunId, 
         </div>`;
 
     animateScore(score);
-    setupResultActions(flow);
+    setupResultActions(flow, {
+        score,
+        confidence,
+        viewRange,
+        breakdown,
+        strengths,
+        weaknesses,
+        criticalIssues: [...technicalIssues, ...criticalIssues],
+        actionPlan,
+        videoTitle: reportVideoTitle,
+        description: userAnswers.description,
+        answers: { ...userAnswers },
+        aiDegraded: Boolean(useRealData && result.aiDegraded)
+    });
 
 }
 
@@ -843,7 +1024,11 @@ function animateScore(targetScore = 92){
 
 }
 
-function setupResultActions(flow){
+function setupResultActions(flow, reportData = null){
+
+    document.getElementById("va-download-pdf")?.addEventListener("click", () => {
+        if (reportData) downloadReportAsPdf(reportData);
+    });
 
     document.getElementById("va-restart").addEventListener("click", ()=> renderUpload(flow));
 

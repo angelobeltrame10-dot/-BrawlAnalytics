@@ -10,7 +10,7 @@
     align-items:center;
     padding:.25rem .7rem;
     border-radius:var(--radius-round);
-    background:rgba(255,201,60,.14);
+    background:rgba(114,211,179,.14);
     color:var(--color-primary);
     font-family:var(--font-mono);
     font-size:.78rem;
@@ -36,8 +36,8 @@
 
 .plan-col-pro{
 
-    border-color:rgba(255,201,60,.4);
-    background:rgba(255,201,60,.06);
+    border-color:rgba(114,211,179,.4);
+    background:rgba(114,211,179,.06);
 
 }
 
@@ -80,7 +80,7 @@
 .upgrade-subtitle{color:var(--color-text-muted);font-size:.9rem}
 .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:1.75rem}
 .pricing-card{position:relative;display:flex;flex-direction:column;gap:.7rem;padding:1.4rem 1.2rem 1.2rem;border-radius:var(--radius-md);background:var(--color-surface-light);border:1px solid var(--color-border)}
-.pricing-card-pro{border-color:rgba(255,201,60,.5);background:linear-gradient(160deg,rgba(255,201,60,.1),rgba(255,255,255,.02));box-shadow:0 12px 30px rgba(255,201,60,.12)}
+.pricing-card-pro{border-color:rgba(114,211,179,.5);background:linear-gradient(160deg,rgba(114,211,179,.1),rgba(255,255,255,.02));box-shadow:0 12px 30px rgba(114,211,179,.12)}
 .pricing-label{position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:.2rem .7rem;border-radius:var(--radius-round);background:var(--color-surface);border:1px solid var(--color-border);font-size:.65rem;font-weight:800;color:var(--color-text-muted);white-space:nowrap}
 .pricing-label-pro{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-background)}
 .pricing-plan-name{font-family:var(--font-display);font-size:1rem;text-align:center;margin-top:.4rem}

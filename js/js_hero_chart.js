@@ -12,6 +12,12 @@ export function initHeroChartLine(){
     const hero = document.querySelector(".hero");
     if(!hero) return;
 
+    // On touch devices (phones/tablets) skip the scroll-driven chart
+    // entirely: it intercepts wheel/touch gestures to draw the line,
+    // which blocks the page's initial scroll. Desktop keeps the
+    // scroll-lock animation unchanged.
+    if(window.matchMedia("(pointer: coarse)").matches) return;
+
     /* --------------------------------------------------
        1. BUILD THE SVG
     -------------------------------------------------- */

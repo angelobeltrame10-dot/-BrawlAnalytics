@@ -20,7 +20,7 @@ import { loadCalibrationStats } from "./js_calibration.js";
 import { analyzeVideoWithAI } from "./js_virality_ai.js";
 import { extractFeatures } from "./js_feature_extraction.js";
 import { calculateViralityScore, calculateScoreBreakdown, getScoreQualitative, getScoreCategory } from "./js_dynamic_scoring.js";
-import { calculateConfidence, getConfidenceQualitative, getConfidenceFactors } from "./js_confidence.js";
+import { calculateConfidence, getConfidenceQualitative, getConfidenceFactors, getConfidenceSampleSummary } from "./js_confidence.js";
 import { predictViewRange, formatViewRange, getPredictionContext } from "./js_view_prediction.js";
 import { generateStrengths, generateWeaknesses, generateCriticalIssues, generateSummary, generateActionPlan } from "./js_report_generator.js";
 import { logPrediction } from "./js_learning_engine.js?v=20260825-1";
@@ -48,7 +48,7 @@ export async function analyzeVirality(proposal, trendsAnalysis = null, videoInsi
         const scoreCategory = getScoreCategory(viralityScore);
 
         // Livello 5: Confidence + View Prediction
-        const confidence = calculateConfidence(features, channelProfile, proposal, calibrationStats);
+        const confidence = calculateConfidence(features, channelProfile, proposal, calibrationStats, aiAnalysis.aiDegraded);
         const confidenceQualitative = getConfidenceQualitative(confidence);
         const confidenceFactors = getConfidenceFactors(features, channelProfile, proposal, calibrationStats);
 
@@ -78,6 +78,8 @@ export async function analyzeVirality(proposal, trendsAnalysis = null, videoInsi
             confidence,
             confidenceQualitative,
             confidenceFactors,
+            confidenceSampleSummary: getConfidenceSampleSummary(features, channelProfile, calibrationStats),
+            aiDegraded: Boolean(aiAnalysis.aiDegraded),
             viewRange: {
                 min: viewRange.min,
                 max: viewRange.max,
@@ -121,7 +123,10 @@ export async function analyzeVirality(proposal, trendsAnalysis = null, videoInsi
                 durationFit: features.durationFit,
                 innovation: features.innovation,
                 competition: features.competition,
-                topicFreshness: features.topicFreshness
+                topicFreshness: features.topicFreshness,
+                aiDegraded: Boolean(features.aiDegraded),
+                descriptionTokenCount: features.descriptionTokenCount,
+                textSignalReliability: features.textSignalReliability
             }
         };
 
